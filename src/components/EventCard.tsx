@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CalendarEvent } from '@/lib/supabase';
 import { isGoldenHour, formatDateTimeInTimezone, getUserTimezone } from '@/lib/golden-hours';
+import { getEventTypeConfig } from '@/lib/event-types';
+import { isRecurringEvent } from '@/lib/recurrence';
 import { CommunityBadge, GoldenHourBadge, SyncedBadge, SunRune, CommunityRune, SyncedRune } from './runes';
 
 export interface DisplayEvent extends Omit<CalendarEvent, 'id'> {
@@ -26,15 +28,18 @@ export function EventCard({ event, showFullDate = false }: EventCardProps) {
   const startDate = new Date(event.starts_at);
   const isGolden = isGoldenHour(startDate);
   const isGoogleEvent = event.source === 'google';
+  const eventTypeConfig = getEventTypeConfig(event.event_type);
+  const isRecurring = event.isRecurring || isRecurringEvent(event);
 
   useEffect(() => {
     setMounted(true);
     const timezone = getUserTimezone();
-    setFormattedTime(formatDateTimeInTimezone(startDate, timezone));
+    const eventStartDate = new Date(event.starts_at);
+    setFormattedTime(formatDateTimeInTimezone(eventStartDate, timezone));
 
     // Calculate relative time
     const now = new Date();
-    const diffMs = startDate.getTime() - now.getTime();
+    const diffMs = eventStartDate.getTime() - now.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
@@ -52,7 +57,7 @@ export function EventCard({ event, showFullDate = false }: EventCardProps) {
       relative = `In ${diffDays} days`;
     }
     setRelativeTime(relative);
-  }, [event.starts_at]); // startDate is derived from event.starts_at
+  }, [event.starts_at]);
 
   const CardContent = (
     <div
@@ -61,6 +66,14 @@ export function EventCard({ event, showFullDate = false }: EventCardProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-2">
+            {/* Event type badge */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${eventTypeConfig.bgColor} ${eventTypeConfig.textColor} ${eventTypeConfig.borderColor}`}
+            >
+              <span>{eventTypeConfig.icon}</span>
+              <span>{eventTypeConfig.label}</span>
+            </span>
+
             {/* Source badge */}
             {isGoogleEvent ? (
               <SyncedBadge showLabel={false} />
@@ -70,6 +83,13 @@ export function EventCard({ event, showFullDate = false }: EventCardProps) {
 
             {/* Golden hour badge */}
             {isGolden && <GoldenHourBadge />}
+
+            {/* Recurring badge */}
+            {isRecurring && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                🔄 Recurring
+              </span>
+            )}
           </div>
 
           <h3

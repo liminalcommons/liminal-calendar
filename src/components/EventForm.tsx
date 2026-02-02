@@ -3,12 +3,30 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { createEvent, updateEvent, CalendarEvent, CreateEventInput } from '@/lib/supabase';
+import {
+  createEvent,
+  updateEvent,
+  CalendarEvent,
+  CreateEventInput,
+  RecurrenceRule,
+  RecurrencePattern,
+  EventVisibility,
+  EventType
+} from '@/lib/supabase';
 import { isGoldenHour, getUserTimezone, formatTimeInTimezone, getGoldenHoursUTC } from '@/lib/golden-hours';
+import { RECURRENCE_OPTIONS } from '@/lib/recurrence';
+import { EVENT_TYPE_OPTIONS, getEventTypeConfig } from '@/lib/event-types';
 import { TimeZoneStrip } from './TimeZoneStrip';
 import { SunRune, ThresholdRune } from './runes';
 
 const DEFAULT_MEETING_LINK = 'https://castalia.liminalcommons.com';
+
+// Visibility options
+const VISIBILITY_OPTIONS: { value: EventVisibility; label: string; description: string }[] = [
+  { value: 'public', label: 'Public', description: 'Anyone can see this event' },
+  { value: 'members_only', label: 'Members Only', description: 'Only signed-in members can see' },
+  { value: 'invite_only', label: 'Invite Only', description: 'Only invited emails can see' },
+];
 
 // Day names and runes
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -68,6 +86,23 @@ export function EventForm({ event, mode }: EventFormProps) {
   const [title, setTitle] = useState(event?.title || '');
   const [description, setDescription] = useState(event?.description || '');
   const [eventUrl, setEventUrl] = useState(event?.event_url || DEFAULT_MEETING_LINK);
+
+  // New fields: Recurrence, Visibility, Event Type
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>(
+    event?.recurrence_rule?.pattern || 'none'
+  );
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<string>(
+    event?.recurrence_rule?.endDate || ''
+  );
+  const [visibility, setVisibility] = useState<EventVisibility>(
+    event?.visibility || 'public'
+  );
+  const [allowedEmails, setAllowedEmails] = useState<string>(
+    event?.allowed_emails?.join(', ') || ''
+  );
+  const [eventType, setEventType] = useState<EventType>(
+    event?.event_type || 'general'
+  );
 
   // Week navigation + Day + Time Slot selection
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -205,9 +240,25 @@ export function EventForm({ event, mode }: EventFormProps) {
       // End time is 1 hour after start
       const endDate = new Date(computedStartDate.getTime() + 60 * 60 * 1000);
 
+      // Build recurrence rule if pattern is not 'none'
+      const recurrenceRule: RecurrenceRule | undefined =
+        recurrencePattern !== 'none'
+          ? {
+              pattern: recurrencePattern,
+              endDate: recurrenceEndDate || undefined,
+            }
+          : undefined;
+
+      // Parse allowed emails for invite-only events
+      const parsedAllowedEmails =
+        visibility === 'invite_only' && allowedEmails
+          ? allowedEmails.split(',').map(e => e.trim()).filter(Boolean)
+          : undefined;
+
       const eventData: CreateEventInput = {
         creator_id: user.id,
         creator_name: user.fullName || user.primaryEmailAddress?.emailAddress || 'Anonymous',
+        creator_image_url: user.imageUrl || undefined,
         title,
         description: description || undefined,
         event_url: eventUrl || undefined,
@@ -215,6 +266,10 @@ export function EventForm({ event, mode }: EventFormProps) {
         ends_at: endDate.toISOString(),
         timezone,
         is_golden_hour: isGoldenHour(computedStartDate),
+        recurrence_rule: recurrenceRule,
+        visibility,
+        allowed_emails: parsedAllowedEmails,
+        event_type: eventType,
       };
 
       if (mode === 'create') {
@@ -240,41 +295,61 @@ export function EventForm({ event, mode }: EventFormProps) {
         </div>
       )}
 
-      {/* Golden Hour Info */}
-      <div
-        className={`p-4 rounded-lg border ${
-          selectedDateIsGolden
-            ? 'bg-gold-50 border-gold-300'
-            : useCustomTime
-              ? 'bg-amber-50 border-amber-300'
-              : 'bg-stone-50 border-stone-200'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          {selectedDateIsGolden ? (
-            <>
-              <SunRune size="lg" variant="gold" />
-              <p className="font-medium text-gold-800">
-                Golden Hour event - optimal attendance!
-              </p>
-            </>
-          ) : useCustomTime ? (
-            <>
-              <ThresholdRune size="lg" />
-              <p className="font-medium text-amber-800">
-                Custom time - outside Golden Hours
-              </p>
-            </>
-          ) : (
-            <>
-              <ThresholdRune size="lg" variant="gold" />
-              <p className="font-medium text-stone-700">
-                Select a date and Golden Hour time slot
-              </p>
-            </>
-          )}
+      {/* Event Type Selector */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Event Type
+        </label>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {EVENT_TYPE_OPTIONS.map((option) => {
+            const config = getEventTypeConfig(option.value);
+            const isSelected = eventType === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setEventType(option.value)}
+                className={`p-2 rounded-lg border-2 transition-all text-center ${
+                  isSelected
+                    ? `${config.borderColor} ${config.bgColor} ring-2 ring-offset-1`
+                    : 'border-stone-200 bg-white hover:border-stone-300'
+                }`}
+                style={isSelected ? { borderColor: config.color } : {}}
+              >
+                <div className="text-xl">{option.icon}</div>
+                <div className={`text-xs font-medium ${isSelected ? config.textColor : 'text-stone-600'}`}>
+                  {option.label}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {/* Time Status (toned down) */}
+      {computedStartDate && (
+        <div
+          className={`p-3 rounded-lg border text-sm ${
+            selectedDateIsGolden
+              ? 'bg-stone-50 border-stone-200 text-stone-700'
+              : 'bg-stone-50 border-stone-200 text-stone-600'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {selectedDateIsGolden ? (
+              <>
+                <SunRune size="sm" variant="gold" />
+                <span>This time is within Golden Hours</span>
+              </>
+            ) : (
+              <>
+                <ThresholdRune size="sm" />
+                <span>Custom time selected</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Title */}
       <div>
@@ -471,6 +546,97 @@ export function EventForm({ event, mode }: EventFormProps) {
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-golden-500 focus:border-transparent"
           placeholder="https://castalia.liminalcommons.com"
         />
+      </div>
+
+      {/* Recurrence */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Repeat
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {RECURRENCE_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setRecurrencePattern(option.value)}
+              className={`px-3 py-1.5 rounded-lg border transition-all text-sm ${
+                recurrencePattern === option.value
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-stone-200 bg-white hover:border-stone-300 text-stone-600'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        {recurrencePattern !== 'none' && (
+          <div className="mt-3">
+            <label htmlFor="recurrenceEndDate" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+              End recurring on (optional)
+            </label>
+            <input
+              type="date"
+              id="recurrenceEndDate"
+              value={recurrenceEndDate}
+              onChange={(e) => setRecurrenceEndDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Recurring events will be created up to 12 weeks ahead
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Visibility */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Who can see this event?
+        </label>
+        <div className="space-y-2">
+          {VISIBILITY_OPTIONS.map((option) => (
+            <label
+              key={option.value}
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                visibility === option.value
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-stone-200 bg-white hover:border-stone-300'
+              }`}
+            >
+              <input
+                type="radio"
+                name="visibility"
+                value={option.value}
+                checked={visibility === option.value}
+                onChange={() => setVisibility(option.value)}
+                className="mt-0.5 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <div className={`font-medium ${visibility === option.value ? 'text-blue-700' : 'text-stone-700'}`}>
+                  {option.label}
+                </div>
+                <div className="text-xs text-stone-500">{option.description}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {/* Invite-only email list */}
+        {visibility === 'invite_only' && (
+          <div className="mt-3">
+            <label htmlFor="allowedEmails" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+              Invited email addresses (comma-separated)
+            </label>
+            <textarea
+              id="allowedEmails"
+              value={allowedEmails}
+              onChange={(e) => setAllowedEmails(e.target.value)}
+              rows={2}
+              placeholder="alice@example.com, bob@example.com"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
+          </div>
+        )}
       </div>
 
       {/* Submit */}

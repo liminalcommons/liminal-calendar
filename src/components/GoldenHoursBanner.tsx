@@ -12,11 +12,14 @@ import {
 import { SunRune, ThresholdRune } from './runes';
 import { WorldClockStrip } from './TimeZoneStrip';
 
+const BANNER_COLLAPSED_KEY = 'liminal-calendar-banner-collapsed';
+
 export function GoldenHoursBanner() {
   const [timezone, setTimezone] = useState<string>('UTC');
   const [status, setStatus] = useState<string>('');
   const [isGolden, setIsGolden] = useState(false);
   const [showAllTimezones, setShowAllTimezones] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,6 +29,12 @@ export function GoldenHoursBanner() {
     setStatus(getGoldenHourStatus(tz));
     setIsGolden(isGoldenHour(new Date()));
 
+    // Load collapsed preference from localStorage
+    const savedCollapsed = localStorage.getItem(BANNER_COLLAPSED_KEY);
+    if (savedCollapsed !== null) {
+      setIsCollapsed(savedCollapsed === 'true');
+    }
+
     // Update every minute
     const interval = setInterval(() => {
       setStatus(getGoldenHourStatus(tz));
@@ -34,6 +43,12 @@ export function GoldenHoursBanner() {
 
     return () => clearInterval(interval);
   }, []);
+
+  const toggleCollapsed = () => {
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem(BANNER_COLLAPSED_KEY, String(newState));
+  };
 
   if (!mounted) {
     return (
@@ -48,6 +63,35 @@ export function GoldenHoursBanner() {
   const localEnd = formatTimeInTimezone(end, timezone);
   const allTimezones = getGoldenHoursForAllTimezones();
 
+  // Collapsed view - just a minimal header bar
+  if (isCollapsed) {
+    return (
+      <div
+        className="portal-frame p-3 mb-6 cursor-pointer hover:bg-stone-50 transition-colors"
+        onClick={toggleCollapsed}
+        style={{
+          background: 'var(--stone-50)',
+          borderColor: 'var(--stone-200)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-stone-600">
+            {isGolden ? <SunRune size="sm" variant="gold" /> : <ThresholdRune size="sm" />}
+            <span>
+              {isGolden ? 'Golden Hours active' : 'Golden Hours'}: {localStart} – {localEnd}
+            </span>
+            {isGolden && (
+              <span className="px-1.5 py-0.5 bg-gold-200 text-gold-800 text-xs rounded">
+                NOW
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-stone-400">Click to expand</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`portal-frame p-6 mb-6 transition-all ${
@@ -60,6 +104,18 @@ export function GoldenHoursBanner() {
         borderColor: isGolden ? 'var(--gold-400)' : 'var(--stone-300)',
       }}
     >
+      {/* Collapse button in top-right */}
+      <button
+        onClick={toggleCollapsed}
+        className="absolute top-2 right-2 p-1.5 rounded hover:bg-stone-200/50 transition-colors text-stone-400 hover:text-stone-600"
+        title="Collapse banner"
+        style={{ position: 'absolute' }}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        </svg>
+      </button>
+
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
