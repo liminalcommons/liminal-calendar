@@ -4,7 +4,6 @@ import { hyloEventToDisplayEvent } from '@/lib/display-event';
 import { generateCalendarFeed, type ICSEvent } from '@/lib/ics-generator';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 900; // 15 minutes
 
 // Strip HTML tags from description for plain-text ICS
 function stripHtml(html: string): string {
