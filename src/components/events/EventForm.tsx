@@ -140,17 +140,17 @@ export function EventForm({ mode, eventId }: EventFormProps) {
     return weekDays[selectedDayIndex];
   }, [selectedDayIndex, weekDays]);
 
-  /** Combined Date: selectedDay + startTime → UTC Date */
+  /** Combined Date: selectedDay + startTime → local Date (converted to UTC on submit) */
   const selectedStartDate: Date | null = useMemo(() => {
     if (!selectedDay) return null;
     const [h, m] = startTime.split(':').map(Number);
-    // Build a date using the selected day's year/month/date in local time + UTC hours
-    const d = new Date(Date.UTC(
+    // Build date in user's local timezone
+    const d = new Date(
       selectedDay.getFullYear(),
       selectedDay.getMonth(),
       selectedDay.getDate(),
       h, m, 0, 0,
-    ));
+    );
     return d;
   }, [selectedDay, startTime]);
 
@@ -211,15 +211,16 @@ export function EventForm({ mode, eventId }: EventFormProps) {
         const dayOfWeek = startDate.getDay();
         setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1);
 
-        const sh = startDate.getUTCHours().toString().padStart(2, '0');
-        const sm = startDate.getUTCMinutes().toString().padStart(2, '0');
+        // Use local hours (not UTC) so dropdowns show user's time
+        const sh = startDate.getHours().toString().padStart(2, '0');
+        const sm = startDate.getMinutes().toString().padStart(2, '0');
         const startStr = `${sh}:${sm}`;
         setStartTime(startStr);
 
         if (event.ends_at) {
           const endDate = new Date(event.ends_at);
-          const eh = endDate.getUTCHours().toString().padStart(2, '0');
-          const em = endDate.getUTCMinutes().toString().padStart(2, '0');
+          const eh = endDate.getHours().toString().padStart(2, '0');
+          const em = endDate.getMinutes().toString().padStart(2, '0');
           const endStr = `${eh}:${em}`;
           setEndTime(endStr);
           setDurationMinutes(minutesBetween(startStr, endStr));
@@ -312,12 +313,13 @@ export function EventForm({ mode, eventId }: EventFormProps) {
 
     try {
       const [endH, endM] = endTime.split(':').map(Number);
-      const endDate = new Date(Date.UTC(
+      // Build end date in local timezone (same as start)
+      const endDate = new Date(
         selectedDay!.getFullYear(),
         selectedDay!.getMonth(),
         selectedDay!.getDate(),
         endH, endM, 0, 0,
-      ));
+      );
 
       const body: Record<string, unknown> = {
         title: title.trim(),
