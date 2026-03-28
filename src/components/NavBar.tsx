@@ -47,12 +47,7 @@ export function NavBar() {
   };
 
   const handleSignIn = () => {
-    const gatewayUrl = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL;
-    if (gatewayUrl) {
-      window.location.href = `${gatewayUrl}?callbackUrl=${encodeURIComponent(window.location.href)}`;
-    } else {
-      signIn('hylo');
-    }
+    signIn('hylo');
   };
 
   const user = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
