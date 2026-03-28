@@ -155,7 +155,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const user = session.user as unknown as Record<string, unknown>;
       if (token.hyloId) user.hyloId = token.hyloId;
       if (token.picture) user.image = token.picture;
-      user.role = token.role || 'member';
+      // Role: check admin allowlist first, then token.role, then default to 'member'
+      // Gateway JWT may not include role — determine it here from hyloId
+      const hyloId = token.hyloId as string | undefined;
+      if (hyloId && ADMIN_HYLO_IDS.includes(hyloId)) {
+        user.role = 'admin';
+      } else {
+        user.role = token.role || 'member';
+      }
       // Expose access token for server-side helpers
       (session as any).accessToken = token.accessToken;
       return session;
