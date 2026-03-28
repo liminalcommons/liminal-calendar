@@ -159,3 +159,90 @@ export function getICSDataURL(event: ICSEvent): string {
   const icsContent = generateICS(event);
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
 }
+
+// Generate a stable UID for subscription feeds (deterministic from event ID)
+function stableUID(eventId: string): string {
+  return `event-${eventId}@liminalcommons.com`;
+}
+
+// Generate a single VEVENT block for use in a multi-event calendar
+function generateVEVENT(event: ICSEvent & { id: string }): string[] {
+  const startDate = new Date(event.starts_at);
+  const endDate = event.ends_at
+    ? new Date(event.ends_at)
+    : new Date(startDate.getTime() + 60 * 60 * 1000);
+
+  const now = new Date();
+
+  let description = event.description || '';
+  if (event.url) {
+    description = description
+      ? `${description}\\n\\nJoin: ${event.url}`
+      : `Join: ${event.url}`;
+  }
+
+  const lines: string[] = [
+    'BEGIN:VEVENT',
+    `UID:${stableUID(event.id)}`,
+    `DTSTAMP:${formatICSDate(now)}`,
+    `DTSTART:${formatICSDate(startDate)}`,
+    `DTEND:${formatICSDate(endDate)}`,
+    `SUMMARY:${escapeICS(event.title)}`,
+  ];
+
+  if (description) {
+    lines.push(foldLine(`DESCRIPTION:${escapeICS(description)}`));
+  }
+
+  if (event.location) {
+    lines.push(`LOCATION:${escapeICS(event.location)}`);
+  }
+
+  if (event.url) {
+    lines.push(`URL:${event.url}`);
+  }
+
+  if (event.organizer) {
+    const orgEmail = event.organizer.email || 'calendar@liminalcommons.com';
+    lines.push(`ORGANIZER;CN=${escapeICS(event.organizer.name)}:mailto:${orgEmail}`);
+  }
+
+  if (event.recurrenceRule) {
+    const rrule = buildRRule(event.recurrenceRule);
+    if (rrule) {
+      lines.push(rrule);
+    }
+  }
+
+  lines.push(
+    'BEGIN:VALARM',
+    'TRIGGER:-PT15M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeICS(event.title)} starts in 15 minutes`,
+    'END:VALARM'
+  );
+
+  lines.push('END:VEVENT');
+  return lines;
+}
+
+// Generate a full iCalendar feed with multiple events (for subscription feeds)
+export function generateCalendarFeed(events: (ICSEvent & { id: string })[]): string {
+  const lines: string[] = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Liminal Commons//Liminal Calendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Liminal Commons',
+    'X-WR-TIMEZONE:UTC',
+    `X-PUBLISHED-TTL:PT15M`,
+  ];
+
+  for (const event of events) {
+    lines.push(...generateVEVENT(event));
+  }
+
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
