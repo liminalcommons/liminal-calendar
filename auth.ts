@@ -21,6 +21,10 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Liminal Commons Hylo group ID
 const LIMINAL_COMMONS_GROUP_ID = '41955';
 
+// Admin allowlist — Hylo IDs that get 'admin' role regardless of Hylo group role
+// Hylo only exposes hasModeratorRole, no distinct admin field
+const ADMIN_HYLO_IDS = ['67402']; // victor
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     {
@@ -101,11 +105,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!lcMembership) {
           // Not a member of Liminal Commons — blocked by middleware
           token.role = undefined;
+        } else if (ADMIN_HYLO_IDS.includes(p.id)) {
+          // Hardcoded admin allowlist (Hylo has no distinct admin role)
+          token.role = 'admin';
         } else if (lcMembership.hasModeratorRole) {
           // Moderators in Hylo map to 'host' tier
-          // NOTE: Hylo does not expose a separate 'admin' role via OAuth membership API.
-          // hasModeratorRole covers both moderators and group admins in Hylo's data model.
-          // If Hylo adds a distinct admin field in future, add a check here first.
           token.role = 'host';
         } else {
           token.role = 'member';
@@ -151,7 +155,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const user = session.user as unknown as Record<string, unknown>;
       if (token.hyloId) user.hyloId = token.hyloId;
       if (token.picture) user.image = token.picture;
-      if (token.role) user.role = token.role;
+      user.role = token.role || 'member';
       // Expose access token for server-side helpers
       (session as any).accessToken = token.accessToken;
       return session;
