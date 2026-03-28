@@ -186,9 +186,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
       }
     : undefined,
-  pages: {
-    signIn: '/',
-  },
+  // pages: {
+  //   signIn: '/',
+  // },
   // No redirectProxyUrl — sign-in is handled by direct redirect to auth.castalia.one
   // (see NEXT_PUBLIC_AUTH_GATEWAY_URL). Gateway runs OAuth, sets .castalia.one cookie,
   // calendar reads the shared session. Same pattern as Vox + Commonwealth.
