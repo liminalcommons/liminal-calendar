@@ -261,7 +261,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
         {/* Description */}
         {event.description && (
           <p className="text-xs text-grove-text-muted line-clamp-2 leading-relaxed">
-            {event.description}
+            {event.description.replace(/<[^>]*>/g, '')}
           </p>
         )}
 
