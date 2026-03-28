@@ -22,6 +22,8 @@ export default auth((req) => {
       const isPageRequest = !req.nextUrl.pathname.startsWith('/api/') &&
                             !req.nextUrl.pathname.startsWith('/_next/');
       if (isPageRequest) {
+        // Redirect to gateway signin page which triggers full Hylo OAuth flow
+        // This gets a fresh access token (not just session refresh)
         const gatewayUrl = `${AUTH_GATEWAY}/signin?callbackUrl=${encodeURIComponent(currentUrl)}`;
         return NextResponse.redirect(gatewayUrl);
       }

@@ -12,9 +12,19 @@ export default function ListPage() {
 
   useEffect(() => {
     fetch('/api/events')
-      .then(r => r.json())
+      .then(r => {
+        if (r.status === 401) {
+          // Token expired — redirect to gateway for fresh auth
+          const gateway = 'https://auth.castalia.one';
+          window.location.href = `${gateway}/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
+          return [];
+        }
+        return r.json();
+      })
       .then(data => {
-        setEvents(getUpcomingEvents(data, 20))
+        if (Array.isArray(data)) {
+          setEvents(getUpcomingEvents(data, 20))
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
