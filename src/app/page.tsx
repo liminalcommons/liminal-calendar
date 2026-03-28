@@ -2,6 +2,7 @@ import { auth } from '../../auth';
 import { getEvents, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
 import { hyloEventToDisplayEvent } from '@/lib/display-event';
 import { NavBar } from '@/components/NavBar';
+import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 
 export const revalidate = 60;
@@ -24,6 +25,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-grove-bg flex flex-col">
       <NavBar />
+      <SubscribeBanner />
       <main className="flex-1 h-[calc(100vh-56px)]">
         <WeeklyGrid events={events} />
       </main>
