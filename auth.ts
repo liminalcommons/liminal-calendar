@@ -26,6 +26,7 @@ const LIMINAL_COMMONS_GROUP_ID = '41955';
 const ADMIN_HYLO_IDS = ['67402']; // victor
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  debug: true,
   providers: [
     {
       id: 'hylo',
