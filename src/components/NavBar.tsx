@@ -1,8 +1,8 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Volume2, VolumeX, LogOut } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Volume2, VolumeX, LogOut, CalendarPlus } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { ViewToggle } from './ViewToggle';
 import { RuneAccent } from './RuneAccent';
 import { calendarSFX } from '@/lib/sound-manager';
@@ -23,14 +23,33 @@ function getInitials(name?: string | null, email?: string | null): string {
   return '?';
 }
 
+const WEBCAL_URL = 'webcal://calendar.castalia.one/api/calendar/feed.ics';
+const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics';
+const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(WEBCAL_URL)}`;
+const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(FEED_URL)}`;
+
 export function NavBar() {
   const { data: session, status } = useSession();
   const [muted, setMuted] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const subRef = useRef<HTMLDivElement>(null);
 
   // Sync initial mute state from calendarSFX on mount
   useEffect(() => {
     setMuted(calendarSFX.isMuted());
   }, []);
+
+  // Close subscribe dropdown on outside click
+  useEffect(() => {
+    if (!subOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (subRef.current && !subRef.current.contains(e.target as Node)) {
+        setSubOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [subOpen]);
 
   const toggleMute = () => {
     const next = !muted;
@@ -79,6 +98,25 @@ export function NavBar() {
         >
           {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </button>
+
+        {/* Subscribe dropdown */}
+        <div className="relative" ref={subRef}>
+          <button
+            onClick={() => setSubOpen(!subOpen)}
+            className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+            aria-label="Subscribe to calendar"
+            title="Subscribe to calendar"
+          >
+            <CalendarPlus size={16} />
+          </button>
+          {subOpen && (
+            <div className="absolute right-0 top-full mt-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg py-1.5 min-w-[140px] z-50">
+              <a href={GOOGLE_URL} target="_blank" rel="noopener noreferrer" className="block px-3 py-1.5 text-xs text-grove-text hover:bg-grove-border/30 transition-colors">Google Calendar</a>
+              <a href={WEBCAL_URL} className="block px-3 py-1.5 text-xs text-grove-text hover:bg-grove-border/30 transition-colors">Apple Calendar</a>
+              <a href={OUTLOOK_URL} target="_blank" rel="noopener noreferrer" className="block px-3 py-1.5 text-xs text-grove-text hover:bg-grove-border/30 transition-colors">Outlook</a>
+            </div>
+          )}
+        </div>
 
         {status === 'authenticated' && user ? (
           <>
