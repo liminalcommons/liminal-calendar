@@ -9,18 +9,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        golden: {
-          50: '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
-        },
+        "grove-bg": "#f5efe4",
+        "grove-surface": "#faf6f0",
+        "grove-border": "#d4c4a8",
+        "grove-text": "#5a4632",
+        "grove-text-muted": "#9a8570",
+        "grove-text-dim": "#b8956a",
+        "grove-accent": "#c4935a",
+        "grove-accent-deep": "#6b5744",
+        "grove-green": "#7a8b6a",
+        "grove-green-deep": "#5a7a4a",
+      },
+      fontFamily: {
+        serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
       },
     },
   },

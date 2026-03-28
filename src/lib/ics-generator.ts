@@ -12,6 +12,7 @@ export interface ICSEvent {
     name: string;
     email?: string;
   };
+  recurrenceRule?: string; // 'daily' | 'weekly' | 'fortnightly' | 'monthly'
 }
 
 // Generate a unique ID for the event
@@ -48,6 +49,22 @@ function foldLine(line: string): string {
   lines.push(remaining);
 
   return lines.join('\r\n');
+}
+
+// Map recurrence rule string to RRULE line
+function buildRRule(recurrenceRule: string): string | null {
+  switch (recurrenceRule) {
+    case 'daily':
+      return 'RRULE:FREQ=DAILY';
+    case 'weekly':
+      return 'RRULE:FREQ=WEEKLY';
+    case 'fortnightly':
+      return 'RRULE:FREQ=WEEKLY;INTERVAL=2';
+    case 'monthly':
+      return 'RRULE:FREQ=MONTHLY';
+    default:
+      return null;
+  }
 }
 
 export function generateICS(event: ICSEvent): string {
@@ -97,6 +114,14 @@ export function generateICS(event: ICSEvent): string {
   if (event.organizer) {
     const orgEmail = event.organizer.email || 'calendar@liminalcommons.com';
     lines.push(`ORGANIZER;CN=${escapeICS(event.organizer.name)}:mailto:${orgEmail}`);
+  }
+
+  // Add RRULE if recurrenceRule provided
+  if (event.recurrenceRule) {
+    const rrule = buildRRule(event.recurrenceRule);
+    if (rrule) {
+      lines.push(rrule);
+    }
   }
 
   // Add alarm 15 minutes before

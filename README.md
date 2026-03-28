@@ -4,11 +4,27 @@ A community calendar for distributed teams with **Golden Hours** - optimal meeti
 
 ## Features
 
+### Core
 - **Golden Hours Display**: Shows optimal meeting times for Europe, Americas, and Brazil overlap
 - **Self-Service Events**: Any member can create events, only creators can edit/delete
 - **Time Zone Intelligence**: Auto-detects user's timezone, shows events in local time
 - **Soft Nudge**: Warning when scheduling outside Golden Hours (not blocking)
 - **No Admin Required**: Fully self-service, no gatekeepers
+
+### Event Management
+- **Recurring Events**: Daily, weekly, biweekly, and monthly recurrence patterns
+- **Event Types**: Categorize events (General, Presentation, Workshop, Social, Meeting, Standup)
+- **Color-Coded Badges**: Visual differentiation by event type
+- **Host as Attendee**: Event creator is automatically counted in RSVP
+
+### Access Control
+- **Public Events**: Visible to all visitors
+- **Members Only**: Requires sign-in to view
+- **Invite Only**: Restricted to specific email addresses
+
+### Notifications
+- **Email Reminders**: Automatic 24-hour reminder emails for RSVPed attendees
+- **RSVP System**: Going, Maybe, and Cancel status tracking
 
 ## Golden Hours
 
@@ -49,48 +65,23 @@ cp .env.local.example .env.local
 
 ### 3. Database Schema
 
-Run this in your Supabase SQL editor:
+Run the migrations in your Supabase SQL editor:
 
-```sql
--- Events table
-CREATE TABLE events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  creator_id TEXT NOT NULL,
-  creator_name TEXT NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT,
-  event_url TEXT,
-  starts_at TIMESTAMPTZ NOT NULL,
-  ends_at TIMESTAMPTZ,
-  timezone TEXT NOT NULL,
-  is_golden_hour BOOLEAN DEFAULT FALSE,
-  status TEXT DEFAULT 'scheduled',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+```bash
+# First, run the base schema
+migrations/001_event_rsvps.sql
 
--- Enable RLS
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-
--- Anyone can read events
-CREATE POLICY "Public read" ON events FOR SELECT USING (true);
-
--- Authenticated users can create
-CREATE POLICY "Auth create" ON events FOR INSERT
-  WITH CHECK (true);
-
--- Only creator can update
-CREATE POLICY "Creator update" ON events FOR UPDATE
-  USING (creator_id = current_setting('request.jwt.claims', true)::json->>'sub');
-
--- Only creator can delete
-CREATE POLICY "Creator delete" ON events FOR DELETE
-  USING (creator_id = current_setting('request.jwt.claims', true)::json->>'sub');
-
--- Index for faster queries
-CREATE INDEX events_starts_at_idx ON events (starts_at);
-CREATE INDEX events_status_idx ON events (status);
+# Then, run the upgrades for new features
+migrations/002_calendar_upgrades.sql
 ```
+
+The migrations add:
+- Users table (timezone tracking)
+- Event RSVPs table (attendance tracking)
+- Recurring events support (series_id, recurrence_rule)
+- Visibility control (public/members_only/invite_only)
+- Event types (general, presentation, workshop, etc.)
+- Email reminders table and triggers
 
 ### 4. Run Development Server
 
@@ -104,8 +95,17 @@ Open [http://localhost:3000](http://localhost:3000)
 
 1. Push to GitHub
 2. Import to Vercel
-3. Add environment variables
+3. Add environment variables (see `.env.example`)
 4. Deploy!
+
+### Email Reminders
+
+For email reminders to work, you need either:
+- **Resend** (recommended): Set `RESEND_API_KEY` and `EMAIL_FROM`
+- **SMTP**: Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+
+The cron job at `/api/reminders` runs hourly (configured in `vercel.json`).
+Set `CRON_SECRET` to secure the endpoint.
 
 ## Tech Stack
 
