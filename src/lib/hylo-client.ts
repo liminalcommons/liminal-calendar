@@ -41,7 +41,7 @@ const EVENTS_QUERY = `
       posts(filter: $filter, first: $first, sortBy: "start_time", order: "asc") {
         items {
           id title details type createdAt updatedAt
-          imageUrl
+
           creator { id name avatarUrl }
           startTime endTime timezone location
           myEventResponse
@@ -126,7 +126,6 @@ const SINGLE_EVENT_QUERY = `
   query SingleEvent($id: ID!) {
     post(id: $id) {
       id title details type createdAt updatedAt
-      imageUrl
       creator { id name avatarUrl }
       startTime endTime timezone location
       myEventResponse
