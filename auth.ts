@@ -118,7 +118,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Refresh if: expired (with 60s buffer) OR no expiry stored
       const expires = token.accessTokenExpires as number | undefined;
-      if (token.refreshToken && (!expires || Date.now() > expires - 60_000)) {
+      const needsRefresh = !expires || Date.now() > expires - 60_000;
+      const hasRefreshToken = !!token.refreshToken;
+
+      if (hasRefreshToken && needsRefresh) {
+        console.log('[auth] Token refresh triggered', {
+          hasRefreshToken,
+          expires: expires ? new Date(expires).toISOString() : 'none',
+          now: new Date().toISOString(),
+        });
         try {
           const clientId = process.env.HYLO_CLIENT_ID?.trim();
           const clientSecret = process.env.HYLO_CLIENT_SECRET?.trim();
@@ -141,12 +149,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.accessToken = refreshed.access_token;
             if (refreshed.refresh_token) token.refreshToken = refreshed.refresh_token;
             token.accessTokenExpires = Date.now() + (refreshed.expires_in ?? 3600) * 1000;
+            console.log('[auth] Token refreshed OK, new expiry:', new Date(token.accessTokenExpires as number).toISOString());
           } else {
-            console.error('[auth] Hylo token refresh failed:', res.status, await res.text());
+            const errText = await res.text().catch(() => '');
+            console.error('[auth] Hylo token refresh failed:', res.status, errText);
           }
         } catch (err) {
           console.error('[auth] Hylo token refresh error:', err);
         }
+      } else if (!hasRefreshToken && needsRefresh) {
+        console.warn('[auth] Token expired but no refresh token available — user must re-authenticate');
       }
 
       return token;
