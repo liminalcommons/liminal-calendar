@@ -74,7 +74,6 @@ const CREATE_POST_MUTATION = `
   mutation CreatePost($data: PostInput!) {
     createPost(data: $data) {
       id title details type createdAt
-      imageUrl
       creator { id name avatarUrl }
       startTime endTime timezone location
       myEventResponse
@@ -87,7 +86,6 @@ const UPDATE_POST_MUTATION = `
   mutation UpdatePost($id: ID!, $data: PostInput!) {
     updatePost(id: $id, data: $data) {
       id title details type createdAt updatedAt
-      imageUrl
       creator { id name avatarUrl }
       startTime endTime timezone location
       myEventResponse
