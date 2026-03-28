@@ -185,9 +185,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
       }
     : undefined,
-  // Note: custom pages.signIn was causing UnknownAction error.
-  // Use NextAuth default sign-in page instead.
-  // No redirectProxyUrl — sign-in is handled by direct redirect to auth.castalia.one
-  // (see NEXT_PUBLIC_AUTH_GATEWAY_URL). Gateway runs OAuth, sets .castalia.one cookie,
-  // calendar reads the shared session. Same pattern as Vox + Commonwealth.
+  pages: {
+    signIn: '/',
+  },
+  // Sign-in is handled by redirecting to auth.castalia.one directly (gateway pattern).
+  // auth.castalia.one runs the full Hylo OAuth flow and sets the session cookie on .castalia.one.
+  // Calendar reads the shared cookie — no local OAuth or redirectProxyUrl needed.
 });

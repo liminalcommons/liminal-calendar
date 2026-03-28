@@ -47,7 +47,9 @@ export function NavBar() {
   };
 
   const handleSignIn = () => {
-    signIn('hylo');
+    const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
+    const callbackUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${gateway}/signin?callbackUrl=${callbackUrl}`;
   };
 
   const user = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
