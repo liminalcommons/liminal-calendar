@@ -121,18 +121,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const needsRefresh = !expires || Date.now() > expires - 60_000;
       const hasRefreshToken = !!token.refreshToken;
 
-      // Debug: log all token keys to understand gateway JWT structure
-      if (needsRefresh) {
-        console.log('[auth] Token needs refresh. JWT keys:', Object.keys(token).join(', '));
-        console.log('[auth] Has refreshToken:', hasRefreshToken, 'Has accessToken:', !!token.accessToken);
-      }
-
       if (hasRefreshToken && needsRefresh) {
-        console.log('[auth] Token refresh triggered', {
-          hasRefreshToken,
-          expires: expires ? new Date(expires).toISOString() : 'none',
-          now: new Date().toISOString(),
-        });
         try {
           const clientId = process.env.HYLO_CLIENT_ID?.trim();
           const clientSecret = process.env.HYLO_CLIENT_SECRET?.trim();
@@ -155,7 +144,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.accessToken = refreshed.access_token;
             if (refreshed.refresh_token) token.refreshToken = refreshed.refresh_token;
             token.accessTokenExpires = Date.now() + (refreshed.expires_in ?? 3600) * 1000;
-            console.log('[auth] Token refreshed OK, new expiry:', new Date(token.accessTokenExpires as number).toISOString());
+            // Token refreshed successfully
           } else {
             const errText = await res.text().catch(() => '');
             console.error('[auth] Hylo token refresh failed:', res.status, errText);
@@ -163,8 +152,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } catch (err) {
           console.error('[auth] Hylo token refresh error:', err);
         }
-      } else if (!hasRefreshToken && needsRefresh) {
-        console.warn('[auth] Token expired but no refresh token available — user must re-authenticate');
       }
 
       return token;

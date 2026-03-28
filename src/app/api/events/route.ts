@@ -16,7 +16,11 @@ export async function GET() {
     const displayEvents = events.map(hyloEventToDisplayEvent);
     return NextResponse.json(displayEvents);
   } catch (err) {
-    console.error('[GET /api/events]', err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('[GET /api/events]', errMsg);
+    if (errMsg.includes('401')) {
+      return NextResponse.json({ error: 'token_expired', reauth: true }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
   }
 }
