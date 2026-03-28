@@ -121,6 +121,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const needsRefresh = !expires || Date.now() > expires - 60_000;
       const hasRefreshToken = !!token.refreshToken;
 
+      // Debug: log all token keys to understand gateway JWT structure
+      if (needsRefresh) {
+        console.log('[auth] Token needs refresh. JWT keys:', Object.keys(token).join(', '));
+        console.log('[auth] Has refreshToken:', hasRefreshToken, 'Has accessToken:', !!token.accessToken);
+      }
+
       if (hasRefreshToken && needsRefresh) {
         console.log('[auth] Token refresh triggered', {
           hasRefreshToken,
