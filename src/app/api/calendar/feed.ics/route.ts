@@ -1,0 +1,57 @@
+import { NextResponse } from 'next/server';
+import { getEvents, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
+import { hyloEventToDisplayEvent } from '@/lib/display-event';
+import { generateCalendarFeed, type ICSEvent } from '@/lib/ics-generator';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 900; // 15 minutes
+
+// Strip HTML tags from description for plain-text ICS
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
+export async function GET() {
+  const serviceToken = process.env.HYLO_SERVICE_TOKEN?.trim();
+  if (!serviceToken) {
+    return new NextResponse('Calendar feed temporarily unavailable', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain', 'Retry-After': '3600' },
+    });
+  }
+
+  try {
+    const hyloEvents = await getEvents(serviceToken, LIMINAL_COMMONS_GROUP_ID);
+    const displayEvents = hyloEvents.map(hyloEventToDisplayEvent);
+
+    const icsEvents: (ICSEvent & { id: string })[] = displayEvents.map((e) => ({
+      id: e.id,
+      title: e.title,
+      description: e.description ? stripHtml(e.description) : undefined,
+      starts_at: e.starts_at,
+      ends_at: e.ends_at ?? undefined,
+      location: e.location ?? undefined,
+      url: e.event_url ?? undefined,
+      organizer: { name: e.creator_name },
+      recurrenceRule: e.recurrenceRule,
+    }));
+
+    const icsContent = generateCalendarFeed(icsEvents);
+
+    return new NextResponse(icsContent, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': 'inline; filename="liminal-commons.ics"',
+        'Cache-Control': 'public, max-age=900, s-maxage=900',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  } catch (err) {
+    console.error('ICS feed error:', err);
+    return new NextResponse('Calendar feed temporarily unavailable', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain', 'Retry-After': '300' },
+    });
+  }
+}
