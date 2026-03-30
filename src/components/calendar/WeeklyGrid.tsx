@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, isToday, addWeeks, subWeeks } from 'date-fns';
+import { format, isToday, addWeeks, subWeeks, addDays, isBefore, isAfter, parseISO } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
 import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
@@ -258,6 +258,22 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
             {/* NowIndicator — only on current week */}
             {isCurrentWeek(currentWeekStart) && (
               <NowIndicator hourHeight={HOUR_HEIGHT} />
+            )}
+
+            {/* Empty week hint */}
+            {(() => {
+              const weekEnd = addDays(currentWeekStart, 7);
+              return !events.some(e => {
+                const start = parseISO(e.starts_at);
+                return !isBefore(start, currentWeekStart) && isBefore(start, weekEnd);
+              });
+            })() && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                <div className="text-center text-grove-text-muted/50 select-none">
+                  <p className="text-sm">No events this week</p>
+                  <p className="text-xs mt-1">Click any time slot to create one</p>
+                </div>
+              </div>
             )}
 
             {/* Day columns */}
