@@ -127,6 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         needsRefresh,
         expiresAt: expires ? new Date(expires).toISOString() : 'none',
         now: new Date().toISOString(),
+        tokenKeys: Object.keys(token).join(','),
       });
 
       if (hasRefreshToken && needsRefresh) {
