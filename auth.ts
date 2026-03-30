@@ -121,6 +121,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const needsRefresh = !expires || Date.now() > expires - 60_000;
       const hasRefreshToken = !!token.refreshToken;
 
+      console.log('[auth] token check:', {
+        hasAccessToken: !!token.accessToken,
+        hasRefreshToken,
+        needsRefresh,
+        expiresAt: expires ? new Date(expires).toISOString() : 'none',
+        now: new Date().toISOString(),
+      });
+
       if (hasRefreshToken && needsRefresh) {
         try {
           const clientId = process.env.HYLO_CLIENT_ID?.trim();
@@ -144,7 +152,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.accessToken = refreshed.access_token;
             if (refreshed.refresh_token) token.refreshToken = refreshed.refresh_token;
             token.accessTokenExpires = Date.now() + (refreshed.expires_in ?? 3600) * 1000;
-            // Token refreshed successfully
+            console.log('[auth] token refreshed OK, expires_in:', refreshed.expires_in);
           } else {
             const errText = await res.text().catch(() => '');
             console.error('[auth] Hylo token refresh failed:', res.status, errText);
