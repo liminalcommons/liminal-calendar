@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { X, ChevronDown, ChevronUp, Video, FileText } from 'lucide-react';
+import { UserPicker, type PickedUser } from './UserPicker';
 import { useSession } from 'next-auth/react';
 import { format, addHours } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -68,6 +69,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
   const [description, setDescription] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [invitees, setInvitees] = useState<PickedUser[]>([]);
   const [showMore, setShowMore] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +120,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
     if (description.trim()) body.details = description.trim();
     if (meetingLink.trim()) body.location = meetingLink.trim();
+    if (invitees.length) body.invitees = invitees.map(u => u.id);
 
     try {
       const res = await apiFetch('/api/events', {
@@ -141,7 +144,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     } finally {
       setIsCreating(false);
     }
-  }, [title, description, meetingLink, durationMinutes, day, hour, onCreated, onClose]);
+  }, [title, description, meetingLink, durationMinutes, invitees, day, hour, onCreated, onClose]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) handleCreate();
@@ -233,7 +236,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           {showMore ? 'Less options' : 'More options'}
         </button>
 
-        {/* Collapsible: description */}
+        {/* Collapsible: description + invite */}
         {showMore && (
           <div className="space-y-2.5">
             <div className="flex items-start gap-2">
@@ -250,6 +253,11 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
                 disabled={isCreating}
               />
             </div>
+            <UserPicker
+              selected={invitees}
+              onChange={setInvitees}
+              disabled={isCreating}
+            />
           </div>
         )}
 

@@ -141,7 +141,35 @@ const SINGLE_EVENT_QUERY = `
   }
 `;
 
+const MEMBERS_QUERY = `
+  query GroupMembers($groupId: ID!, $search: String, $first: Int) {
+    group(id: $groupId) {
+      members(first: $first, search: $search) {
+        items { id name avatarUrl }
+      }
+    }
+  }
+`;
+
 // --- Public API ---
+
+export interface HyloMember {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
+export async function getGroupMembers(
+  token: string,
+  groupId: string,
+  search?: string,
+  first = 20,
+): Promise<HyloMember[]> {
+  const data = await hyloGraphQL<{ group: { members: { items: HyloMember[] } } }>(
+    token, MEMBERS_QUERY, { groupId, search, first },
+  );
+  return data.group.members.items;
+}
 
 export async function getEvents(token: string, groupId: string): Promise<HyloEvent[]> {
   const data = await hyloGraphQL<{ group: { posts: { items: HyloEvent[] } } }>(
