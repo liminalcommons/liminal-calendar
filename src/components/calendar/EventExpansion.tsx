@@ -77,6 +77,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [closing, setClosing] = useState(false);
 
   const role = getUserRole(session);
   const isCreator = session?.user?.id === event.creator_id || (session as any)?.user?.hyloId === event.creator_id;
@@ -188,8 +189,11 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
       const res = await apiFetch(`/api/events/${event.id}`, { method: 'DELETE' });
       if (res.ok) {
         calendarSFX.play('dissolve');
-        onDelete?.(event.id);
-        onClose();
+        setClosing(true);
+        setTimeout(() => {
+          onDelete?.(event.id);
+          onClose();
+        }, 300);
       }
     } catch {
       // ignore
@@ -205,7 +209,9 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border"
+      className={`fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border transition-all duration-300 ${
+        closing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+      }`}
       style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
       role="dialog"
       aria-label={`Event details: ${event.title}`}
