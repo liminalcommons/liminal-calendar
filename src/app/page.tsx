@@ -6,7 +6,7 @@ import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const session = await auth();
