@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { calendarSFX } from '@/lib/sound-manager';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface AttendeeItem {
   id?: string;
@@ -81,7 +82,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
 
   async function fetchAttendees() {
     try {
-      const res = await fetch(`/api/events/${eventId}/rsvp`);
+      const res = await apiFetch(`/api/events/${eventId}/rsvp`);
       if (res.ok) {
         const data = await res.json();
         const items: AttendeeItem[] = data.invitations?.items ?? [];
@@ -109,7 +110,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
     setUpdating(true);
 
     try {
-      const res = await fetch(`/api/events/${eventId}/rsvp`, {
+      const res = await apiFetch(`/api/events/${eventId}/rsvp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response }),

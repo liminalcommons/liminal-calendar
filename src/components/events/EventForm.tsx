@@ -7,6 +7,7 @@ import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUN
 import { TimeZoneStrip } from '@/components/timezone/TimeZoneStrip';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
 import { ImageUpload } from '@/components/ImageUpload';
+import { apiFetch } from '@/lib/api-fetch';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/events/${eventId}`);
+        const res = await apiFetch(`/api/events/${eventId}`);
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || 'Failed to load event');
@@ -336,7 +337,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
       };
 
       if (mode === 'create') {
-        const res = await fetch('/api/events', {
+        const res = await apiFetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -347,7 +348,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
         const newId = data.id || data.event?.id;
         router.push(`/events/${newId}`);
       } else {
-        const res = await fetch(`/api/events/${eventId}`, {
+        const res = await apiFetch(`/api/events/${eventId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),

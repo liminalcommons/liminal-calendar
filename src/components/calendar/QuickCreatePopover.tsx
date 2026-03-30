@@ -7,6 +7,7 @@ import { format, addHours } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface QuickCreatePopoverProps {
   day: Date;
@@ -103,7 +104,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     const endTime = addHours(startTime, 1);
 
     try {
-      const res = await fetch('/api/events', {
+      const res = await apiFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

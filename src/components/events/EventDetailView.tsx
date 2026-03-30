@@ -14,6 +14,7 @@ import {
 } from '@/lib/timezone-utils';
 import { formatDuration } from '@/lib/calendar-utils';
 import { downloadICS } from '@/lib/ics-generator';
+import { apiFetch } from '@/lib/api-fetch';
 import { TimeZoneStrip } from '@/components/timezone/TimeZoneStrip';
 import { EventRSVP } from './EventRSVP';
 
@@ -58,7 +59,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   useEffect(() => {
     async function fetchEvent() {
       try {
-        const res = await fetch(`/api/events/${eventId}`);
+        const res = await apiFetch(`/api/events/${eventId}`);
         const data = await res.json();
         if (res.ok && (data.id || data.event?.id)) {
           // API returns the event directly (not nested under .event)
@@ -81,7 +82,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     setDeleting(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/events/${event.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/events/${event.id}`, { method: 'DELETE' });
       if (res.ok) {
         router.push('/');
       } else {

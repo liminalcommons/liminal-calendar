@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
+import { apiFetch } from '@/lib/api-fetch';
 import { formatInTimeZone } from 'date-fns-tz';
 
 interface EventExpansionProps {
@@ -126,7 +127,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
     }
     setIsSavingTitle(true);
     try {
-      const res = await fetch(`/api/events/${event.id}`, {
+      const res = await apiFetch(`/api/events/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: trimmed }),
@@ -167,7 +168,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
     }
 
     try {
-      await fetch(`/api/events/${event.id}/rsvp`, {
+      await apiFetch(`/api/events/${event.id}/rsvp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: newStatus ?? 'no' }),
@@ -184,7 +185,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/events/${event.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/events/${event.id}`, { method: 'DELETE' });
       if (res.ok) {
         calendarSFX.play('dissolve');
         onDelete?.(event.id);
