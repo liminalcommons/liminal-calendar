@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { auth } from '../../auth';
 import { getEvents, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
 import { hyloEventToDisplayEvent } from '@/lib/display-event';
@@ -18,7 +19,13 @@ export default async function HomePage() {
       const raw = await getEvents(session.accessToken, LIMINAL_COMMONS_GROUP_ID);
       events = raw.map(hyloEventToDisplayEvent);
     } catch (e) {
-      console.error('Failed to load events:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('Failed to load events:', msg);
+      // If Hylo rejected the token, force re-auth through gateway
+      if (msg.includes('401')) {
+        const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
+        redirect(`${gateway}/signin?callbackUrl=${encodeURIComponent('https://calendar.castalia.one')}`);
+      }
     }
   }
 

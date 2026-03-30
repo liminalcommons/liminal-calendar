@@ -121,14 +121,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const needsRefresh = !expires || Date.now() > expires - 60_000;
       const hasRefreshToken = !!token.refreshToken;
 
-      console.log('[auth] token check:', {
-        hasAccessToken: !!token.accessToken,
-        hasRefreshToken,
-        needsRefresh,
-        expiresAt: expires ? new Date(expires).toISOString() : 'none',
-        now: new Date().toISOString(),
-        tokenKeys: Object.keys(token).join(','),
-      });
+      // No refresh token and expired → force re-auth via gateway
+      if (!hasRefreshToken && needsRefresh) {
+        console.log('[auth] token expired, no refresh token — clearing for re-auth');
+        return { ...token, accessToken: undefined, error: 'token_expired' };
+      }
 
       if (hasRefreshToken && needsRefresh) {
         try {
