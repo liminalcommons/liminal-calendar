@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { X, ChevronDown, ChevronUp, Video, FileText } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { format, addHours } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -17,8 +17,8 @@ interface QuickCreatePopoverProps {
   onCreated?: (event: DisplayEvent) => void;
 }
 
-const POPOVER_WIDTH = 280;
-const POPOVER_APPROX_HEIGHT = 180;
+const POPOVER_WIDTH = 320;
+const POPOVER_APPROX_HEIGHT = 280;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   const vw = window.innerWidth;
@@ -27,13 +27,11 @@ function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   let left = anchorRect.right + 8;
   let top = anchorRect.top;
 
-  // Flip left if near right edge
   if (left + POPOVER_WIDTH > vw - 8) {
     left = anchorRect.left - POPOVER_WIDTH - 8;
   }
   left = Math.max(8, left);
 
-  // Clamp bottom
   if (top + POPOVER_APPROX_HEIGHT > vh - 8) {
     top = Math.max(8, vh - POPOVER_APPROX_HEIGHT - 8);
   }
@@ -53,23 +51,33 @@ function formatDateTimeLabel(day: Date, hour: number): string {
   return format(d, 'EEE MMM d, h:mm aa');
 }
 
+const DURATION_OPTIONS = [
+  { label: '30 min', minutes: 30 },
+  { label: '1 hour', minutes: 60 },
+  { label: '1.5 hours', minutes: 90 },
+  { label: '2 hours', minutes: 120 },
+  { label: '3 hours', minutes: 180 },
+];
+
 export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }: QuickCreatePopoverProps) {
   const { data: session } = useSession();
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [meetingLink, setMeetingLink] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [showMore, setShowMore] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const role = getUserRole(session);
 
-  // Auto-focus title on mount
   useEffect(() => {
     titleInputRef.current?.focus();
   }, []);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -78,7 +86,6 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  // Close on click outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
@@ -101,22 +108,27 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     setError(null);
 
     const startTime = buildStartTime(day, hour);
-    const endTime = addHours(startTime, 1);
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
+
+    const body: Record<string, unknown> = {
+      title: trimmed,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    };
+
+    if (description.trim()) body.details = description.trim();
+    if (meetingLink.trim()) body.location = meetingLink.trim();
 
     try {
       const res = await apiFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: trimmed,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error || `Error ${res.status}`);
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Error ${res.status}`);
         return;
       }
 
@@ -129,22 +141,22 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     } finally {
       setIsCreating(false);
     }
-  }, [title, day, hour, onCreated, onClose]);
+  }, [title, description, meetingLink, durationMinutes, day, hour, onCreated, onClose]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleCreate();
+    if (e.key === 'Enter' && !e.shiftKey) handleCreate();
   };
 
-  // Gate: only host or admin can create events (after all hooks)
   if (!canCreateEvents(role)) return null;
 
   const pos = computePosition(anchorRect);
   const dateTimeLabel = formatDateTimeLabel(day, hour);
+  const durationLabel = DURATION_OPTIONS.find(d => d.minutes === durationMinutes)?.label ?? `${durationMinutes} min`;
 
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border"
+      className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border animate-in fade-in slide-in-from-top-1 duration-200"
       style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
       role="dialog"
       aria-label="Quick create event"
@@ -162,8 +174,8 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
       </div>
 
       {/* Body */}
-      <div className="px-4 pb-3 space-y-3">
-        {/* Title input */}
+      <div className="px-4 pb-3 space-y-2.5">
+        {/* Title */}
         <input
           ref={titleInputRef}
           type="text"
@@ -178,11 +190,68 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           disabled={isCreating}
         />
 
-        {/* Date/time display */}
-        <div className="text-xs text-grove-text-muted">
-          <span className="font-medium text-grove-text">{dateTimeLabel}</span>
-          <span className="ml-2 text-grove-accent-deep">· 1 hour</span>
+        {/* Date/time + duration */}
+        <div className="flex items-center justify-between text-xs">
+          <div className="text-grove-text-muted">
+            <span className="font-medium text-grove-text">{dateTimeLabel}</span>
+          </div>
+          <select
+            value={durationMinutes}
+            onChange={e => setDurationMinutes(Number(e.target.value))}
+            className="text-xs bg-grove-border/20 border border-grove-border rounded-md px-2 py-1
+                       text-grove-text focus:outline-none focus:ring-1 focus:ring-grove-accent"
+            disabled={isCreating}
+          >
+            {DURATION_OPTIONS.map(d => (
+              <option key={d.minutes} value={d.minutes}>{d.label}</option>
+            ))}
+          </select>
         </div>
+
+        {/* Meeting link (always visible) */}
+        <div className="flex items-center gap-2">
+          <Video size={14} className="text-grove-text-muted shrink-0" />
+          <input
+            type="url"
+            value={meetingLink}
+            onChange={e => setMeetingLink(e.target.value)}
+            placeholder="Meeting link (optional)"
+            className="flex-1 text-xs bg-grove-border/20 border border-grove-border rounded-md px-2.5 py-1.5
+                       text-grove-text placeholder:text-grove-text-muted
+                       focus:outline-none focus:ring-1 focus:ring-grove-accent
+                       transition-colors"
+            disabled={isCreating}
+          />
+        </div>
+
+        {/* More options toggle */}
+        <button
+          onClick={() => setShowMore(!showMore)}
+          className="flex items-center gap-1 text-xs text-grove-text-muted hover:text-grove-text transition-colors"
+        >
+          {showMore ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showMore ? 'Less options' : 'More options'}
+        </button>
+
+        {/* Collapsible: description */}
+        {showMore && (
+          <div className="space-y-2.5">
+            <div className="flex items-start gap-2">
+              <FileText size={14} className="text-grove-text-muted shrink-0 mt-1.5" />
+              <textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Description (optional)"
+                rows={2}
+                className="flex-1 text-xs bg-grove-border/20 border border-grove-border rounded-md px-2.5 py-1.5
+                           text-grove-text placeholder:text-grove-text-muted resize-none
+                           focus:outline-none focus:ring-1 focus:ring-grove-accent
+                           transition-colors"
+                disabled={isCreating}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (
