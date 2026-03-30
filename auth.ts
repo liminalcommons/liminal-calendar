@@ -23,7 +23,7 @@ const LIMINAL_COMMONS_GROUP_ID = '41955';
 
 // Admin allowlist — Hylo IDs that get 'admin' role regardless of Hylo group role
 // Hylo only exposes hasModeratorRole, no distinct admin field
-const ADMIN_HYLO_IDS = ['67402']; // victor
+const ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']; // victor, psygenlab, danielle johnson, erik h
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
