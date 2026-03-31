@@ -12,7 +12,7 @@ interface HourCellProps {
 }
 
 function isDayHour(hour: number): boolean {
-  return hour >= 6 && hour <= 20;
+  return hour >= 12 && hour <= 21;
 }
 
 const HourCell = React.memo(function HourCell({
