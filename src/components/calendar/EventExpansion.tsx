@@ -206,11 +206,15 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       if (res.ok) {
         calendarSFX.play('dissolve');
         setClosing(true);
+        // Let fade-out animation play, then close and refresh
         setTimeout(() => {
           onDelete?.(event.id);
           onClose();
-          router.refresh(); // Re-fetch to remove all recurrence instances
         }, 300);
+        // Delay refresh so the animation is visible
+        setTimeout(() => {
+          router.refresh();
+        }, 500);
       }
     } catch {
       // ignore
@@ -358,26 +362,45 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       {/* Delete confirmation */}
       {showDeleteConfirm && (
         <div className="px-4 pb-4 border-t border-grove-border/40 pt-3">
-          <p className="text-xs text-grove-text-muted mb-2">
-            {event.recurrenceRule
-              ? 'Delete this recurring event and all its occurrences? This cannot be undone.'
-              : 'Delete this event? This cannot be undone.'}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="flex-1 text-xs py-1.5 rounded-md bg-red-500/80 hover:bg-red-500 text-white border border-red-500/60 transition-colors disabled:opacity-50"
-            >
-              {isDeleting ? 'Deleting...' : 'Yes, delete'}
-            </button>
-            <button
-              onClick={() => setShowDeleteConfirm(false)}
-              className="flex-1 text-xs py-1.5 rounded-md border border-grove-border text-grove-text-muted hover:text-grove-text transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
+          {event.recurrenceRule ? (
+            <>
+              <p className="text-xs text-grove-text-muted mb-2">This is a recurring event. What do you want to delete?</p>
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="w-full text-xs py-1.5 rounded-md bg-red-500/80 hover:bg-red-500 text-white border border-red-500/60 transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'All occurrences'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="w-full text-xs py-1.5 rounded-md border border-grove-border text-grove-text-muted hover:text-grove-text transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-grove-text-muted mb-2">Delete this event? This cannot be undone.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 text-xs py-1.5 rounded-md bg-red-500/80 hover:bg-red-500 text-white border border-red-500/60 transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? 'Deleting...' : 'Yes, delete'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 text-xs py-1.5 rounded-md border border-grove-border text-grove-text-muted hover:text-grove-text transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
