@@ -7,7 +7,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
 import { MoonPhase } from '@/components/MoonPhase';
-import { TimeGutter, HOUR_HEIGHT } from './TimeGutter';
+import { TimeGutter, DEFAULT_HOUR_HEIGHT } from './TimeGutter';
 import { DayColumn } from './DayColumn';
 import { NowIndicator } from './NowIndicator';
 import { EventExpansion } from './EventExpansion';
@@ -17,9 +17,6 @@ interface WeeklyGridProps {
   events: DisplayEvent[];
 }
 
-const SCROLL_HOUR_AMOUNT = HOUR_HEIGHT; // 1 hour
-const SCROLL_PAGE_AMOUNT = HOUR_HEIGHT * 6; // 6 hours
-
 export function WeeklyGrid({ events }: WeeklyGridProps) {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
@@ -27,8 +24,8 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const hasMounted = useRef(false);
+  const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const weekDays = getWeekDays(currentWeekStart);
 
@@ -40,25 +37,19 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll on mount to current time (or 9 AM)
+  // Dynamically compute hour height to fit viewport
   useEffect(() => {
-    if (hasMounted.current) return;
-    hasMounted.current = true;
-
-    const el = scrollRef.current;
+    const el = gridRef.current;
     if (!el) return;
 
-    const now = new Date();
-    const targetHour = isCurrentWeek(currentWeekStart)
-      ? Math.max(now.getHours() - 1, 0)
-      : 9;
-    const targetScroll = targetHour * HOUR_HEIGHT;
-
-    // Small delay to let layout settle
-    setTimeout(() => {
-      el.scrollTop = targetScroll;
-    }, 50);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const h = Math.floor(entry.contentRect.height / 24);
+        setHourHeight(Math.max(h, 20)); // minimum 20px
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   function isCurrentWeek(weekStart: Date): boolean {
@@ -79,50 +70,25 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
   const goToToday = useCallback(() => {
     setCurrentWeekStart(getWeekStart(new Date()));
     calendarSFX.play('navigate');
-    // Scroll to current time
-    const el = scrollRef.current;
-    if (el) {
-      const targetHour = Math.max(new Date().getHours() - 1, 0);
-      el.scrollTop = targetHour * HOUR_HEIGHT;
-    }
   }, []);
 
-  // Keyboard navigation
+  // Keyboard navigation — week nav only (no scrolling needed)
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    const el = scrollRef.current;
-    if (!el) return;
-
     switch (e.key) {
-      case 'ArrowUp':
+      case 'ArrowLeft':
         e.preventDefault();
-        el.scrollTop -= SCROLL_HOUR_AMOUNT;
+        goToPrevWeek();
         break;
-      case 'ArrowDown':
+      case 'ArrowRight':
         e.preventDefault();
-        el.scrollTop += SCROLL_HOUR_AMOUNT;
-        break;
-      case 'PageUp':
-        e.preventDefault();
-        el.scrollTop -= SCROLL_PAGE_AMOUNT;
-        break;
-      case 'PageDown':
-        e.preventDefault();
-        el.scrollTop += SCROLL_PAGE_AMOUNT;
-        break;
-      case 'Home':
-        e.preventDefault();
-        el.scrollTop = 0;
-        break;
-      case 'End':
-        e.preventDefault();
-        el.scrollTop = el.scrollHeight;
+        goToNextWeek();
         break;
       case 'Escape':
         e.preventDefault();
         goToToday();
         break;
     }
-  }, [goToToday]);
+  }, [goToToday, goToPrevWeek, goToNextWeek]);
 
   const handleCellClick = useCallback((day: Date, hour: number, rect: DOMRect) => {
     setExpansion(null);
@@ -147,7 +113,7 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
     return `${format(start, 'MMM')} – ${format(end, 'MMM yyyy')}`;
   })();
 
-  const totalGridHeight = 24 * HOUR_HEIGHT;
+  const totalGridHeight = 24 * hourHeight;
 
   return (
     <div
@@ -196,7 +162,7 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
       {/* ── Day headers row ── */}
       <div className="flex-shrink-0 flex bg-grove-surface border-b border-grove-border">
         {/* Spacer for time gutter */}
-        <div className="w-16 flex-shrink-0" />
+        <div className="w-14 flex-shrink-0" />
 
         {weekDays.map((day, i) => {
           const today = isToday(day);
@@ -206,14 +172,14 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
           return (
             <div
               key={i}
-              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1.5 border-l border-grove-border/40"
+              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border/40"
             >
               <span className={`text-[10px] font-medium uppercase tracking-wider ${
                 today ? 'text-grove-accent' : 'text-grove-text-muted'
               }`}>
                 {dayName}
               </span>
-              <span className={`text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center mt-0.5 ${
+              <span className={`text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center mt-0.5 ${
                 today
                   ? 'bg-grove-accent text-grove-surface'
                   : 'text-grove-text'
@@ -243,21 +209,21 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
         />
       )}
 
-      {/* ── Scrollable grid body ── */}
+      {/* ── Grid body — fills remaining space, no scroll ── */}
       <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden"
+        ref={gridRef}
+        className="flex-1 overflow-hidden"
         style={{ minHeight: 0 }}
       >
         <div className="flex" style={{ height: totalGridHeight }}>
           {/* Time gutter */}
-          <TimeGutter />
+          <TimeGutter hourHeight={hourHeight} />
 
           {/* Day columns + NowIndicator overlay wrapper */}
           <div className="relative flex flex-1 min-w-0">
             {/* NowIndicator — only on current week */}
             {isCurrentWeek(currentWeekStart) && (
-              <NowIndicator hourHeight={HOUR_HEIGHT} />
+              <NowIndicator hourHeight={hourHeight} />
             )}
 
             {/* Empty week hint */}
@@ -284,6 +250,7 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
                 events={events}
                 isToday={isToday(day)}
                 currentHour={currentHour}
+                hourHeight={hourHeight}
                 onCellClick={handleCellClick}
                 onEventClick={handleEventClick}
               />

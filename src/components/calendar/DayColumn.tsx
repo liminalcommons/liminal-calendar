@@ -6,8 +6,6 @@ import { toDateKey } from '@/lib/calendar-utils';
 import { HourCell } from './HourCell';
 import { EventBlock } from './EventBlock';
 import { computeOverlapLayout } from './overlap';
-import { HOUR_HEIGHT } from './TimeGutter';
-
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 interface DayColumnProps {
@@ -15,6 +13,7 @@ interface DayColumnProps {
   events: DisplayEvent[];
   isToday: boolean;
   currentHour?: number;
+  hourHeight: number;
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
 }
@@ -40,6 +39,7 @@ const DayColumn = React.memo(function DayColumn({
   events,
   isToday,
   currentHour,
+  hourHeight,
   onCellClick,
   onEventClick,
 }: DayColumnProps) {
@@ -66,6 +66,7 @@ const DayColumn = React.memo(function DayColumn({
           hour={hour}
           isToday={isToday}
           currentHour={currentHour}
+          hourHeight={hourHeight}
           onCellClick={onCellClick}
         />
       ))}
@@ -79,7 +80,7 @@ const DayColumn = React.memo(function DayColumn({
             event={event}
             colIndex={overlap.colIndex}
             colTotal={overlap.colTotal}
-            hourHeight={HOUR_HEIGHT}
+            hourHeight={hourHeight}
             onEventClick={onEventClick}
           />
         );

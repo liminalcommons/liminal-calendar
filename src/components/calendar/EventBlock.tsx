@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import type { DisplayEvent } from '@/lib/display-event';
-import { HOUR_HEIGHT } from './TimeGutter';
+import { DEFAULT_HOUR_HEIGHT } from './TimeGutter';
 
 interface EventBlockProps {
   event: DisplayEvent;
@@ -46,7 +46,7 @@ const EventBlock = React.memo(function EventBlock({
   event,
   colIndex,
   colTotal,
-  hourHeight = HOUR_HEIGHT,
+  hourHeight = DEFAULT_HOUR_HEIGHT,
   onEventClick,
 }: EventBlockProps) {
   const blockRef = useRef<HTMLDivElement>(null);

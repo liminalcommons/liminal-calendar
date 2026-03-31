@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { HOUR_HEIGHT } from './TimeGutter';
+import { DEFAULT_HOUR_HEIGHT } from './TimeGutter';
 
 interface NowIndicatorProps {
   hourHeight?: number;
@@ -12,7 +12,7 @@ function getNowMinutes(): number {
   return now.getHours() * 60 + now.getMinutes();
 }
 
-export function NowIndicator({ hourHeight = HOUR_HEIGHT }: NowIndicatorProps) {
+export function NowIndicator({ hourHeight = DEFAULT_HOUR_HEIGHT }: NowIndicatorProps) {
   const [nowMinutes, setNowMinutes] = useState<number>(getNowMinutes);
 
   useEffect(() => {

@@ -1,13 +1,13 @@
 'use client';
 
 import React from 'react';
-import { HOUR_HEIGHT } from './TimeGutter';
 
 interface HourCellProps {
   day: Date;
   hour: number;
   isToday: boolean;
   currentHour?: number;
+  hourHeight: number;
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
 }
 
@@ -20,6 +20,7 @@ const HourCell = React.memo(function HourCell({
   hour,
   isToday,
   currentHour,
+  hourHeight,
   onCellClick,
 }: HourCellProps) {
   const isCurrentHour = isToday && currentHour === hour;
@@ -31,10 +32,8 @@ const HourCell = React.memo(function HourCell({
   if (isCurrentHour) {
     cellClass += ' bg-grove-accent/10';
   } else if (isDay) {
-    // Slightly lighter for daytime
     cellClass += ' bg-grove-surface/60';
   } else {
-    // Night: slight grove-border tint
     cellClass += ' bg-grove-border/10';
   }
 
@@ -45,7 +44,7 @@ const HourCell = React.memo(function HourCell({
   return (
     <div
       className={cellClass}
-      style={{ height: HOUR_HEIGHT }}
+      style={{ height: hourHeight }}
       onClick={onCellClick ? (e) => onCellClick(day, hour, (e.currentTarget as HTMLDivElement).getBoundingClientRect()) : undefined}
       aria-label={`${hour}:00`}
     />

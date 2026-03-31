@@ -1,11 +1,12 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Volume2, VolumeX, LogOut, CalendarPlus } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { ViewToggle } from './ViewToggle';
 import { RuneAccent } from './RuneAccent';
 import { calendarSFX } from '@/lib/sound-manager';
+import { useTheme } from '@/components/providers/ThemeProvider';
 
 function getRoleLabel(role?: string): string | null {
   if (role === 'admin') return 'admin';
@@ -30,6 +31,7 @@ const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeU
 
 export function NavBar() {
   const { data: session, status } = useSession();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [muted, setMuted] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const subRef = useRef<HTMLDivElement>(null);
@@ -88,6 +90,16 @@ export function NavBar() {
       {/* Right: controls */}
       <div className="flex items-center gap-3">
         <ViewToggle />
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
+          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
 
         {/* Mute toggle */}
         <button

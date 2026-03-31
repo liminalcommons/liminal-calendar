@@ -1,24 +1,29 @@
 import type { Config } from "tailwindcss";
 
+function withOpacity(varName: string) {
+  return `rgb(var(${varName}) / <alpha-value>)`;
+}
+
 export default {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        "grove-bg": "#f5efe4",
-        "grove-surface": "#faf6f0",
-        "grove-border": "#d4c4a8",
-        "grove-text": "#5a4632",
-        "grove-text-muted": "#9a8570",
-        "grove-text-dim": "#b8956a",
-        "grove-accent": "#c4935a",
-        "grove-accent-deep": "#6b5744",
-        "grove-green": "#7a8b6a",
-        "grove-green-deep": "#5a7a4a",
+        "grove-bg": withOpacity("--grove-bg"),
+        "grove-surface": withOpacity("--grove-surface"),
+        "grove-border": withOpacity("--grove-border"),
+        "grove-text": withOpacity("--grove-text"),
+        "grove-text-muted": withOpacity("--grove-text-muted"),
+        "grove-text-dim": withOpacity("--grove-text-dim"),
+        "grove-accent": withOpacity("--grove-accent"),
+        "grove-accent-deep": withOpacity("--grove-accent-deep"),
+        "grove-green": withOpacity("--grove-green"),
+        "grove-green-deep": withOpacity("--grove-green-deep"),
       },
       fontFamily: {
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],

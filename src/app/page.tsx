@@ -40,10 +40,10 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-grove-bg flex flex-col">
+    <div className="h-screen bg-grove-bg flex flex-col overflow-hidden">
       <NavBar />
       <SubscribeBanner />
-      <main className="flex-1 h-[calc(100vh-56px)]">
+      <main className="flex-1 min-h-0">
         <WeeklyGrid events={displayEvents} />
       </main>
     </div>
