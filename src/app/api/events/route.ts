@@ -4,6 +4,7 @@ import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
+import { createEvent as createHyloEvent } from '@/lib/hylo-client';
 import { asc, eq } from 'drizzle-orm';
 
 export async function GET() {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule } =
+  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule, hyloGroupId } =
     body as Record<string, unknown>;
 
   if (!title || typeof title !== 'string' || !title.trim()) {
@@ -83,6 +84,8 @@ export async function POST(request: NextRequest) {
 
   const user = session.user as any;
 
+  const groupId = typeof hyloGroupId === 'string' && hyloGroupId ? hyloGroupId : null;
+
   try {
     const [created] = await db
       .insert(events)
@@ -95,11 +98,37 @@ export async function POST(request: NextRequest) {
         location: typeof location === 'string' ? location : null,
         imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
         recurrenceRule: typeof recurrenceRule === 'string' ? recurrenceRule : null,
+        hyloGroupId: groupId,
         creatorId: user.hyloId ?? user.id ?? 'unknown',
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,
       })
       .returning();
+
+    // Sync to Hylo if a group was selected and we have an access token
+    const accessToken = (session as any).accessToken as string | undefined;
+    if (groupId && accessToken) {
+      try {
+        const hyloEvent = await createHyloEvent(accessToken, groupId, {
+          title: (title as string).trim(),
+          details: typeof details === 'string' ? details : undefined,
+          startTime: startDate,
+          endTime: endDate,
+          timezone: typeof timezone === 'string' ? timezone : undefined,
+          location: typeof location === 'string' ? location : undefined,
+        });
+
+        // Store the Hylo post ID back on the local event
+        await db
+          .update(events)
+          .set({ hyloPostId: hyloEvent.id })
+          .where(eq(events.id, created.id));
+
+        created.hyloPostId = hyloEvent.id;
+      } catch (hyloErr) {
+        console.warn('[POST /api/events] Hylo sync failed (event saved locally):', hyloErr);
+      }
+    }
 
     return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {

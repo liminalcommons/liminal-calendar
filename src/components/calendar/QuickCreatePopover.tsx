@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, Video, FileText, Repeat } from 'lucide-react';
+import { X, Video, FileText, Repeat, Globe } from 'lucide-react';
 import { UserPicker, type PickedUser } from './UserPicker';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
@@ -84,6 +84,9 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [recurrence, setRecurrence] = useState('');
   const [invitees, setInvitees] = useState<PickedUser[]>([]);
+  const [hyloGroupId, setHyloGroupId] = useState('');
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +114,24 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
+  // Fetch user's Hylo groups for the "Post to Hylo" picker
+  useEffect(() => {
+    let cancelled = false;
+    setGroupsLoading(true);
+    apiFetch('/api/groups')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: Array<{ id: string; name: string; slug: string }>) => {
+        if (!cancelled) setGroups(data);
+      })
+      .catch(() => {
+        /* silently ignore — dropdown will just be empty */
+      })
+      .finally(() => {
+        if (!cancelled) setGroupsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   const handleCreate = useCallback(async () => {
     const trimmed = title.trim();
     if (!trimmed) {
@@ -135,6 +156,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     if (meetingLink.trim()) body.location = meetingLink.trim();
     if (recurrence) body.recurrence = recurrence;
     if (invitees.length) body.invitees = invitees.map(u => u.id);
+    if (hyloGroupId) body.hyloGroupId = hyloGroupId;
 
     try {
       const res = await apiFetch('/api/events', {
@@ -158,7 +180,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     } finally {
       setIsCreating(false);
     }
-  }, [title, description, meetingLink, durationMinutes, recurrence, invitees, day, hour, onCreated, onClose]);
+  }, [title, description, meetingLink, durationMinutes, recurrence, invitees, hyloGroupId, day, hour, onCreated, onClose]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) handleCreate();
@@ -273,6 +295,22 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           >
             {RECURRENCE_OPTIONS.map(r => (
               <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Post to Hylo group */}
+        <div className="flex items-center gap-2">
+          <Globe size={14} className="text-grove-text-muted shrink-0" />
+          <select
+            value={hyloGroupId}
+            onChange={e => setHyloGroupId(e.target.value)}
+            className={`flex-1 ${inputClass}`}
+            disabled={isCreating || groupsLoading}
+          >
+            <option value="">Don&apos;t post to Hylo</option>
+            {groups.map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
             ))}
           </select>
         </div>
