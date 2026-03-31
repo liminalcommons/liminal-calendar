@@ -26,15 +26,17 @@ const HourCell = React.memo(function HourCell({
   const isCurrentHour = isToday && currentHour === hour;
   const isDay = isDayHour(hour);
 
+  const isEvenHour = hour % 2 === 0;
+
   let cellClass =
-    'relative border-b border-grove-border/40 transition-colors';
+    'relative border-b border-grove-border/70 transition-colors';
 
   if (isCurrentHour) {
     cellClass += ' bg-grove-accent/10';
   } else if (isDay) {
-    cellClass += ' bg-grove-surface/60';
+    cellClass += isEvenHour ? ' bg-grove-surface/80' : ' bg-grove-border/15';
   } else {
-    cellClass += ' bg-grove-border/10';
+    cellClass += isEvenHour ? ' bg-grove-border/15' : ' bg-grove-border/25';
   }
 
   if (onCellClick) {

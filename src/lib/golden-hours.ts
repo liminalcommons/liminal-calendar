@@ -7,9 +7,9 @@
  */
 
 const CENTER = 14;   // Peak of the bell curve (2 PM)
-const SIGMA = 5.5;   // Width — controls how gradually it tapers
-const MIN_WEIGHT = 0.3; // Floor so off-hours never fully vanish
-const MAX_WEIGHT = 3.0; // Cap so peak hours don't dominate too much
+const SIGMA = 6;     // Wider spread for gentler taper
+const MIN_WEIGHT = 0.7; // Off-hours still get decent space
+const MAX_WEIGHT = 1.8; // Golden hours get ~2.5x off-hours, not 10x
 
 function hourWeight(hour: number): number {
   // Gaussian: e^(-(x-center)^2 / (2*sigma^2))

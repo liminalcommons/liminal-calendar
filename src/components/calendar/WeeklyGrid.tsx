@@ -187,7 +187,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           return (
             <div
               key={i}
-              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border/40"
+              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border/70"
             >
               <span className={`text-[10px] font-medium uppercase tracking-wider ${
                 today ? 'text-grove-accent' : 'text-grove-text-muted'
