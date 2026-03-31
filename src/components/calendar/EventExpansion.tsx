@@ -9,6 +9,7 @@ import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
 import { formatInTimeZone } from 'date-fns-tz';
+import { useRouter } from 'next/navigation';
 
 interface EventExpansionProps {
   event: DisplayEvent;
@@ -64,8 +65,14 @@ function formatEventTime(event: DisplayEvent): string {
   }
 }
 
+// Extract original DB event ID from expanded recurrence IDs like "42-20260401"
+function getOriginalEventId(id: string): string {
+  return id.replace(/-\d{8}$/, '');
+}
+
 export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate }: EventExpansionProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -193,14 +200,16 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);
+    const originalId = getOriginalEventId(event.id);
     try {
-      const res = await apiFetch(`/api/events/${event.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/events/${originalId}`, { method: 'DELETE' });
       if (res.ok) {
         calendarSFX.play('dissolve');
         setClosing(true);
         setTimeout(() => {
           onDelete?.(event.id);
           onClose();
+          router.refresh(); // Re-fetch to remove all recurrence instances
         }, 300);
       }
     } catch {
@@ -349,7 +358,11 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       {/* Delete confirmation */}
       {showDeleteConfirm && (
         <div className="px-4 pb-4 border-t border-grove-border/40 pt-3">
-          <p className="text-xs text-grove-text-muted mb-2">Delete this event? This cannot be undone.</p>
+          <p className="text-xs text-grove-text-muted mb-2">
+            {event.recurrenceRule
+              ? 'Delete this recurring event and all its occurrences? This cannot be undone.'
+              : 'Delete this event? This cannot be undone.'}
+          </p>
           <div className="flex gap-2">
             <button
               onClick={handleDelete}

@@ -5,6 +5,7 @@ import { X, Video, FileText, Repeat, Globe } from 'lucide-react';
 import { UserPicker, type PickedUser } from './UserPicker';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
@@ -91,6 +92,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
   const [error, setError] = useState<string | null>(null);
 
   const role = getUserRole(session);
+  const router = useRouter();
 
   useEffect(() => {
     titleInputRef.current?.focus();
@@ -175,6 +177,8 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
       calendarSFX.play('spawn');
       onCreated?.(created);
       onClose();
+      // Refresh server component to show new event (including recurrence instances)
+      router.refresh();
     } catch {
       setError('Network error — please try again');
     } finally {
