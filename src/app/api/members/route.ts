@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
-import { getGroupMembers, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
+import { searchPeople } from '@/lib/hylo-client';
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const token = (session as any).accessToken as string;
-    const members = await getGroupMembers(token, LIMINAL_COMMONS_GROUP_ID, search);
+    const members = await searchPeople(token, search);
     return NextResponse.json(members);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);

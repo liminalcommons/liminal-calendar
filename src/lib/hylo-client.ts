@@ -151,6 +151,14 @@ const MEMBERS_QUERY = `
   }
 `;
 
+const PEOPLE_QUERY = `
+  query SearchPeople($search: String, $first: Int) {
+    people(search: $search, first: $first) {
+      items { id name avatarUrl location }
+    }
+  }
+`;
+
 // --- Public API ---
 
 export interface HyloMember {
@@ -170,6 +178,17 @@ export async function getGroupMembers(
     token, MEMBERS_QUERY, { groupId, search, first },
   );
   return data.group.members.items;
+}
+
+export async function searchPeople(
+  token: string,
+  search?: string,
+  first = 20,
+): Promise<HyloMember[]> {
+  const data = await hyloGraphQL<{ people: { items: HyloMember[] } }>(
+    token, PEOPLE_QUERY, { search, first },
+  );
+  return data.people.items;
 }
 
 export async function getEvents(token: string, groupId: string): Promise<HyloEvent[]> {
