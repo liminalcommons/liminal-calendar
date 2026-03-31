@@ -29,34 +29,6 @@ export function getTimeEmoji(tod: TimeOfDay): string {
 /**
  * Get the user's local timezone string. Falls back to 'UTC'.
  */
-/**
- * Infer a timezone from a location string (city/country name).
- * Returns a best-guess IANA timezone or the user's local timezone as fallback.
- */
-export function inferTimezone(location?: string | null): string {
-  if (!location) return getUserTimezone();
-  const loc = location.toLowerCase();
-  // Common city/region mappings
-  const map: Record<string, string> = {
-    'los angeles': 'America/Los_Angeles', 'la': 'America/Los_Angeles', 'california': 'America/Los_Angeles', 'seattle': 'America/Los_Angeles', 'portland': 'America/Los_Angeles', 'san francisco': 'America/Los_Angeles',
-    'denver': 'America/Denver', 'colorado': 'America/Denver', 'phoenix': 'America/Phoenix',
-    'chicago': 'America/Chicago', 'dallas': 'America/Chicago', 'houston': 'America/Chicago',
-    'new york': 'America/New_York', 'boston': 'America/New_York', 'miami': 'America/New_York', 'toronto': 'America/Toronto',
-    'london': 'Europe/London', 'uk': 'Europe/London', 'england': 'Europe/London',
-    'paris': 'Europe/Paris', 'france': 'Europe/Paris', 'berlin': 'Europe/Berlin', 'germany': 'Europe/Berlin',
-    'amsterdam': 'Europe/Amsterdam', 'netherlands': 'Europe/Amsterdam',
-    'helsinki': 'Europe/Helsinki', 'finland': 'Europe/Helsinki',
-    'stockholm': 'Europe/Stockholm', 'sweden': 'Europe/Stockholm',
-    'tokyo': 'Asia/Tokyo', 'japan': 'Asia/Tokyo',
-    'sydney': 'Australia/Sydney', 'australia': 'Australia/Sydney',
-    'brazil': 'America/Sao_Paulo', 'são paulo': 'America/Sao_Paulo',
-  };
-  for (const [key, tz] of Object.entries(map)) {
-    if (loc.includes(key)) return tz;
-  }
-  return getUserTimezone();
-}
-
 export function getUserTimezone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -157,10 +129,10 @@ const LOCATION_TZ_MAP: [RegExp, string][] = [
   [/lagos|nigeria|nairobi|kenya/i, 'Africa/Lagos'],
 ];
 
-export function inferTimezone(location: string | null | undefined): string | null {
-  if (!location) return null;
+export function inferTimezone(location?: string | null): string {
+  if (!location) return getUserTimezone();
   for (const [pattern, tz] of LOCATION_TZ_MAP) {
     if (pattern.test(location)) return tz;
   }
-  return null;
+  return getUserTimezone();
 }
