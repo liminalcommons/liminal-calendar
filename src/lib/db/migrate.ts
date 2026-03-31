@@ -5,7 +5,9 @@ import { neon } from '@neondatabase/serverless';
  * Uses raw SQL since Drizzle Kit push/migrate requires CLI or node adapter.
  */
 export async function runMigrations() {
-  const sql = neon(process.env.DATABASE_URL!);
+  const url = process.env.DATABASE_URL || process.env.calender_DATABASE_URL || process.env.POSTGRES_URL || process.env.calender_POSTGRES_URL;
+  if (!url) throw new Error('No database URL found');
+  const sql = neon(url);
 
   // Create events table
   await sql`
