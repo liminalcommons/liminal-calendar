@@ -15,8 +15,10 @@ export function getDb(): NeonHttpDatabase<typeof schema> {
 }
 
 // Convenience export — lazy, only connects on first use
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const db = new Proxy({} as NeonHttpDatabase<typeof schema>, {
   get(_target, prop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (getDb() as any)[prop];
   },
 });
