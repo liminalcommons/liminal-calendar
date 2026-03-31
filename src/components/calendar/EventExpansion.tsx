@@ -15,6 +15,7 @@ interface EventExpansionProps {
   anchorRect: DOMRect;
   onClose: () => void;
   onDelete?: (id: string) => void;
+  onUpdate?: (id: string, patch: Partial<DisplayEvent>) => void;
 }
 
 const POPOVER_WIDTH = 320;
@@ -63,7 +64,7 @@ function formatEventTime(event: DisplayEvent): string {
   }
 }
 
-export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventExpansionProps) {
+export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate }: EventExpansionProps) {
   const { data: session } = useSession();
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -134,6 +135,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
         body: JSON.stringify({ title: trimmed }),
       });
       if (res.ok) {
+        onUpdate?.(event.id, { title: trimmed });
         setTitleShimmer(true);
         calendarSFX.play('shimmer');
         setTimeout(() => setTitleShimmer(false), 600);
@@ -145,7 +147,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
       setIsSavingTitle(false);
       setIsEditingTitle(false);
     }
-  }, [titleValue, event.id, event.title]);
+  }, [titleValue, event.id, event.title, onUpdate]);
 
   const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') saveTitle();
@@ -174,6 +176,12 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ response: newStatus ?? 'no' }),
       });
+      // Update grid state
+      const newGoing = newStatus === 'yes' ? prevCount + 1 : Math.max(0, prevCount - 1);
+      onUpdate?.(event.id, {
+        myResponse: newStatus,
+        attendees: { ...event.attendees, going: newGoing },
+      });
     } catch {
       // Revert
       setRsvpStatus(prevStatus);
@@ -181,7 +189,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete }: EventEx
     } finally {
       setRsvpLoading(false);
     }
-  }, [event.id, rsvpStatus, rsvpLoading, attendeeCount]);
+  }, [event.id, event.attendees, rsvpStatus, rsvpLoading, attendeeCount, onUpdate]);
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);

@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, isToday, addWeeks, subWeeks, addDays, isBefore, isAfter, parseISO } from 'date-fns';
+import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
 import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
+import { useEvents } from '@/lib/use-events';
+import { computeHourHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { MoonPhase } from '@/components/MoonPhase';
-import { TimeGutter, DEFAULT_HOUR_HEIGHT } from './TimeGutter';
+import { TimeGutter } from './TimeGutter';
 import { DayColumn } from './DayColumn';
 import { NowIndicator } from './NowIndicator';
 import { EventExpansion } from './EventExpansion';
@@ -18,27 +20,23 @@ interface WeeklyGridProps {
 }
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
-  const [localEvents, setLocalEvents] = useState<DisplayEvent[]>([]);
+  const { events, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
+
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
   );
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
-  const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
+  const [containerHeight, setContainerHeight] = useState(600);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Merge server events with locally created ones (dedup by id)
-  const events = React.useMemo(() => {
-    const ids = new Set(serverEvents.map(e => e.id));
-    return [...serverEvents, ...localEvents.filter(e => !ids.has(e.id))];
-  }, [serverEvents, localEvents]);
-
-  const handleEventCreated = useCallback((event: DisplayEvent) => {
-    setLocalEvents(prev => [...prev, event]);
-  }, []);
-
   const weekDays = getWeekDays(currentWeekStart);
+
+  // Golden hour heights — recompute when container resizes
+  const hourHeights = useMemo(() => computeHourHeights(containerHeight), [containerHeight]);
+  const hourOffsets = useMemo(() => computeHourOffsets(hourHeights), [hourHeights]);
+  const totalGridHeight = hourHeights.reduce((s, h) => s + h, 0);
 
   // Update current hour every minute
   useEffect(() => {
@@ -48,15 +46,14 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Dynamically compute hour height to fit viewport
+  // Measure container for golden hour sizing
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
 
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
-        const h = Math.floor(entry.contentRect.height / 24);
-        setHourHeight(Math.max(h, 20)); // minimum 20px
+        setContainerHeight(Math.floor(entry.contentRect.height));
       }
     });
     observer.observe(el);
@@ -83,7 +80,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     calendarSFX.play('navigate');
   }, []);
 
-  // Keyboard navigation — week nav only (no scrolling needed)
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
     switch (e.key) {
       case 'ArrowLeft':
@@ -111,6 +107,19 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     setExpansion({ event, rect });
   }, []);
 
+  const handleEventCreated = useCallback((event: DisplayEvent) => {
+    addEvent(event);
+  }, [addEvent]);
+
+  const handleEventDeleted = useCallback((id: string) => {
+    removeEvent(id);
+    setExpansion(null);
+  }, [removeEvent]);
+
+  const handleEventUpdated = useCallback((id: string, patch: Partial<DisplayEvent>) => {
+    updateEvent(id, patch);
+  }, [updateEvent]);
+
   // Week header label
   const weekLabel = (() => {
     const start = weekDays[0];
@@ -124,8 +133,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     return `${format(start, 'MMM')} – ${format(end, 'MMM yyyy')}`;
   })();
 
-  const totalGridHeight = 24 * hourHeight;
-
   return (
     <div
       className="flex flex-col h-full bg-grove-bg focus:outline-none"
@@ -135,13 +142,11 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     >
       {/* ── Header bar ── */}
       <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-grove-surface border-b border-grove-border">
-        {/* Moon phase + week label */}
         <div className="flex items-center gap-3">
           <MoonPhase />
           <span className="text-sm font-semibold text-grove-text">{weekLabel}</span>
         </div>
 
-        {/* Navigation */}
         <div className="flex items-center gap-1">
           <button
             onClick={goToPrevWeek}
@@ -172,7 +177,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
 
       {/* ── Day headers row ── */}
       <div className="flex-shrink-0 flex bg-grove-surface border-b border-grove-border">
-        {/* Spacer for time gutter */}
         <div className="w-14 flex-shrink-0" />
 
         {weekDays.map((day, i) => {
@@ -202,16 +206,14 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         })}
       </div>
 
-      {/* ── Popovers (rendered at grid level, outside scroll) ── */}
+      {/* ── Popovers ── */}
       {expansion && (
         <EventExpansion
           event={expansion.event}
           anchorRect={expansion.rect}
           onClose={() => setExpansion(null)}
-          onDelete={(id) => {
-            setLocalEvents(prev => prev.filter(e => e.id !== id));
-            setExpansion(null);
-          }}
+          onDelete={handleEventDeleted}
+          onUpdate={handleEventUpdated}
         />
       )}
       {quickCreate && (
@@ -232,13 +234,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
       >
         <div className="flex" style={{ height: totalGridHeight }}>
           {/* Time gutter */}
-          <TimeGutter hourHeight={hourHeight} />
+          <TimeGutter hourHeights={hourHeights} />
 
-          {/* Day columns + NowIndicator overlay wrapper */}
+          {/* Day columns + NowIndicator */}
           <div className="relative flex flex-1 min-w-0">
-            {/* NowIndicator — only on current week */}
             {isCurrentWeek(currentWeekStart) && (
-              <NowIndicator hourHeight={hourHeight} />
+              <NowIndicator hourHeights={hourHeights} hourOffsets={hourOffsets} />
             )}
 
             {/* Empty week hint */}
@@ -257,7 +258,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
               </div>
             )}
 
-            {/* Day columns */}
             {weekDays.map((day, i) => (
               <DayColumn
                 key={i}
@@ -265,7 +265,8 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                 events={events}
                 isToday={isToday(day)}
                 currentHour={currentHour}
-                hourHeight={hourHeight}
+                hourHeights={hourHeights}
+                hourOffsets={hourOffsets}
                 onCellClick={handleCellClick}
                 onEventClick={handleEventClick}
               />

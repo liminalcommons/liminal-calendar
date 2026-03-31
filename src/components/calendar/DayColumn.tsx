@@ -6,6 +6,7 @@ import { toDateKey } from '@/lib/calendar-utils';
 import { HourCell } from './HourCell';
 import { EventBlock } from './EventBlock';
 import { computeOverlapLayout } from './overlap';
+
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 interface DayColumnProps {
@@ -13,7 +14,8 @@ interface DayColumnProps {
   events: DisplayEvent[];
   isToday: boolean;
   currentHour?: number;
-  hourHeight: number;
+  hourHeights: number[];
+  hourOffsets: number[];
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
 }
@@ -26,10 +28,9 @@ function eventToMinutes(event: DisplayEvent): { startMinutes: number; endMinutes
   if (event.ends_at) {
     const end = new Date(event.ends_at);
     endMinutes = end.getHours() * 60 + end.getMinutes();
-    // Handle events spanning midnight: clamp to 24*60
     if (endMinutes <= startMinutes) endMinutes = 24 * 60;
   } else {
-    endMinutes = startMinutes + 60; // Default 1 hour
+    endMinutes = startMinutes + 60;
   }
   return { startMinutes, endMinutes };
 }
@@ -39,16 +40,14 @@ const DayColumn = React.memo(function DayColumn({
   events,
   isToday,
   currentHour,
-  hourHeight,
+  hourHeights,
+  hourOffsets,
   onCellClick,
   onEventClick,
 }: DayColumnProps) {
   const dateKey = toDateKey(day);
-
-  // Filter events to this day only
   const dayEvents = events.filter(e => toDateKey(new Date(e.starts_at)) === dateKey);
 
-  // Build overlap input
   const overlapInput = dayEvents.map(e => ({
     id: e.id,
     ...eventToMinutes(e),
@@ -66,12 +65,12 @@ const DayColumn = React.memo(function DayColumn({
           hour={hour}
           isToday={isToday}
           currentHour={currentHour}
-          hourHeight={hourHeight}
+          hourHeight={hourHeights[hour]}
           onCellClick={onCellClick}
         />
       ))}
 
-      {/* Event overlays */}
+      {/* Event overlays — positioned using golden hour offsets */}
       {dayEvents.map(event => {
         const overlap = overlapMap.get(event.id) ?? { colIndex: 0, colTotal: 1 };
         return (
@@ -80,7 +79,8 @@ const DayColumn = React.memo(function DayColumn({
             event={event}
             colIndex={overlap.colIndex}
             colTotal={overlap.colTotal}
-            hourHeight={hourHeight}
+            hourHeights={hourHeights}
+            hourOffsets={hourOffsets}
             onEventClick={onEventClick}
           />
         );
