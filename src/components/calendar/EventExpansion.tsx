@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { X, Edit2, Trash2, ExternalLink } from 'lucide-react';
+import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
@@ -19,8 +19,8 @@ interface EventExpansionProps {
   onUpdate?: (id: string, patch: Partial<DisplayEvent>) => void;
 }
 
-const POPOVER_WIDTH = 320;
-const POPOVER_APPROX_HEIGHT = 340;
+const POPOVER_WIDTH = 360;
+const POPOVER_APPROX_HEIGHT = 420;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   const vw = window.innerWidth;
@@ -275,30 +275,74 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       </div>
 
       {/* Body */}
-      <div className="px-4 pb-3 space-y-2">
+      <div className="px-4 pb-3 space-y-2.5">
         {/* Time + duration */}
-        <div className="text-xs text-grove-text-muted">
-          <span>{timeStr}</span>
-          <span className="ml-2 text-grove-accent-deep font-medium">({duration})</span>
+        <div className="flex items-center gap-2 text-xs text-grove-text-muted">
+          <Clock size={12} className="shrink-0 text-grove-accent" />
+          <div>
+            <span className="text-grove-text font-medium">{timeStr}</span>
+            <span className="ml-1.5 text-grove-accent-deep font-medium">({duration})</span>
+          </div>
         </div>
 
         {/* Host */}
-        <div className="text-xs text-grove-text-muted">
-          Host: <span className="text-grove-text font-medium">{event.creator_name}</span>
+        <div className="flex items-center gap-2 text-xs text-grove-text-muted">
+          {event.creator_image ? (
+            <img src={event.creator_image} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="w-4 h-4 rounded-full bg-grove-accent/20 shrink-0" />
+          )}
+          <span>Hosted by <span className="text-grove-text font-medium">{event.creator_name}</span></span>
         </div>
 
-        {/* Description */}
+        {/* Location */}
+        {event.location && !event.location.startsWith('http') && (
+          <div className="flex items-center gap-2 text-xs text-grove-text-muted">
+            <MapPin size={12} className="shrink-0" />
+            <span className="truncate">{event.location}</span>
+          </div>
+        )}
+
+        {/* Meeting link */}
+        {event.event_url && (
+          <div className="flex items-center gap-2 text-xs">
+            <Video size={12} className="shrink-0 text-grove-green" />
+            <a
+              href={event.event_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-grove-accent-deep hover:text-grove-accent truncate transition-colors"
+            >
+              Join meeting
+            </a>
+          </div>
+        )}
+
+        {/* Recurrence */}
+        {event.recurrenceRule && (
+          <div className="flex items-center gap-2 text-xs text-grove-text-muted">
+            <Repeat size={12} className="shrink-0" />
+            <span className="capitalize">{event.recurrenceRule}</span>
+          </div>
+        )}
+
+        {/* Description — show more text */}
         {event.description && (
-          <p className="text-xs text-grove-text-muted line-clamp-2 leading-relaxed">
+          <p className="text-xs text-grove-text-muted leading-relaxed line-clamp-5 whitespace-pre-line">
             {event.description.replace(/<[^>]*>/g, '')}
           </p>
         )}
 
-        {/* Attendee count */}
-        {attendeeCount > 0 && (
-          <p className="text-xs text-grove-text-muted">
-            <span className="font-medium text-grove-text">{attendeeCount}</span> going
-          </p>
+        {/* Attendees */}
+        {(attendeeCount > 0 || event.attendees.interested > 0) && (
+          <div className="flex items-center gap-2 text-xs text-grove-text-muted">
+            <Users size={12} className="shrink-0" />
+            <span>
+              {attendeeCount > 0 && <><span className="font-medium text-grove-text">{attendeeCount}</span> going</>}
+              {attendeeCount > 0 && event.attendees.interested > 0 && ' · '}
+              {event.attendees.interested > 0 && <><span className="font-medium text-grove-text">{event.attendees.interested}</span> interested</>}
+            </span>
+          </div>
         )}
       </div>
 
