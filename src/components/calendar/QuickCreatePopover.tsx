@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { X, ChevronDown, ChevronUp, Video, FileText } from 'lucide-react';
+import { X, Video, FileText, Repeat } from 'lucide-react';
 import { UserPicker, type PickedUser } from './UserPicker';
 import { useSession } from 'next-auth/react';
-import { format, addHours } from 'date-fns';
+import { format } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
@@ -18,8 +18,8 @@ interface QuickCreatePopoverProps {
   onCreated?: (event: DisplayEvent) => void;
 }
 
-const POPOVER_WIDTH = 320;
-const POPOVER_APPROX_HEIGHT = 280;
+const POPOVER_WIDTH = 340;
+const POPOVER_APPROX_HEIGHT = 480;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   const vw = window.innerWidth;
@@ -60,6 +60,18 @@ const DURATION_OPTIONS = [
   { label: '3 hours', minutes: 180 },
 ];
 
+const RECURRENCE_OPTIONS = [
+  { value: '', label: 'Does not repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'fortnightly', label: 'Biweekly' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
+const inputClass = `w-full text-xs bg-grove-border/20 border border-grove-border rounded-md px-2.5 py-1.5
+  text-grove-text placeholder:text-grove-text-muted
+  focus:outline-none focus:ring-1 focus:ring-grove-accent focus:border-grove-accent transition-colors`;
+
 export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }: QuickCreatePopoverProps) {
   const { data: session } = useSession();
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -69,8 +81,8 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
   const [description, setDescription] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(60);
+  const [recurrence, setRecurrence] = useState('');
   const [invitees, setInvitees] = useState<PickedUser[]>([]);
-  const [showMore, setShowMore] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,6 +132,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
     if (description.trim()) body.details = description.trim();
     if (meetingLink.trim()) body.location = meetingLink.trim();
+    if (recurrence) body.recurrence = recurrence;
     if (invitees.length) body.invitees = invitees.map(u => u.id);
 
     try {
@@ -144,7 +157,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     } finally {
       setIsCreating(false);
     }
-  }, [title, description, meetingLink, durationMinutes, invitees, day, hour, onCreated, onClose]);
+  }, [title, description, meetingLink, durationMinutes, recurrence, invitees, day, hour, onCreated, onClose]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) handleCreate();
@@ -154,13 +167,12 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
   const pos = computePosition(anchorRect);
   const dateTimeLabel = formatDateTimeLabel(day, hour);
-  const durationLabel = DURATION_OPTIONS.find(d => d.minutes === durationMinutes)?.label ?? `${durationMinutes} min`;
 
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border animate-in fade-in slide-in-from-top-1 duration-200"
-      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
+      className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border"
+      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
       role="dialog"
       aria-label="Quick create event"
     >
@@ -195,9 +207,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
         {/* Date/time + duration */}
         <div className="flex items-center justify-between text-xs">
-          <div className="text-grove-text-muted">
-            <span className="font-medium text-grove-text">{dateTimeLabel}</span>
-          </div>
+          <span className="font-medium text-grove-text">{dateTimeLabel}</span>
           <select
             value={durationMinutes}
             onChange={e => setDurationMinutes(Number(e.target.value))}
@@ -211,7 +221,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           </select>
         </div>
 
-        {/* Meeting link (always visible) */}
+        {/* Meeting link */}
         <div className="flex items-center gap-2">
           <Video size={14} className="text-grove-text-muted shrink-0" />
           <input
@@ -219,47 +229,45 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             value={meetingLink}
             onChange={e => setMeetingLink(e.target.value)}
             placeholder="Meeting link (optional)"
-            className="flex-1 text-xs bg-grove-border/20 border border-grove-border rounded-md px-2.5 py-1.5
-                       text-grove-text placeholder:text-grove-text-muted
-                       focus:outline-none focus:ring-1 focus:ring-grove-accent
-                       transition-colors"
+            className={`flex-1 ${inputClass}`}
             disabled={isCreating}
           />
         </div>
 
-        {/* More options toggle */}
-        <button
-          onClick={() => setShowMore(!showMore)}
-          className="flex items-center gap-1 text-xs text-grove-text-muted hover:text-grove-text transition-colors"
-        >
-          {showMore ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-          {showMore ? 'Less options' : 'More options'}
-        </button>
+        {/* Description */}
+        <div className="flex items-start gap-2">
+          <FileText size={14} className="text-grove-text-muted shrink-0 mt-1.5" />
+          <textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className={`flex-1 ${inputClass} resize-none`}
+            disabled={isCreating}
+          />
+        </div>
 
-        {/* Collapsible: description + invite */}
-        {showMore && (
-          <div className="space-y-2.5">
-            <div className="flex items-start gap-2">
-              <FileText size={14} className="text-grove-text-muted shrink-0 mt-1.5" />
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Description (optional)"
-                rows={2}
-                className="flex-1 text-xs bg-grove-border/20 border border-grove-border rounded-md px-2.5 py-1.5
-                           text-grove-text placeholder:text-grove-text-muted resize-none
-                           focus:outline-none focus:ring-1 focus:ring-grove-accent
-                           transition-colors"
-                disabled={isCreating}
-              />
-            </div>
-            <UserPicker
-              selected={invitees}
-              onChange={setInvitees}
-              disabled={isCreating}
-            />
-          </div>
-        )}
+        {/* Recurrence */}
+        <div className="flex items-center gap-2">
+          <Repeat size={14} className="text-grove-text-muted shrink-0" />
+          <select
+            value={recurrence}
+            onChange={e => setRecurrence(e.target.value)}
+            className={`flex-1 ${inputClass}`}
+            disabled={isCreating}
+          >
+            {RECURRENCE_OPTIONS.map(r => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Invite members */}
+        <UserPicker
+          selected={invitees}
+          onChange={setInvitees}
+          disabled={isCreating}
+        />
 
         {/* Error */}
         {error && (
