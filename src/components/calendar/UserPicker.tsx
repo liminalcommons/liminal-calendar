@@ -3,17 +3,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Users, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { inferTimezone, formatTimeInTimezone } from '@/lib/timezone-utils';
 
 export interface PickedUser {
   id: string;
   name: string;
   avatarUrl?: string | null;
+  location?: string | null;
 }
 
 interface UserPickerProps {
   selected: PickedUser[];
   onChange: (members: PickedUser[]) => void;
   disabled?: boolean;
+  /** Event start time — used to show each invitee's local time */
+  eventStart?: Date;
 }
 
 function Initials({ name }: { name: string }) {
@@ -42,7 +46,29 @@ function Avatar({ user }: { user: PickedUser }) {
   return <Initials name={user.name} />;
 }
 
-export function UserPicker({ selected, onChange, disabled }: UserPickerProps) {
+/** Show the user's location and their local time for the event */
+function LocalTimeLabel({ user, eventStart }: { user: PickedUser; eventStart?: Date }) {
+  if (!user.location) return null;
+
+  const tz = inferTimezone(user.location);
+  if (!tz || !eventStart) {
+    return <span className="text-grove-text-dim truncate">{user.location}</span>;
+  }
+
+  const localTime = formatTimeInTimezone(eventStart, tz);
+  const hour = parseInt(localTime, 10);
+  const isLate = localTime.toLowerCase().includes('pm')
+    ? (hour === 12 || hour >= 10) // 10pm, 11pm, 12am
+    : hour <= 5 || hour === 12; // 12am-5am
+
+  return (
+    <span className={`truncate ${isLate ? 'text-red-400' : 'text-grove-text-dim'}`}>
+      {user.location} · {localTime}
+    </span>
+  );
+}
+
+export function UserPicker({ selected, onChange, disabled, eventStart }: UserPickerProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PickedUser[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -50,7 +76,6 @@ export function UserPicker({ selected, onChange, disabled }: UserPickerProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -76,7 +101,6 @@ export function UserPicker({ selected, onChange, disabled }: UserPickerProps) {
         return;
       }
       const data: PickedUser[] = await res.json();
-      // Filter out already-selected members
       const selectedIds = new Set(selected.map(s => s.id));
       setResults(data.filter(m => !selectedIds.has(m.id)));
       setIsOpen(true);
@@ -140,13 +164,18 @@ export function UserPicker({ selected, onChange, disabled }: UserPickerProps) {
                          hover:bg-grove-border/30 transition-colors text-left"
             >
               <Avatar user={user} />
-              <span className="truncate">{user.name}</span>
+              <div className="flex flex-col min-w-0">
+                <span className="truncate font-medium">{user.name}</span>
+                {user.location && (
+                  <LocalTimeLabel user={user} eventStart={eventStart} />
+                )}
+              </div>
             </button>
           ))}
         </div>
       )}
 
-      {/* No results message */}
+      {/* No results */}
       {isOpen && results.length === 0 && query.trim() && !loading && (
         <div className="absolute z-50 left-5 right-0 mt-1 bg-grove-surface border border-grove-border rounded-md shadow-lg px-3 py-2">
           <span className="text-xs text-grove-text-muted">No members found</span>
@@ -163,7 +192,15 @@ export function UserPicker({ selected, onChange, disabled }: UserPickerProps) {
                          bg-grove-accent/10 border border-grove-accent/20 text-xs text-grove-text"
             >
               <Avatar user={user} />
-              <span className="truncate max-w-[100px]">{user.name}</span>
+              <span className="truncate max-w-[80px]">{user.name}</span>
+              {eventStart && user.location && (
+                <span className="text-[9px] text-grove-text-dim">
+                  {(() => {
+                    const tz = inferTimezone(user.location);
+                    return tz ? formatTimeInTimezone(eventStart, tz) : '';
+                  })()}
+                </span>
+              )}
               <button
                 onClick={() => handleRemove(user.id)}
                 className="p-0.5 rounded-full hover:bg-grove-accent/20 transition-colors"

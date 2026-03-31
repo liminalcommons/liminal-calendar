@@ -320,6 +320,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           selected={invitees}
           onChange={setInvitees}
           disabled={isCreating}
+          eventStart={buildStartTime(day, hour)}
         />
 
         {/* Error */}

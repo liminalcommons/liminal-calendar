@@ -145,7 +145,7 @@ const MEMBERS_QUERY = `
   query GroupMembers($groupId: ID!, $search: String, $first: Int) {
     group(id: $groupId) {
       members(first: $first, search: $search) {
-        items { id name avatarUrl }
+        items { id name avatarUrl location }
       }
     }
   }
@@ -157,6 +157,7 @@ export interface HyloMember {
   id: string;
   name: string;
   avatarUrl: string | null;
+  location: string | null;
 }
 
 export async function getGroupMembers(
