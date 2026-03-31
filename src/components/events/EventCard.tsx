@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { Video, ExternalLink } from 'lucide-react'
 import { RuneAccent } from '@/components/RuneAccent'
 import { formatTimeInTimezone, getUserTimezone } from '@/lib/timezone-utils'
 import { formatDuration } from '@/lib/calendar-utils'
@@ -77,6 +78,22 @@ export function EventCard({ event }: EventCardProps) {
             <p className="text-xs text-grove-text-dim mt-1 line-clamp-2">
               {event.description.replace(/<[^>]*>/g, '')}
             </p>
+          )}
+
+          {/* Meeting link */}
+          {event.event_url && (
+            <a
+              href={event.event_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-grove-green hover:text-grove-green-deep
+                         bg-grove-green/10 border border-grove-green/20 rounded px-2 py-1 mt-1.5 transition-colors"
+            >
+              <Video size={12} className="shrink-0" />
+              Join Meeting
+              <ExternalLink size={9} className="shrink-0 opacity-60" />
+            </a>
           )}
 
           {/* Bottom row: attendees + relative time */}
