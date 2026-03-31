@@ -306,16 +306,33 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
 
         {/* Meeting link */}
         {event.event_url && (
-          <div className="flex items-center gap-2 text-xs">
-            <Video size={12} className="shrink-0 text-grove-green" />
+          <div className="rounded-lg bg-grove-green/10 border border-grove-green/30 px-3 py-2 space-y-1.5">
             <a
               href={event.event_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-grove-accent-deep hover:text-grove-accent truncate transition-colors"
+              className="flex items-center gap-2 text-xs font-semibold text-grove-green hover:text-grove-green-deep transition-colors"
             >
-              Join meeting
+              <Video size={14} className="shrink-0" />
+              Join Meeting
+              <ExternalLink size={10} className="shrink-0 opacity-60" />
             </a>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-grove-text-muted truncate flex-1 font-mono select-all">
+                {event.event_url}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(event.event_url!);
+                }}
+                className="text-[10px] text-grove-accent-deep hover:text-grove-accent px-1.5 py-0.5
+                           rounded border border-grove-border/60 hover:bg-grove-border/20
+                           transition-colors shrink-0"
+              >
+                Copy
+              </button>
+            </div>
           </div>
         )}
 
