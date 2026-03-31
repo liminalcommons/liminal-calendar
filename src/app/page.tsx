@@ -3,9 +3,11 @@ import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { asc } from 'drizzle-orm';
+import { addMonths } from 'date-fns';
 import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
+import { expandRecurringEvents } from '@/lib/recurrence-expander';
 import type { DisplayEvent } from '@/lib/display-event';
 
 export const dynamic = 'force-dynamic';
@@ -32,9 +34,15 @@ export default async function HomePage() {
       rsvpsByEvent.set(rsvp.eventId, list);
     }
 
-    displayEvents = allEvents.map((event) =>
+    const baseEvents = allEvents.map((event) =>
       dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
     );
+
+    // Expand recurring events over a 6-month window
+    const now = new Date();
+    const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // 1 month ago
+    const rangeEnd = addMonths(now, 6);
+    displayEvents = expandRecurringEvents(baseEvents, rangeStart, rangeEnd);
   } catch (e) {
     console.error('Failed to load events:', e instanceof Error ? e.message : String(e));
   }
