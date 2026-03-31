@@ -60,7 +60,7 @@ const DayColumn = React.memo(function DayColumn({
   const overlapMap = computeOverlapLayout(overlapInput);
 
   return (
-    <div className="relative flex-1 min-w-0 border-l border-grove-border/70">
+    <div className="relative flex-1 min-w-0 border-l border-grove-border">
       {/* Hour cells */}
       {HOURS.map(hour => (
         <HourCell

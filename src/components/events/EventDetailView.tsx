@@ -9,13 +9,10 @@ import {
   getUserTimezone,
   formatTimeInTimezone,
   formatDateInTimezone,
-  COMMUNITY_TIMEZONES,
-  isLateNightInAnyTimezone,
 } from '@/lib/timezone-utils';
 import { formatDuration } from '@/lib/calendar-utils';
 import { downloadICS } from '@/lib/ics-generator';
 import { apiFetch } from '@/lib/api-fetch';
-import { TimeZoneStrip } from '@/components/timezone/TimeZoneStrip';
 import { EventRSVP } from './EventRSVP';
 
 interface EventDetailViewProps {
@@ -144,9 +141,6 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   const startDate = new Date(event.starts_at);
   const endDate = event.ends_at ? new Date(event.ends_at) : null;
   const duration = formatDuration(event.starts_at, event.ends_at);
-  const communityTzIds = COMMUNITY_TIMEZONES.map(tz => tz.id);
-  const lateNight = isLateNightInAnyTimezone(startDate, communityTzIds);
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Back navigation */}
@@ -217,16 +211,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
             Your timezone: {timezone.split('/').pop()?.replace(/_/g, ' ')}
           </p>
 
-          {/* Late-night warning */}
-          {lateNight && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">
-              🌙 This event falls during late-night hours for some community members
-            </p>
-          )}
         </div>
-
-        {/* TimeZoneStrip */}
-        <TimeZoneStrip selectedTime={startDate} userTimezone={timezone} />
 
         {/* Description */}
         {event.description && (

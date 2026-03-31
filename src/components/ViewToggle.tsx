@@ -5,6 +5,7 @@ import { calendarSFX } from '@/lib/sound-manager';
 
 const VIEWS = [
   { label: 'Week', path: '/' },
+  { label: 'Month', path: '/month' },
   { label: 'List', path: '/list' },
 ] as const;
 

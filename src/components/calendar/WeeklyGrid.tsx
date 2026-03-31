@@ -28,13 +28,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
-  const [containerHeight, setContainerHeight] = useState(600);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const weekDays = getWeekDays(currentWeekStart);
 
-  // Golden hour heights — recompute when container resizes
-  const hourHeights = useMemo(() => computeHourHeights(containerHeight), [containerHeight]);
+  // Uniform hour heights
+  const hourHeights = useMemo(() => computeHourHeights(0), []);
   const hourOffsets = useMemo(() => computeHourOffsets(hourHeights), [hourHeights]);
   const totalGridHeight = hourHeights.reduce((s, h) => s + h, 0);
 
@@ -46,19 +45,16 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Measure container for golden hour sizing
+  // Scroll to midday on initial load
+  const hasScrolledRef = useRef(false);
   useEffect(() => {
     const el = gridRef.current;
-    if (!el) return;
-
-    const observer = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        setContainerHeight(Math.floor(entry.contentRect.height));
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (!el || hasScrolledRef.current) return;
+    // Scroll to 11 AM so noon is nicely visible
+    const targetOffset = hourOffsets[11] ?? 0;
+    el.scrollTop = targetOffset;
+    hasScrolledRef.current = true;
+  }, [hourOffsets]);
 
   function isCurrentWeek(weekStart: Date): boolean {
     const todayWeek = getWeekStart(new Date());
@@ -187,7 +183,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           return (
             <div
               key={i}
-              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border/70"
+              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border"
             >
               <span className={`text-[10px] font-medium uppercase tracking-wider ${
                 today ? 'text-grove-accent' : 'text-grove-text-muted'
@@ -226,10 +222,10 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         />
       )}
 
-      {/* ── Grid body — fills remaining space, no scroll ── */}
+      {/* ── Grid body — fills remaining space, scrollable ── */}
       <div
         ref={gridRef}
-        className="flex-1 overflow-hidden"
+        className="flex-1 overflow-y-auto"
         style={{ minHeight: 0 }}
       >
         <div className="flex" style={{ height: totalGridHeight }}>

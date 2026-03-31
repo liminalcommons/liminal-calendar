@@ -1,45 +1,12 @@
 /**
- * Golden hour layout — smooth gaussian expansion of working hours.
- *
- * Uses a bell curve centered on 14:00 (2 PM) with a wide spread so
- * the transition from expanded to compressed is gradual and organic.
- * No hard cutoffs — every hour blends smoothly into the next.
+ * Uniform hour heights — each row is the same size.
+ * The grid scrolls, so we don't need to compress hours to fit the viewport.
  */
 
-const CENTER = 14;   // Peak of the bell curve (2 PM)
-const SIGMA = 6;     // Wider spread for gentler taper
-const MIN_WEIGHT = 0.7; // Off-hours still get decent space
-const MAX_WEIGHT = 1.8; // Golden hours get ~2.5x off-hours, not 10x
+const HOUR_HEIGHT = 64; // px — comfortable row height for readability
 
-function hourWeight(hour: number): number {
-  // Gaussian: e^(-(x-center)^2 / (2*sigma^2))
-  const dist = hour - CENTER;
-  const gaussian = Math.exp(-(dist * dist) / (2 * SIGMA * SIGMA));
-  // Scale from [0,1] gaussian to [MIN_WEIGHT, MAX_WEIGHT]
-  return MIN_WEIGHT + gaussian * (MAX_WEIGHT - MIN_WEIGHT);
-}
-
-export function computeHourHeights(totalHeight: number): number[] {
-  const weights = Array.from({ length: 24 }, (_, i) => hourWeight(i));
-  const totalWeight = weights.reduce((s, w) => s + w, 0);
-  const unit = totalHeight / totalWeight;
-
-  const raw = weights.map(w => w * unit);
-
-  // Floor and distribute remainder
-  const floored = raw.map(h => Math.floor(h));
-  let remainder = totalHeight - floored.reduce((s, h) => s + h, 0);
-
-  const indices = Array.from({ length: 24 }, (_, i) => i)
-    .sort((a, b) => (raw[b] - floored[b]) - (raw[a] - floored[a]));
-
-  for (const i of indices) {
-    if (remainder <= 0) break;
-    floored[i]++;
-    remainder--;
-  }
-
-  return floored;
+export function computeHourHeights(_totalHeight: number): number[] {
+  return Array.from({ length: 24 }, () => HOUR_HEIGHT);
 }
 
 /** Cumulative top offsets for each hour */

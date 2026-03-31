@@ -15,9 +15,11 @@ interface EventBlockProps {
 }
 
 function hashId(id: string): number {
+  // Strip recurring instance suffix (e.g., "10-20260412" → "10") so all instances share the same color
+  const baseId = id.replace(/-\d{8}$/, '');
   let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < baseId.length; i++) {
+    h = (h * 31 + baseId.charCodeAt(i)) >>> 0;
   }
   return h % 2;
 }

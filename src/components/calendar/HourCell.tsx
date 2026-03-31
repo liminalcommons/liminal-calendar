@@ -11,10 +11,6 @@ interface HourCellProps {
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
 }
 
-function isDayHour(hour: number): boolean {
-  return hour >= 12 && hour <= 21;
-}
-
 const HourCell = React.memo(function HourCell({
   day,
   hour,
@@ -24,20 +20,17 @@ const HourCell = React.memo(function HourCell({
   onCellClick,
 }: HourCellProps) {
   const isCurrentHour = isToday && currentHour === hour;
-  const isDay = isDayHour(hour);
   const isEven = hour % 2 === 0;
 
   let cellClass =
-    'relative border-b border-grove-border/70 transition-colors';
+    'relative border-b border-grove-border transition-colors';
 
   if (isCurrentHour) {
     cellClass += ' bg-grove-accent/15';
-  } else if (isDay) {
-    // Golden hours — warm, clearly distinct
-    cellClass += isEven ? ' bg-grove-hour-golden' : ' bg-grove-hour-golden/80';
+  } else if (isEven) {
+    cellClass += ' bg-grove-surface/80';
   } else {
-    // Off-hours — noticeably darker/cooler
-    cellClass += isEven ? ' bg-grove-hour-off' : ' bg-grove-hour-off/80';
+    cellClass += ' bg-grove-border/20';
   }
 
   if (onCellClick) {
