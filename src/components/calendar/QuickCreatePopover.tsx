@@ -9,6 +9,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
+import { COMMUNITY_TIMEZONES, formatTimeInTimezone, getHourInTimezone } from '@/lib/timezone-utils';
 
 interface QuickCreatePopoverProps {
   day: Date;
@@ -219,6 +220,20 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
               <option key={d.minutes} value={d.minutes}>{d.label}</option>
             ))}
           </select>
+        </div>
+
+        {/* Timezone preview — show event time across community timezones */}
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-grove-text-muted px-0.5">
+          {COMMUNITY_TIMEZONES.filter((_, i) => i % 2 === 0 || i === COMMUNITY_TIMEZONES.length - 1).map(tz => {
+            const eventStart = buildStartTime(day, hour);
+            const h = getHourInTimezone(eventStart, tz.id);
+            const isLate = h >= 22 || h <= 5;
+            return (
+              <span key={tz.id} className={isLate ? 'text-red-400' : ''}>
+                {tz.label} {formatTimeInTimezone(eventStart, tz.id)}
+              </span>
+            );
+          })}
         </div>
 
         {/* Meeting link */}

@@ -17,7 +17,8 @@ interface WeeklyGridProps {
   events: DisplayEvent[];
 }
 
-export function WeeklyGrid({ events }: WeeklyGridProps) {
+export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
+  const [localEvents, setLocalEvents] = useState<DisplayEvent[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
   );
@@ -26,6 +27,16 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
   const [hourHeight, setHourHeight] = useState(DEFAULT_HOUR_HEIGHT);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // Merge server events with locally created ones (dedup by id)
+  const events = React.useMemo(() => {
+    const ids = new Set(serverEvents.map(e => e.id));
+    return [...serverEvents, ...localEvents.filter(e => !ids.has(e.id))];
+  }, [serverEvents, localEvents]);
+
+  const handleEventCreated = useCallback((event: DisplayEvent) => {
+    setLocalEvents(prev => [...prev, event]);
+  }, []);
 
   const weekDays = getWeekDays(currentWeekStart);
 
@@ -197,7 +208,10 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
           event={expansion.event}
           anchorRect={expansion.rect}
           onClose={() => setExpansion(null)}
-          onDelete={() => setExpansion(null)}
+          onDelete={(id) => {
+            setLocalEvents(prev => prev.filter(e => e.id !== id));
+            setExpansion(null);
+          }}
         />
       )}
       {quickCreate && (
@@ -206,6 +220,7 @@ export function WeeklyGrid({ events }: WeeklyGridProps) {
           hour={quickCreate.hour}
           anchorRect={quickCreate.rect}
           onClose={() => setQuickCreate(null)}
+          onCreated={handleEventCreated}
         />
       )}
 
