@@ -154,7 +154,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
     if (description.trim()) body.details = description.trim();
     if (meetingLink.trim()) body.location = meetingLink.trim();
-    if (recurrence) body.recurrence = recurrence;
+    if (recurrence) body.recurrenceRule = recurrence;
     if (invitees.length) body.invitees = invitees.map(u => u.id);
     if (hyloGroupId) body.hyloGroupId = hyloGroupId;
 
