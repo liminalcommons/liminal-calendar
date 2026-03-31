@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../../../auth';
-import { respondToEvent, getEventAttendees } from '@/lib/hylo-client';
+import { db } from '@/lib/db';
+import { events, rsvps } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -10,11 +12,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
-  if (!session || !(session as any).accessToken) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id } = await params;
+  const numId = parseInt(id, 10);
+  if (isNaN(numId)) {
+    return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
+  }
 
   let body: unknown;
   try {
@@ -31,9 +37,39 @@ export async function POST(
     );
   }
 
+  // Verify event exists
+  const [event] = await db.select().from(events).where(eq(events.id, numId));
+  if (!event) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  }
+
+  const user = session.user as any;
+  const userId = user.hyloId ?? user.id ?? 'unknown';
+  const userName = user.name ?? 'Unknown';
+  const userImage = user.image ?? null;
+
   try {
-    const token = (session as any).accessToken as string;
-    await respondToEvent(token, id, response as ValidResponse);
+    // Upsert: try to update existing RSVP, insert if not found
+    const [existing] = await db
+      .select()
+      .from(rsvps)
+      .where(and(eq(rsvps.eventId, numId), eq(rsvps.userId, userId)));
+
+    if (existing) {
+      await db
+        .update(rsvps)
+        .set({ status: response as string, userName, userImage })
+        .where(eq(rsvps.id, existing.id));
+    } else {
+      await db.insert(rsvps).values({
+        eventId: numId,
+        userId,
+        userName,
+        userImage,
+        status: response as string,
+      });
+    }
+
     return NextResponse.json({ success: true, response });
   } catch (err) {
     console.error('[POST /api/events/[id]/rsvp]', err);
@@ -45,16 +81,44 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session || !(session as any).accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id } = await params;
+  const numId = parseInt(id, 10);
+  if (isNaN(numId)) {
+    return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const { id } = await params;
-
   try {
-    const token = (session as any).accessToken as string;
-    const { creator, invitations } = await getEventAttendees(token, id);
+    // Fetch event for creator info
+    const [event] = await db.select().from(events).where(eq(events.id, numId));
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    // Fetch RSVPs
+    const eventRsvps = await db
+      .select()
+      .from(rsvps)
+      .where(eq(rsvps.eventId, numId));
+
+    const creator = {
+      id: event.creatorId,
+      name: event.creatorName,
+      avatarUrl: event.creatorImage,
+    };
+
+    const invitations = {
+      total: eventRsvps.length,
+      items: eventRsvps.map((r) => ({
+        id: String(r.id),
+        person: {
+          id: r.userId,
+          name: r.userName,
+          avatarUrl: r.userImage,
+        },
+        response: r.status,
+      })),
+    };
+
     return NextResponse.json({ creator, invitations });
   } catch (err) {
     console.error('[GET /api/events/[id]/rsvp]', err);

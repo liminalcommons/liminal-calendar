@@ -1,32 +1,42 @@
-import { redirect } from 'next/navigation';
 import { auth } from '../../auth';
-import { getEvents, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
-import { hyloEventToDisplayEvent } from '@/lib/display-event';
+import { db } from '@/lib/db';
+import { events, rsvps } from '@/lib/db/schema';
+import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
+import { asc } from 'drizzle-orm';
 import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
+import type { DisplayEvent } from '@/lib/display-event';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const session = await auth();
+  const currentUserId = (session?.user as any)?.hyloId as string | undefined;
 
-  // If not authenticated, show sign-in prompt (don't redirect — let NavBar handle it)
-  let events: ReturnType<typeof hyloEventToDisplayEvent>[] = [];
+  let displayEvents: DisplayEvent[] = [];
 
-  if (session?.accessToken) {
-    try {
-      const raw = await getEvents(session.accessToken, LIMINAL_COMMONS_GROUP_ID);
-      events = raw.map(hyloEventToDisplayEvent);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('Failed to load events:', msg);
-      // If Hylo rejected the token, force re-auth through gateway
-      if (msg.includes('401')) {
-        const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
-        redirect(`${gateway}/signin?callbackUrl=${encodeURIComponent('https://calendar.castalia.one')}`);
-      }
+  try {
+    const allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
+
+    // Fetch all RSVPs in one query
+    const allRsvps = allEvents.length > 0
+      ? await db.select().from(rsvps)
+      : [];
+
+    // Group RSVPs by event ID
+    const rsvpsByEvent = new Map<number, typeof allRsvps>();
+    for (const rsvp of allRsvps) {
+      const list = rsvpsByEvent.get(rsvp.eventId) ?? [];
+      list.push(rsvp);
+      rsvpsByEvent.set(rsvp.eventId, list);
     }
+
+    displayEvents = allEvents.map((event) =>
+      dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
+    );
+  } catch (e) {
+    console.error('Failed to load events:', e instanceof Error ? e.message : String(e));
   }
 
   return (
@@ -34,7 +44,7 @@ export default async function HomePage() {
       <NavBar />
       <SubscribeBanner />
       <main className="flex-1 h-[calc(100vh-56px)]">
-        <WeeklyGrid events={events} />
+        <WeeklyGrid events={displayEvents} />
       </main>
     </div>
   );

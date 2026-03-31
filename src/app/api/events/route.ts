@@ -1,39 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../auth';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
-import { getEvents, createEvent, LIMINAL_COMMONS_GROUP_ID } from '@/lib/hylo-client';
-import { hyloEventToDisplayEvent } from '@/lib/display-event';
+import { db } from '@/lib/db';
+import { events, rsvps } from '@/lib/db/schema';
+import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
+import { asc, eq } from 'drizzle-orm';
 
 export async function GET() {
-  const session = await auth();
-  if (!session || !(session as any).accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
-    const token = (session as any).accessToken as string;
-    const events = await getEvents(token, LIMINAL_COMMONS_GROUP_ID);
-    const displayEvents = events.map(hyloEventToDisplayEvent);
+    const allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
+
+    // Fetch all RSVPs in one query
+    const allRsvps = allEvents.length > 0
+      ? await db.select().from(rsvps)
+      : [];
+
+    // Group RSVPs by event ID
+    const rsvpsByEvent = new Map<number, typeof allRsvps>();
+    for (const rsvp of allRsvps) {
+      const list = rsvpsByEvent.get(rsvp.eventId) ?? [];
+      list.push(rsvp);
+      rsvpsByEvent.set(rsvp.eventId, list);
+    }
+
+    // Get current user for myResponse
+    const session = await auth();
+    const currentUserId = (session?.user as any)?.hyloId as string | undefined;
+
+    const displayEvents = allEvents.map((event) =>
+      dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
+    );
+
     return NextResponse.json(displayEvents);
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('[GET /api/events]', errMsg);
-    if (errMsg.includes('401')) {
-      return NextResponse.json({ error: 'token_expired', reauth: true }, { status: 401 });
-    }
+    console.error('[GET /api/events]', err);
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session || !(session as any).accessToken) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const role = getUserRole(session);
   if (!canCreateEvents(role)) {
-    return NextResponse.json({ error: 'Forbidden: only hosts and admins can create events' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Forbidden: only hosts and admins can create events' },
+      { status: 403 },
+    );
   }
 
   let body: unknown;
@@ -43,7 +59,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { title, startTime, endTime, details, timezone, location, imageUrl } = body as Record<string, unknown>;
+  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule } =
+    body as Record<string, unknown>;
 
   if (!title || typeof title !== 'string' || !title.trim()) {
     return NextResponse.json({ error: 'title is required' }, { status: 400 });
@@ -64,18 +81,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'endTime is not a valid date' }, { status: 400 });
   }
 
+  const user = session.user as any;
+
   try {
-    const token = (session as any).accessToken as string;
-    const created = await createEvent(token, LIMINAL_COMMONS_GROUP_ID, {
-      title: (title as string).trim(),
-      startTime: startDate,
-      endTime: endDate,
-      details: typeof details === 'string' ? details : undefined,
-      timezone: typeof timezone === 'string' ? timezone : undefined,
-      location: typeof location === 'string' ? location : undefined,
-      imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
-    });
-    return NextResponse.json(hyloEventToDisplayEvent(created), { status: 201 });
+    const [created] = await db
+      .insert(events)
+      .values({
+        title: (title as string).trim(),
+        description: typeof details === 'string' ? details : null,
+        startsAt: startDate,
+        endsAt: endDate,
+        timezone: typeof timezone === 'string' ? timezone : 'UTC',
+        location: typeof location === 'string' ? location : null,
+        imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
+        recurrenceRule: typeof recurrenceRule === 'string' ? recurrenceRule : null,
+        creatorId: user.hyloId ?? user.id ?? 'unknown',
+        creatorName: user.name ?? 'Unknown',
+        creatorImage: user.image ?? null,
+      })
+      .returning();
+
+    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
