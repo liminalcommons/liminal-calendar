@@ -1,19 +1,22 @@
 /**
- * Golden hour layout — expand working hours, compress off-hours.
+ * Golden hour layout — smooth gaussian expansion of working hours.
  *
- * Returns an array of 24 pixel heights that sum to `totalHeight`.
- * Hours near the "golden" range get more space; late night / early morning get compressed.
+ * Uses a bell curve centered on 14:00 (2 PM) with a wide spread so
+ * the transition from expanded to compressed is gradual and organic.
+ * No hard cutoffs — every hour blends smoothly into the next.
  */
 
-/** Weight per hour — higher = more vertical space */
+const CENTER = 14;   // Peak of the bell curve (2 PM)
+const SIGMA = 5.5;   // Width — controls how gradually it tapers
+const MIN_WEIGHT = 0.3; // Floor so off-hours never fully vanish
+const MAX_WEIGHT = 3.0; // Cap so peak hours don't dominate too much
+
 function hourWeight(hour: number): number {
-  // Golden hours: 8am–8pm (peak activity)
-  if (hour >= 8 && hour <= 20) return 3;
-  // Shoulder hours: 6–7am, 9–10pm
-  if (hour >= 6 && hour <= 7) return 1.8;
-  if (hour >= 21 && hour <= 22) return 1.8;
-  // Off-hours: 11pm–5am
-  return 0.5;
+  // Gaussian: e^(-(x-center)^2 / (2*sigma^2))
+  const dist = hour - CENTER;
+  const gaussian = Math.exp(-(dist * dist) / (2 * SIGMA * SIGMA));
+  // Scale from [0,1] gaussian to [MIN_WEIGHT, MAX_WEIGHT]
+  return MIN_WEIGHT + gaussian * (MAX_WEIGHT - MIN_WEIGHT);
 }
 
 export function computeHourHeights(totalHeight: number): number[] {
@@ -21,14 +24,12 @@ export function computeHourHeights(totalHeight: number): number[] {
   const totalWeight = weights.reduce((s, w) => s + w, 0);
   const unit = totalHeight / totalWeight;
 
-  // Compute raw heights
   const raw = weights.map(w => w * unit);
 
-  // Floor everything and distribute remainder pixel by pixel
+  // Floor and distribute remainder
   const floored = raw.map(h => Math.floor(h));
   let remainder = totalHeight - floored.reduce((s, h) => s + h, 0);
 
-  // Give leftover pixels to the golden hours first
   const indices = Array.from({ length: 24 }, (_, i) => i)
     .sort((a, b) => (raw[b] - floored[b]) - (raw[a] - floored[a]));
 
