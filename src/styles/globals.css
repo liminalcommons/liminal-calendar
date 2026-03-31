@@ -13,6 +13,8 @@
   --grove-accent-deep: 94 74 56;
   --grove-green: 106 123 90;
   --grove-green-deep: 74 106 58;
+  --grove-hour-golden: 245 238 226;
+  --grove-hour-off: 228 219 204;
   --hour-height: 60px;
 }
 
@@ -27,6 +29,8 @@
   --grove-accent-deep: 196 147 90;
   --grove-green: 122 139 106;
   --grove-green-deep: 90 122 74;
+  --grove-hour-golden: 42 36 28;
+  --grove-hour-off: 22 19 15;
 }
 
 html,

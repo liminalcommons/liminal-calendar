@@ -24,6 +24,8 @@ export default {
         "grove-accent-deep": withOpacity("--grove-accent-deep"),
         "grove-green": withOpacity("--grove-green"),
         "grove-green-deep": withOpacity("--grove-green-deep"),
+        "grove-hour-golden": withOpacity("--grove-hour-golden"),
+        "grove-hour-off": withOpacity("--grove-hour-off"),
       },
       fontFamily: {
         serif: ["Georgia", "Cambria", "Times New Roman", "serif"],
