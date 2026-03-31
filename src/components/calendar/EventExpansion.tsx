@@ -217,8 +217,9 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   return (
     <div
       ref={popoverRef}
-      className={`fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border transition-all duration-300 ${
-        closing ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+      className={`fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border
+        transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        closing ? 'opacity-0 scale-95 translate-y-2' : 'opacity-100 scale-100 translate-y-0'
       }`}
       style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
       role="dialog"

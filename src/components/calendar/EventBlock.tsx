@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import type { DisplayEvent } from '@/lib/display-event';
 
 interface EventBlockProps {
@@ -9,10 +9,11 @@ interface EventBlockProps {
   colTotal: number;
   hourHeights: number[];
   hourOffsets: number[];
+  isDissolving?: boolean;
+  isSpawning?: boolean;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
 }
 
-/** Simple string hash → 0 or 1, used to alternate accent/green gradient */
 function hashId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) {
@@ -42,9 +43,6 @@ function getRecurrenceLabel(rule?: string): string | null {
 
 const MIN_DISPLAY_MINUTES = 15;
 
-/**
- * Convert a minute offset to a pixel position using variable hour heights.
- */
 function minutesToPx(minutes: number, hourOffsets: number[], hourHeights: number[]): number {
   const hour = Math.min(Math.floor(minutes / 60), 23);
   const frac = (minutes - hour * 60) / 60;
@@ -57,6 +55,8 @@ const EventBlock = React.memo(function EventBlock({
   colTotal,
   hourHeights,
   hourOffsets,
+  isDissolving,
+  isSpawning,
   onEventClick,
 }: EventBlockProps) {
   const blockRef = useRef<HTMLDivElement>(null);
@@ -82,20 +82,19 @@ const EventBlock = React.memo(function EventBlock({
 
   const recurrenceLabel = getRecurrenceLabel(event.recurrenceRule);
 
-  useEffect(() => {
-    const el = blockRef.current;
-    if (!el) return;
-    el.classList.add('glitch-spawn');
-    const timer = setTimeout(() => el.classList.remove('glitch-spawn'), 400);
-    return () => clearTimeout(timer);
-  }, []);
+  // Animation class: spawn on creation, dissolve on deletion
+  let animClass = '';
+  if (isDissolving) animClass = 'glitch-dissolve';
+  else if (isSpawning) animClass = 'glitch-spawn';
 
   return (
     <div
       ref={blockRef}
-      className="absolute rounded-md px-1.5 py-0.5 overflow-hidden cursor-pointer
-                 shadow-sm hover:shadow-md transition-shadow z-10
-                 border border-white/20 select-none"
+      className={`absolute rounded-md px-1.5 py-0.5 overflow-hidden cursor-pointer
+                 shadow-sm hover:shadow-md hover:brightness-110
+                 transition-all duration-300 ease-out z-10
+                 border border-white/20 select-none
+                 ${animClass}`}
       style={{
         top: topPx,
         height: heightPx,

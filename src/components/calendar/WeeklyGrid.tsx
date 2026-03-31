@@ -20,7 +20,7 @@ interface WeeklyGridProps {
 }
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
-  const { events, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
+  const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
@@ -267,6 +267,8 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                 currentHour={currentHour}
                 hourHeights={hourHeights}
                 hourOffsets={hourOffsets}
+                dissolvingIds={dissolvingIds}
+                spawningIds={spawningIds}
                 onCellClick={handleCellClick}
                 onEventClick={handleEventClick}
               />

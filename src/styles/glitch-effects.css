@@ -1,17 +1,20 @@
-/* Grove glitch-inspired transition animations */
+/* Grove-inspired transition animations — smooth and organic */
 
 @keyframes glitch-spawn-keyframes {
   0% {
     opacity: 0;
-    transform: translateY(4px) scale(0.95);
+    transform: translateY(8px) scale(0.92);
+    filter: blur(2px);
   }
-  60% {
-    opacity: 0.8;
-    transform: translateY(-1px) scale(1.02);
+  50% {
+    opacity: 0.7;
+    transform: translateY(-2px) scale(1.01);
+    filter: blur(0.5px);
   }
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
 }
 
@@ -19,14 +22,17 @@
   0% {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
   }
-  40% {
-    opacity: 0.8;
-    transform: translateY(-1px) scale(1.02);
+  50% {
+    opacity: 0.5;
+    transform: translateY(-3px) scale(1.02);
+    filter: blur(1px);
   }
   100% {
     opacity: 0;
-    transform: translateY(4px) scale(0.95);
+    transform: translateY(8px) scale(0.9);
+    filter: blur(3px);
   }
 }
 
@@ -35,7 +41,7 @@
     box-shadow: 0 0 0 0 rgba(196, 147, 90, 0);
   }
   40% {
-    box-shadow: 0 0 8px 2px rgba(196, 147, 90, 0.4);
+    box-shadow: 0 0 12px 3px rgba(196, 147, 90, 0.35);
   }
   100% {
     box-shadow: 0 0 0 0 rgba(196, 147, 90, 0);
@@ -43,15 +49,16 @@
 }
 
 .glitch-spawn {
-  animation: glitch-spawn-keyframes 400ms ease-out both;
+  animation: glitch-spawn-keyframes 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .glitch-dissolve {
-  animation: glitch-dissolve-keyframes 350ms ease-in both;
+  animation: glitch-dissolve-keyframes 400ms cubic-bezier(0.55, 0, 1, 0.45) both;
+  pointer-events: none;
 }
 
 .glitch-shimmer {
-  animation: glitch-shimmer-keyframes 500ms ease-in-out both;
+  animation: glitch-shimmer-keyframes 600ms ease-in-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -16,6 +16,8 @@ interface DayColumnProps {
   currentHour?: number;
   hourHeights: number[];
   hourOffsets: number[];
+  dissolvingIds: Set<string>;
+  spawningIds: Set<string>;
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
 }
@@ -42,6 +44,8 @@ const DayColumn = React.memo(function DayColumn({
   currentHour,
   hourHeights,
   hourOffsets,
+  dissolvingIds,
+  spawningIds,
   onCellClick,
   onEventClick,
 }: DayColumnProps) {
@@ -81,6 +85,8 @@ const DayColumn = React.memo(function DayColumn({
             colTotal={overlap.colTotal}
             hourHeights={hourHeights}
             hourOffsets={hourOffsets}
+            isDissolving={dissolvingIds.has(event.id)}
+            isSpawning={spawningIds.has(event.id)}
             onEventClick={onEventClick}
           />
         );
