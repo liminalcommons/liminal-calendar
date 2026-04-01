@@ -21,8 +21,8 @@ interface Member {
 const ROLES = ['member', 'host', 'admin'] as const;
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: 'bg-red-100 text-red-800 border-red-200',
-  host: 'bg-amber-100 text-amber-800 border-amber-200',
+  admin: 'bg-red-900/30 text-red-300 border-red-700/50 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/50',
+  host: 'bg-amber-900/30 text-amber-300 border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
   member: 'bg-grove-border/30 text-grove-text-muted border-grove-border',
 };
 
@@ -280,7 +280,7 @@ export default function AdminPage() {
                           focus:outline-none focus:ring-1 focus:ring-grove-accent`}
                       >
                         {ROLES.map(r => (
-                          <option key={r} value={r}>{r}</option>
+                          <option key={r} value={r} className="bg-grove-surface text-grove-text">{r}</option>
                         ))}
                       </select>
                     </td>

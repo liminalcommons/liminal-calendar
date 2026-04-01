@@ -243,7 +243,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             disabled={isCreating}
           >
             {DURATION_OPTIONS.map(d => (
-              <option key={d.minutes} value={d.minutes}>{d.label}</option>
+              <option key={d.minutes} value={d.minutes} className="bg-grove-surface text-grove-text">{d.label}</option>
             ))}
           </select>
         </div>
@@ -298,7 +298,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             disabled={isCreating}
           >
             {RECURRENCE_OPTIONS.map(r => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value} className="bg-grove-surface text-grove-text">{r.label}</option>
             ))}
           </select>
         </div>
@@ -312,9 +312,9 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             className={`flex-1 ${inputClass}`}
             disabled={isCreating || groupsLoading}
           >
-            <option value="">Don&apos;t post to Hylo</option>
+            <option value="" className="bg-grove-surface text-grove-text">Don&apos;t post to Hylo</option>
             {groups.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
+              <option key={g.id} value={g.id} className="bg-grove-surface text-grove-text">{g.name}</option>
             ))}
           </select>
         </div>
