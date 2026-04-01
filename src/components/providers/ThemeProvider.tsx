@@ -9,7 +9,7 @@ interface ThemeContextValue {
   toggle: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({ theme: 'light', toggle: () => {} });
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'dark', toggle: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -18,16 +18,16 @@ export function useTheme() {
 const STORAGE_KEY = 'calendar-theme';
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>('dark');
 
-  // Read from localStorage on mount
+  // Read from localStorage on mount — default to dark
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (stored === 'dark' || stored === 'light') {
       setTheme(stored);
       document.documentElement.classList.toggle('dark', stored === 'dark');
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
+    } else {
+      // Default: dark mode
       document.documentElement.classList.add('dark');
     }
   }, []);
