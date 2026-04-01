@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -8,6 +9,7 @@ import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
 import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
+import { canCreateEvents } from '@/lib/auth-helpers';
 import { MoonPhase } from '@/components/MoonPhase';
 import { TimeGutter } from './TimeGutter';
 import { DayColumn } from './DayColumn';
@@ -20,6 +22,9 @@ interface WeeklyGridProps {
 }
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role || 'member';
+  const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
@@ -301,7 +306,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                 hourOffsets={hourOffsets}
                 dissolvingIds={dissolvingIds}
                 spawningIds={spawningIds}
-                onCellClick={handleCellClick}
+                onCellClick={canCreate ? handleCellClick : undefined}
                 onEventClick={handleEventClick}
               />
             ))}
