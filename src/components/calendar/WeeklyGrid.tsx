@@ -7,7 +7,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
-import { computeHourHeights, computeHourOffsets } from '@/lib/golden-hours';
+import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { MoonPhase } from '@/components/MoonPhase';
 import { TimeGutter } from './TimeGutter';
 import { DayColumn } from './DayColumn';
@@ -29,11 +29,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const [centerHour, setCenterHour] = useState(12); // fractional hour at viewport center
 
   const weekDays = getWeekDays(currentWeekStart);
 
-  // Uniform hour heights
-  const hourHeights = useMemo(() => computeHourHeights(0), []);
+  // Fisheye hour heights — recompute when center hour changes
+  const hourHeights = useMemo(() => computeFisheyeHeights(centerHour), [centerHour]);
   const hourOffsets = useMemo(() => computeHourOffsets(hourHeights), [hourHeights]);
   const totalGridHeight = hourHeights.reduce((s, h) => s + h, 0);
 
@@ -45,16 +46,51 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     return () => clearInterval(interval);
   }, []);
 
+  // Fisheye scroll handler — compute which hour is at viewport center
+  const lastCenterRef = useRef(12);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    let rafId: number;
+    const onScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const viewportCenter = el.scrollTop + el.clientHeight / 2;
+        // Find which hour the viewport center falls in (using current offsets)
+        const offsets = computeHourOffsets(computeFisheyeHeights(lastCenterRef.current));
+        let hour = 0;
+        for (let i = 0; i < 24; i++) {
+          if (offsets[i] > viewportCenter) break;
+          hour = i;
+        }
+        // Add fractional part based on position within the hour
+        const hourTop = offsets[hour];
+        const hourH = computeFisheyeHeights(lastCenterRef.current)[hour];
+        const frac = hourH > 0 ? (viewportCenter - hourTop) / hourH : 0;
+        const newCenter = Math.round((hour + Math.min(frac, 1)) * 4) / 4; // quantize to 0.25
+        if (newCenter !== lastCenterRef.current) {
+          lastCenterRef.current = newCenter;
+          setCenterHour(newCenter);
+        }
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   // Scroll to midday on initial load
   const hasScrolledRef = useRef(false);
   useEffect(() => {
     const el = gridRef.current;
     if (!el || hasScrolledRef.current) return;
     // Scroll to 11 AM so noon is nicely visible
-    const targetOffset = hourOffsets[11] ?? 0;
-    el.scrollTop = targetOffset;
+    const initialOffsets = computeHourOffsets(computeFisheyeHeights(12));
+    el.scrollTop = initialOffsets[11] ?? 0;
     hasScrolledRef.current = true;
-  }, [hourOffsets]);
+  }, []);
 
   function isCurrentWeek(weekStart: Date): boolean {
     const todayWeek = getWeekStart(new Date());
