@@ -98,7 +98,7 @@ export default function AdminPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-serif text-grove-text">Member Directory</h1>
           <p className="text-sm text-grove-text-muted mt-1">
-            {members.length} members · Assign roles to control event creation permissions
+            {members.length} {members.length === 1 ? 'member' : 'members'} · Assign roles to control event creation permissions
           </p>
         </div>
 

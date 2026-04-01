@@ -1,7 +1,8 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { ViewToggle } from './ViewToggle';
 import { RuneAccent } from './RuneAccent';
@@ -132,6 +133,17 @@ export function NavBar() {
 
         {status === 'authenticated' && user ? (
           <>
+            {/* Admin link */}
+            {user.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+                title="Member Directory"
+              >
+                <Settings size={16} />
+              </Link>
+            )}
+
             {/* Avatar + role badge */}
             <div className="flex items-center gap-1.5">
               <div
