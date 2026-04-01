@@ -95,32 +95,32 @@ export function NavBar() {
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
-          className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+          className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
           aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
         >
-          {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          <span className="text-[8px] leading-none">{theme === 'dark' ? 'Light' : 'Dark'}</span>
         </button>
 
         {/* Mute toggle */}
         <button
           onClick={toggleMute}
-          className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+          className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
           aria-label={muted ? 'Unmute sounds' : 'Mute sounds'}
-          title={muted ? 'Unmute sounds' : 'Mute sounds'}
         >
-          {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          <span className="text-[8px] leading-none">{muted ? 'Unmute' : 'Sound'}</span>
         </button>
 
         {/* Subscribe dropdown */}
         <div className="relative" ref={subRef}>
           <button
             onClick={() => setSubOpen(!subOpen)}
-            className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+            className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
             aria-label="Subscribe to calendar"
-            title="Subscribe to calendar"
           >
-            <CalendarPlus size={16} />
+            <CalendarPlus size={14} />
+            <span className="text-[8px] leading-none">Subscribe</span>
           </button>
           {subOpen && (
             <div className="absolute right-0 top-full mt-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg py-1.5 min-w-[140px] z-50">
@@ -137,10 +137,10 @@ export function NavBar() {
             {user.role === 'admin' && (
               <Link
                 href="/admin"
-                className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
-                title="Member Directory"
+                className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
               >
-                <Settings size={16} />
+                <Settings size={14} />
+                <span className="text-[8px] leading-none">Admin</span>
               </Link>
             )}
 
@@ -162,11 +162,11 @@ export function NavBar() {
             {/* Sign out */}
             <button
               onClick={handleSignOut}
-              className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+              className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
               aria-label="Sign out"
-              title="Sign out"
             >
-              <LogOut size={16} />
+              <LogOut size={14} />
+              <span className="text-[8px] leading-none">Sign out</span>
             </button>
           </>
         ) : status === 'unauthenticated' ? (
