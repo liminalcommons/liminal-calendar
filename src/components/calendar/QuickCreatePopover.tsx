@@ -43,9 +43,9 @@ function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   return { top, left };
 }
 
-function buildStartTime(day: Date, hour: number): Date {
+function buildStartTime(day: Date, slot: number): Date {
   const d = new Date(day);
-  d.setHours(hour, 0, 0, 0);
+  d.setHours(Math.floor(slot / 2), (slot % 2) * 30, 0, 0);
   return d;
 }
 

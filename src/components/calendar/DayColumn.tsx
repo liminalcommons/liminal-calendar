@@ -6,8 +6,9 @@ import { toDateKey } from '@/lib/calendar-utils';
 import { HourCell } from './HourCell';
 import { EventBlock } from './EventBlock';
 import { computeOverlapLayout } from './overlap';
+import { SLOTS_PER_DAY } from '@/lib/golden-hours';
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const SLOTS = Array.from({ length: SLOTS_PER_DAY }, (_, i) => i);
 
 interface DayColumnProps {
   day: Date;
@@ -61,15 +62,15 @@ const DayColumn = React.memo(function DayColumn({
 
   return (
     <div className="relative flex-1 min-w-0 border-l border-grove-border">
-      {/* Hour cells */}
-      {HOURS.map(hour => (
+      {/* 30-min slot cells */}
+      {SLOTS.map(slot => (
         <HourCell
-          key={hour}
+          key={slot}
           day={day}
-          hour={hour}
+          hour={slot}
           isToday={isToday}
           currentHour={currentHour}
-          hourHeight={hourHeights[hour]}
+          hourHeight={hourHeights[slot]}
           onCellClick={onCellClick}
         />
       ))}

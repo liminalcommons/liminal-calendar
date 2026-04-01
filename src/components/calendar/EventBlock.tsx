@@ -54,10 +54,10 @@ function getRecurrenceLabel(rule?: string): string | null {
 
 const MIN_DISPLAY_MINUTES = 15;
 
-function minutesToPx(minutes: number, hourOffsets: number[], hourHeights: number[]): number {
-  const hour = Math.min(Math.floor(minutes / 60), 23);
-  const frac = (minutes - hour * 60) / 60;
-  return hourOffsets[hour] + frac * hourHeights[hour];
+function minutesToPx(minutes: number, slotOffsets: number[], slotHeights: number[]): number {
+  const slot = Math.min(Math.floor(minutes / 30), 47);
+  const frac = (minutes - slot * 30) / 30;
+  return slotOffsets[slot] + frac * slotHeights[slot];
 }
 
 const EventBlock = React.memo(function EventBlock({

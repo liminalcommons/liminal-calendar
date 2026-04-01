@@ -30,29 +30,33 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
   );
-  const [currentHour, setCurrentHour] = useState<number>(() => new Date().getHours());
+  const [currentSlot, setCurrentSlot] = useState<number>(() => {
+    const now = new Date();
+    return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
+  });
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const [centerHour, setCenterHour] = useState(12); // fractional hour at viewport center
+  const [centerSlot, setCenterSlot] = useState(24); // slot 24 = 12:00 PM
 
   const weekDays = getWeekDays(currentWeekStart);
 
-  // Fisheye hour heights — recompute when center hour changes
-  const hourHeights = useMemo(() => computeFisheyeHeights(centerHour), [centerHour]);
+  // Fisheye slot heights — recompute when center slot changes
+  const hourHeights = useMemo(() => computeFisheyeHeights(centerSlot), [centerSlot]);
   const hourOffsets = useMemo(() => computeHourOffsets(hourHeights), [hourHeights]);
   const totalGridHeight = hourHeights.reduce((s, h) => s + h, 0);
 
-  // Update current hour every minute
+  // Update current slot every minute
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentHour(new Date().getHours());
+      const now = new Date();
+      setCurrentSlot(now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0));
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Fisheye scroll handler — compute which hour is at viewport center
-  const lastCenterRef = useRef(12);
+  // Fisheye scroll handler — compute which slot is at viewport center
+  const lastCenterRef = useRef(24);
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -61,21 +65,19 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         const viewportCenter = el.scrollTop + el.clientHeight / 2;
-        // Find which hour the viewport center falls in (using current offsets)
         const offsets = computeHourOffsets(computeFisheyeHeights(lastCenterRef.current));
-        let hour = 0;
-        for (let i = 0; i < 24; i++) {
+        let slot = 0;
+        for (let i = 0; i < 48; i++) {
           if (offsets[i] > viewportCenter) break;
-          hour = i;
+          slot = i;
         }
-        // Add fractional part based on position within the hour
-        const hourTop = offsets[hour];
-        const hourH = computeFisheyeHeights(lastCenterRef.current)[hour];
-        const frac = hourH > 0 ? (viewportCenter - hourTop) / hourH : 0;
-        const newCenter = Math.round((hour + Math.min(frac, 1)) * 4) / 4; // quantize to 0.25
+        const slotTop = offsets[slot];
+        const slotH = computeFisheyeHeights(lastCenterRef.current)[slot];
+        const frac = slotH > 0 ? (viewportCenter - slotTop) / slotH : 0;
+        const newCenter = Math.round((slot + Math.min(frac, 1)) * 2) / 2; // quantize to 0.5
         if (newCenter !== lastCenterRef.current) {
           lastCenterRef.current = newCenter;
-          setCenterHour(newCenter);
+          setCenterSlot(newCenter);
         }
       });
     };
@@ -86,14 +88,13 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     };
   }, []);
 
-  // Scroll to midday on initial load
+  // Scroll to midday on initial load (slot 22 = 11 AM)
   const hasScrolledRef = useRef(false);
   useEffect(() => {
     const el = gridRef.current;
     if (!el || hasScrolledRef.current) return;
-    // Scroll to 11 AM so noon is nicely visible
-    const initialOffsets = computeHourOffsets(computeFisheyeHeights(12));
-    el.scrollTop = initialOffsets[11] ?? 0;
+    const initialOffsets = computeHourOffsets(computeFisheyeHeights(24));
+    el.scrollTop = initialOffsets[22] ?? 0;
     hasScrolledRef.current = true;
   }, []);
 
@@ -301,7 +302,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                 day={day}
                 events={events}
                 isToday={isToday(day)}
-                currentHour={currentHour}
+                currentHour={currentSlot}
                 hourHeights={hourHeights}
                 hourOffsets={hourOffsets}
                 dissolvingIds={dissolvingIds}

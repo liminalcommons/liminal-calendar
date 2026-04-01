@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 
 interface NowIndicatorProps {
-  hourHeights: number[];
-  hourOffsets: number[];
+  hourHeights: number[]; // slot heights (48 slots)
+  hourOffsets: number[]; // slot offsets (48 slots)
 }
 
 function getNowMinutes(): number {
@@ -24,9 +24,10 @@ export function NowIndicator({ hourHeights, hourOffsets }: NowIndicatorProps) {
 
   if (nowMinutes < 0 || nowMinutes > 24 * 60) return null;
 
-  const hour = Math.min(Math.floor(nowMinutes / 60), 23);
-  const frac = (nowMinutes - hour * 60) / 60;
-  const topPx = hourOffsets[hour] + frac * hourHeights[hour];
+  // Map minutes to 30-min slot system
+  const slot = Math.min(Math.floor(nowMinutes / 30), 47);
+  const frac = (nowMinutes - slot * 30) / 30;
+  const topPx = hourOffsets[slot] + frac * hourHeights[slot];
 
   return (
     <div
