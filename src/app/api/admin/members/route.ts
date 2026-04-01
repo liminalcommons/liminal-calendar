@@ -65,3 +65,58 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update member' }, { status: 500 });
   }
 }
+
+export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (getUserRole(session) !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const { hyloId, name, image, role } = body as Record<string, unknown>;
+
+  if (!hyloId || typeof hyloId !== 'string') {
+    return NextResponse.json({ error: 'hyloId is required' }, { status: 400 });
+  }
+  if (!name || typeof name !== 'string') {
+    return NextResponse.json({ error: 'name is required' }, { status: 400 });
+  }
+  const assignRole = (typeof role === 'string' && ['member', 'host', 'admin'].includes(role))
+    ? role
+    : 'member';
+
+  try {
+    const [created] = await db
+      .insert(members)
+      .values({
+        hyloId,
+        name,
+        image: typeof image === 'string' ? image : null,
+        role: assignRole,
+      })
+      .onConflictDoUpdate({
+        target: members.hyloId,
+        set: {
+          name,
+          image: typeof image === 'string' ? image : null,
+          role: assignRole,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    return NextResponse.json(created, { status: 201 });
+  } catch (err) {
+    console.error('[POST /api/admin/members]', err);
+    return NextResponse.json({ error: 'Failed to add member' }, { status: 500 });
+  }
+}
