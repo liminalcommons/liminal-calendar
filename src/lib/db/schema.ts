@@ -42,8 +42,21 @@ export const rsvps = pgTable(
   (table) => [unique('rsvps_event_user_unique').on(table.eventId, table.userId)],
 );
 
+export const members = pgTable('members', {
+  id: serial('id').primaryKey(),
+  hyloId: text('hylo_id').notNull().unique(),
+  name: text('name').notNull(),
+  email: text('email'),
+  image: text('image'),
+  role: text('role').notNull().default('member'), // 'member' | 'host' | 'admin'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
 // Type helpers
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;
 export type Rsvp = typeof rsvps.$inferSelect;
 export type NewRsvp = typeof rsvps.$inferInsert;
+export type Member = typeof members.$inferSelect;
+export type NewMember = typeof members.$inferInsert;

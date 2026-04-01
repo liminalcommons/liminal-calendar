@@ -45,11 +45,26 @@ export async function runMigrations() {
     )
   `;
 
+  // Create members table
+  await sql`
+    CREATE TABLE IF NOT EXISTS members (
+      id SERIAL PRIMARY KEY,
+      hylo_id TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      email TEXT,
+      image TEXT,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_event_id ON rsvps(event_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_user_id ON rsvps(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_members_hylo_id ON members(hylo_id)`;
 
   return { success: true, message: 'Migrations complete' };
 }

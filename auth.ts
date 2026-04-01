@@ -1,4 +1,7 @@
 import NextAuth from 'next-auth';
+import { db } from '@/lib/db';
+import { members } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 interface HyloProfile {
   id: string;
@@ -165,14 +168,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const user = session.user as unknown as Record<string, unknown>;
       if (token.hyloId) user.hyloId = token.hyloId;
       if (token.picture) user.image = token.picture;
-      // Role: check admin allowlist first, then token.role, then default to 'member'
-      // Gateway JWT may not include role — determine it here from hyloId
+
       const hyloId = token.hyloId as string | undefined;
-      if (hyloId && ADMIN_HYLO_IDS.includes(hyloId)) {
-        user.role = 'admin';
-      } else {
-        user.role = token.role || 'member';
+
+      // Role priority: 1) DB members table override, 2) admin allowlist, 3) Hylo role, 4) 'member'
+      let role: string = token.role as string || 'member';
+      if (hyloId) {
+        try {
+          const [dbMember] = await db.select({ role: members.role }).from(members).where(eq(members.hyloId, hyloId)).limit(1);
+          if (dbMember) {
+            role = dbMember.role;
+          } else if (ADMIN_HYLO_IDS.includes(hyloId)) {
+            role = 'admin';
+          }
+        } catch {
+          // DB not ready or members table doesn't exist yet — fall back to allowlist
+          if (ADMIN_HYLO_IDS.includes(hyloId)) {
+            role = 'admin';
+          }
+        }
       }
+      user.role = role;
+
+      // Upsert member record on login (non-blocking)
+      if (hyloId) {
+        db.insert(members)
+          .values({
+            hyloId,
+            name: (token.name as string) || 'Unknown',
+            email: (token.email as string) || null,
+            image: (token.picture as string) || null,
+            role,
+          })
+          .onConflictDoUpdate({
+            target: members.hyloId,
+            set: {
+              name: (token.name as string) || 'Unknown',
+              email: (token.email as string) || null,
+              image: (token.picture as string) || null,
+              updatedAt: new Date(),
+            },
+          })
+          .catch(() => {}); // non-blocking, best-effort
+      }
+
       // Expose access token for server-side helpers
       (session as any).accessToken = token.accessToken;
       return session;
