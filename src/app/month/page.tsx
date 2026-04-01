@@ -32,9 +32,9 @@ export default function MonthPage() {
   }, []);
 
   return (
-    <div className="h-screen bg-grove-bg flex flex-col overflow-hidden">
+    <div className="h-screen bg-grove-bg flex flex-col overflow-hidden p-2 pt-0">
       <NavBar />
-      <main className="flex-1 min-h-0">
+      <main className="flex-1 min-h-0 border border-grove-border rounded-lg overflow-hidden">
         <MonthlyGrid events={events} />
       </main>
     </div>

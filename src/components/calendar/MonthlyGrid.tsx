@@ -13,7 +13,6 @@ import {
   eachDayOfInterval,
   isToday,
   isSameMonth,
-  isSameDay,
 } from 'date-fns';
 import Link from 'next/link';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -24,6 +23,15 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 interface MonthlyGridProps {
   events: DisplayEvent[];
+}
+
+function formatShortTime(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? 'p' : 'a';
+  const h12 = h % 12 || 12;
+  return m > 0 ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
 }
 
 export function MonthlyGrid({ events }: MonthlyGridProps) {
@@ -64,6 +72,8 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
     weeks.push(allDays.slice(i, i + 7));
   }
 
+  const numWeeks = weeks.length;
+
   return (
     <div className="flex flex-col h-full bg-grove-bg">
       {/* Header */}
@@ -100,14 +110,14 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
       {/* Day-of-week labels */}
       <div className="flex-shrink-0 grid grid-cols-7 bg-grove-surface border-b border-grove-border">
         {DAY_LABELS.map(label => (
-          <div key={label} className="text-center py-1 text-[10px] font-medium uppercase tracking-wider text-grove-text-muted">
+          <div key={label} className="text-center py-1.5 text-[10px] font-medium uppercase tracking-wider text-grove-text-muted border-r border-grove-border last:border-r-0">
             {label}
           </div>
         ))}
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 grid grid-rows-[repeat(auto-fill,1fr)]">
+      <div className={`flex-1 grid ${numWeeks === 6 ? 'grid-rows-6' : numWeeks === 5 ? 'grid-rows-5' : 'grid-rows-4'}`}>
         {weeks.map((week, wi) => (
           <div key={wi} className="grid grid-cols-7 border-b border-grove-border min-h-0">
             {week.map((day, di) => {
@@ -119,36 +129,46 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
               return (
                 <div
                   key={di}
-                  className={`border-r border-grove-border p-1 overflow-hidden flex flex-col
-                    ${inMonth ? '' : 'opacity-40'}
-                    ${today ? 'bg-grove-accent/10' : ''}
+                  className={`border-r border-grove-border p-1.5 overflow-hidden flex flex-col
+                    ${inMonth ? '' : 'opacity-30'}
+                    ${today ? 'bg-grove-accent/8' : di >= 5 ? 'bg-grove-border/10' : ''}
                   `}
                 >
                   {/* Day number */}
-                  <span className={`text-xs font-semibold mb-0.5 ${
-                    today
-                      ? 'text-grove-accent bg-grove-accent/20 rounded-full w-5 h-5 flex items-center justify-center'
-                      : 'text-grove-text-muted'
-                  }`}>
-                    {format(day, 'd')}
-                  </span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-semibold ${
+                      today
+                        ? 'text-grove-surface bg-grove-accent rounded-full w-6 h-6 flex items-center justify-center'
+                        : 'text-grove-text-muted'
+                    }`}>
+                      {format(day, 'd')}
+                    </span>
+                    {dayEvents.length > 0 && !today && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-grove-green" />
+                    )}
+                  </div>
 
                   {/* Events (max 3 shown) */}
-                  {dayEvents.slice(0, 3).map(event => (
-                    <Link
-                      key={event.id}
-                      href={`/events/${event.id}`}
-                      className="text-[10px] leading-tight truncate rounded px-1 py-0.5 mb-0.5
-                                 bg-grove-green/15 text-grove-green-deep hover:bg-grove-green/25 transition-colors"
-                    >
-                      {event.title}
-                    </Link>
-                  ))}
-                  {dayEvents.length > 3 && (
-                    <span className="text-[9px] text-grove-text-muted">
-                      +{dayEvents.length - 3} more
-                    </span>
-                  )}
+                  <div className="flex-1 space-y-0.5 overflow-hidden">
+                    {dayEvents.slice(0, 3).map(event => (
+                      <Link
+                        key={event.id}
+                        href={`/events/${event.id}`}
+                        className="block text-[10px] leading-tight truncate rounded px-1 py-0.5
+                                   bg-grove-green/15 text-grove-green-deep hover:bg-grove-green/30 transition-colors
+                                   border-l-2 border-grove-green/40"
+                        title={`${event.title} — ${formatShortTime(event.starts_at)}`}
+                      >
+                        <span className="text-grove-text-muted">{formatShortTime(event.starts_at)}</span>{' '}
+                        {event.title}
+                      </Link>
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <span className="text-[9px] text-grove-text-muted pl-1">
+                        +{dayEvents.length - 3} more
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
