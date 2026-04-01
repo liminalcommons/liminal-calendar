@@ -37,7 +37,7 @@ const TimeGutter = React.memo(function TimeGutter({ hourHeights }: TimeGutterPro
           <div
             key={hour}
             className="relative flex items-start justify-end pr-2 gap-0.5 overflow-hidden"
-            style={{ height: h }}
+            style={{ height: h, transition: 'height 150ms ease-out' }}
           >
             {/* Icon — hide when compact */}
             {!compact && (

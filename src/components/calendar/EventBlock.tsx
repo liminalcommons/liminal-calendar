@@ -21,8 +21,17 @@ function hashId(id: string): number {
   for (let i = 0; i < baseId.length; i++) {
     h = (h * 31 + baseId.charCodeAt(i)) >>> 0;
   }
-  return h % 2;
+  return h % 6;
 }
+
+const EVENT_GRADIENTS = [
+  'linear-gradient(135deg, #7a8b6a 0%, #5a7a4a 100%)', // forest green
+  'linear-gradient(135deg, #c4935a 0%, #6b5744 100%)', // warm brown
+  'linear-gradient(135deg, #6a7f8b 0%, #4a5f7a 100%)', // slate blue
+  'linear-gradient(135deg, #8b6a7f 0%, #6b4460 100%)', // muted plum
+  'linear-gradient(135deg, #8b836a 0%, #6b6344 100%)', // olive
+  'linear-gradient(135deg, #6a8b80 0%, #447a6b 100%)', // teal
+];
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -77,10 +86,7 @@ const EventBlock = React.memo(function EventBlock({
   const leftPct = (colIndex / colTotal) * 100;
   const widthPct = (1 / colTotal) * 100;
 
-  const isGreen = hashId(event.id) === 1;
-  const bgGradient = isGreen
-    ? 'linear-gradient(135deg, #7a8b6a 0%, #5a7a4a 100%)'
-    : 'linear-gradient(135deg, #c4935a 0%, #6b5744 100%)';
+  const bgGradient = EVENT_GRADIENTS[hashId(event.id)];
 
   const recurrenceLabel = getRecurrenceLabel(event.recurrenceRule);
 

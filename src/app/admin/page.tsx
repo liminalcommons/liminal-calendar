@@ -95,6 +95,12 @@ export default function AdminPage() {
     <div className="min-h-screen bg-grove-bg">
       <NavBar />
       <main className="max-w-3xl mx-auto px-4 py-8">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-1 text-sm text-grove-text-muted hover:text-grove-text mb-4 transition-colors"
+        >
+          ← Back to Calendar
+        </button>
         <div className="mb-6">
           <h1 className="text-2xl font-serif text-grove-text">Member Directory</h1>
           <p className="text-sm text-grove-text-muted mt-1">

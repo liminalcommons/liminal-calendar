@@ -40,7 +40,7 @@ const HourCell = React.memo(function HourCell({
   return (
     <div
       className={cellClass}
-      style={{ height: hourHeight }}
+      style={{ height: hourHeight, transition: 'height 150ms ease-out' }}
       onClick={onCellClick ? (e) => onCellClick(day, hour, (e.currentTarget as HTMLDivElement).getBoundingClientRect()) : undefined}
       aria-label={`${hour}:00`}
     />

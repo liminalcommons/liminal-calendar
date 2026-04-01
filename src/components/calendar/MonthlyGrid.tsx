@@ -155,8 +155,8 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                         key={event.id}
                         href={`/events/${event.id}`}
                         className="block text-[10px] leading-tight truncate rounded px-1 py-0.5
-                                   bg-grove-green/15 text-grove-green-deep hover:bg-grove-green/30 transition-colors
-                                   border-l-2 border-grove-green/40"
+                                   bg-grove-green/20 text-grove-green dark:text-grove-green hover:bg-grove-green/30 transition-colors
+                                   border-l-2 border-grove-green/50"
                         title={`${event.title} — ${formatShortTime(event.starts_at)}`}
                       >
                         <span className="text-grove-text-muted">{formatShortTime(event.starts_at)}</span>{' '}
