@@ -109,9 +109,15 @@ export async function POST(request: NextRequest) {
     const accessToken = (session as any).accessToken as string | undefined;
     if (groupId && accessToken) {
       try {
+        const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
+        const hyloDetails = [
+          typeof details === 'string' ? details : '',
+          `\n\n---\n📅 [View on Liminal Calendar](${calendarLink})`,
+        ].join('').trim();
+
         const hyloEvent = await createHyloEvent(accessToken, groupId, {
           title: (title as string).trim(),
-          details: typeof details === 'string' ? details : undefined,
+          details: hyloDetails,
           startTime: startDate,
           endTime: endDate,
           timezone: typeof timezone === 'string' ? timezone : undefined,
