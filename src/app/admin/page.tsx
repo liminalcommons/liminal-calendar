@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Search, UserPlus } from 'lucide-react';
+import { Search, UserPlus, ChevronDown, ChevronUp } from 'lucide-react';
 import { NavBar } from '@/components/NavBar';
 import { apiFetch } from '@/lib/api-fetch';
+import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 
 interface Member {
   id: number;
@@ -14,6 +15,8 @@ interface Member {
   email: string | null;
   image: string | null;
   role: string;
+  timezone: string | null;
+  availability: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -35,6 +38,7 @@ export default function AdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{ id: string; name: string; avatarUrl: string | null }[]>([]);
   const [searching, setSearching] = useState(false);
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -250,45 +254,73 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {members.map(member => (
-                  <tr key={member.hyloId} className="border-b border-grove-border/40 last:border-0">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        {member.image ? (
-                          <img src={member.image} alt="" className="w-8 h-8 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-grove-accent/20 flex items-center justify-center text-xs font-semibold text-grove-accent-deep">
-                            {member.name.slice(0, 2).toUpperCase()}
+                {members.map(member => {
+                  const isExpanded = expandedMember === member.hyloId;
+                  const availSlots: number[] = (() => { try { return JSON.parse(member.availability ?? '[]'); } catch { return []; } })();
+                  return (
+                    <React.Fragment key={member.hyloId}>
+                      <tr className="border-b border-grove-border/40 last:border-0">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {member.image ? (
+                              <img src={member.image} alt="" className="w-8 h-8 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-grove-accent/20 flex items-center justify-center text-xs font-semibold text-grove-accent-deep">
+                                {member.name.slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-sm font-medium text-grove-text">{member.name}</p>
+                              {member.email && (
+                                <p className="text-[11px] text-grove-text-muted">{member.email}</p>
+                              )}
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <p className="text-sm font-medium text-grove-text">{member.name}</p>
-                          {member.email && (
-                            <p className="text-[11px] text-grove-text-muted">{member.email}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <select
-                        value={member.role}
-                        onChange={e => handleRoleChange(member.hyloId, e.target.value)}
-                        disabled={updating === member.hyloId}
-                        className={`text-xs font-medium px-2 py-1 rounded-md border cursor-pointer
-                          ${ROLE_COLORS[member.role] || ROLE_COLORS.member}
-                          disabled:opacity-50 disabled:cursor-wait
-                          focus:outline-none focus:ring-1 focus:ring-grove-accent`}
-                      >
-                        {ROLES.map(r => (
-                          <option key={r} value={r} className="bg-grove-surface text-grove-text">{r}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-grove-text-muted">
-                      {new Date(member.createdAt).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={member.role}
+                            onChange={e => handleRoleChange(member.hyloId, e.target.value)}
+                            disabled={updating === member.hyloId}
+                            className={`text-xs font-medium px-2 py-1 rounded-md border cursor-pointer
+                              ${ROLE_COLORS[member.role] || ROLE_COLORS.member}
+                              disabled:opacity-50 disabled:cursor-wait
+                              focus:outline-none focus:ring-1 focus:ring-grove-accent`}
+                          >
+                            {ROLES.map(r => (
+                              <option key={r} value={r} className="bg-grove-surface text-grove-text">{r}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-grove-text-muted">
+                              {new Date(member.createdAt).toLocaleDateString()}
+                            </span>
+                            <button
+                              onClick={() => setExpandedMember(isExpanded ? null : member.hyloId)}
+                              className="p-1 rounded text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors"
+                              title="View availability"
+                            >
+                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="border-b border-grove-border/40">
+                          <td colSpan={3} className="px-4 py-3 bg-grove-bg/50">
+                            <AvailabilityTimeline
+                              slots={availSlots}
+                              timezone={member.timezone ?? 'UTC'}
+                              name={member.name}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
