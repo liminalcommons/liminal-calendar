@@ -8,11 +8,33 @@ import { AvailabilityGrid } from '@/components/availability/AvailabilityGrid';
 import { apiFetch } from '@/lib/api-fetch';
 
 const COMMON_TIMEZONES = [
-  'America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York',
-  'America/Sao_Paulo', 'Atlantic/Azores', 'Europe/London', 'Europe/Berlin',
-  'Europe/Helsinki', 'Asia/Kolkata', 'Asia/Singapore', 'Asia/Tokyo',
-  'Australia/Sydney', 'Pacific/Auckland',
+  'Pacific/Auckland',
+  'Australia/Sydney',
+  'Asia/Tokyo',
+  'Asia/Singapore',
+  'Asia/Kolkata',
+  'Europe/Helsinki',
+  'Europe/Berlin',
+  'Europe/London',
+  'Atlantic/Azores',
+  'America/Sao_Paulo',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
 ];
+
+function formatTimezoneLabel(tz: string): string {
+  try {
+    const now = new Date();
+    const short = now.toLocaleString('en-US', { timeZone: tz, timeZoneName: 'short' }).split(' ').pop() || '';
+    const offset = now.toLocaleString('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).split('GMT').pop() || '';
+    const city = tz.split('/').pop()?.replace(/_/g, ' ') || tz;
+    return `${city} (${short}, UTC${offset || '+0'})`;
+  } catch {
+    return tz.replace(/_/g, ' ');
+  }
+}
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
@@ -97,16 +119,23 @@ export default function ProfilePage() {
         {/* Timezone */}
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-2">Your Timezone</h2>
-          <select
-            value={timezone}
-            onChange={e => setTimezone(e.target.value)}
-            className="w-full max-w-sm text-sm bg-grove-surface border border-grove-border rounded-lg px-3 py-2
-                       text-grove-text focus:outline-none focus:ring-1 focus:ring-grove-accent"
-          >
-            {COMMON_TIMEZONES.map(tz => (
-              <option key={tz} value={tz} className="bg-grove-surface text-grove-text">{tz.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
+          <div className="bg-grove-surface border border-grove-border rounded-xl p-4 max-w-lg">
+            <select
+              value={timezone}
+              onChange={e => setTimezone(e.target.value)}
+              className="w-full text-sm bg-grove-bg border border-grove-border rounded-lg px-3 py-2.5
+                         text-grove-text font-medium focus:outline-none focus:ring-1 focus:ring-grove-accent"
+            >
+              {COMMON_TIMEZONES.map(tz => (
+                <option key={tz} value={tz} className="bg-grove-surface text-grove-text">
+                  {formatTimezoneLabel(tz)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-grove-accent mt-2 font-medium">
+              Currently: {formatTimezoneLabel(timezone)}
+            </p>
+          </div>
         </div>
 
         {/* Availability grid */}
