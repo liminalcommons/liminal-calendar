@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/NavBar';
 import { AvailabilityGrid } from '@/components/availability/AvailabilityGrid';
+import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 import { apiFetch } from '@/lib/api-fetch';
 
 const COMMON_TIMEZONES = [
@@ -155,6 +156,14 @@ export default function ProfilePage() {
             />
           )}
         </div>
+
+        {/* Visual overview */}
+        {availability.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-3">Your Week at a Glance</h2>
+            <AvailabilityTimeline slots={availability} timezone={timezone} />
+          </div>
+        )}
 
         {/* Save */}
         <button
