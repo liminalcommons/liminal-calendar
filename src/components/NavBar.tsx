@@ -144,11 +144,14 @@ export function NavBar() {
               </Link>
             )}
 
-            {/* Avatar + role badge */}
-            <div className="flex items-center gap-1.5">
+            {/* Avatar + role badge — links to profile */}
+            <Link
+              href="/profile"
+              className="flex items-center gap-1.5"
+              title="Your profile & availability"
+            >
               <div
                 className="w-7 h-7 rounded-full bg-grove-accent flex items-center justify-center text-grove-surface text-xs font-semibold select-none"
-                title={user?.name ?? user?.email ?? undefined}
               >
                 {initials}
               </div>
@@ -157,7 +160,7 @@ export function NavBar() {
                   {roleLabel}
                 </span>
               )}
-            </div>
+            </Link>
 
             {/* Sign out */}
             <button

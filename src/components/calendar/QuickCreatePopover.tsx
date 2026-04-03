@@ -6,6 +6,7 @@ import { UserPicker, type PickedUser } from './UserPicker';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
@@ -331,6 +332,17 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
         {error && (
           <p className="text-xs text-red-400">{error}</p>
         )}
+      </div>
+
+      {/* More options link */}
+      <div className="px-4 pb-2">
+        <Link
+          href={`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`}
+          className="text-xs text-grove-accent-deep hover:text-grove-accent transition-colors"
+          onClick={onClose}
+        >
+          More options →
+        </Link>
       </div>
 
       {/* Actions */}
