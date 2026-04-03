@@ -6,6 +6,7 @@ import { asc } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
 import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
+import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -50,6 +51,7 @@ export default async function HomePage() {
   return (
     <div className="h-screen bg-grove-bg flex flex-col overflow-hidden p-2 pt-0">
       <NavBar />
+      <AvailabilityBanner />
       <SubscribeBanner />
       <main className="flex-1 min-h-0 border border-grove-border rounded-lg overflow-hidden">
         <WeeklyGrid events={displayEvents} />
