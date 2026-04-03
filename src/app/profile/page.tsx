@@ -118,22 +118,23 @@ export default function ProfilePage() {
 
         {/* Timezone */}
         <div className="mb-8">
-          <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-2">Your Timezone</h2>
-          <div className="bg-grove-surface border border-grove-border rounded-xl p-4 max-w-lg">
+          <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-3">Your Timezone</h2>
+          <div className="bg-grove-surface border border-grove-border rounded-xl p-5">
             <select
               value={timezone}
               onChange={e => setTimezone(e.target.value)}
-              className="w-full text-sm bg-grove-bg border border-grove-border rounded-lg px-3 py-2.5
-                         text-grove-text font-medium focus:outline-none focus:ring-1 focus:ring-grove-accent"
+              className="w-full text-base bg-grove-bg border-2 border-grove-accent/40 rounded-lg px-4 py-3
+                         text-grove-text font-semibold focus:outline-none focus:ring-2 focus:ring-grove-accent
+                         cursor-pointer"
             >
               {COMMON_TIMEZONES.map(tz => (
-                <option key={tz} value={tz} className="bg-grove-surface text-grove-text">
+                <option key={tz} value={tz} className="bg-grove-surface text-grove-text text-base py-2">
                   {formatTimezoneLabel(tz)}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-grove-accent mt-2 font-medium">
-              Currently: {formatTimezoneLabel(timezone)}
+            <p className="text-sm text-grove-accent mt-3 font-semibold">
+              {formatTimezoneLabel(timezone)}
             </p>
           </div>
         </div>
