@@ -59,6 +59,10 @@ export async function runMigrations() {
     )
   `;
 
+  // Add timezone and availability columns to members (idempotent)
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'`;
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT '[]'`;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;

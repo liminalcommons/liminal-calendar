@@ -1,0 +1,96 @@
+<h2>Full Event Creation Page Layout</h2>
+<p class="subtitle">How should /events/new be organized? Pick the layout that feels right.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Two-Column Split</h3>
+      <p><strong>Left column:</strong> Event form (title, description, time, duration, recurrence, meeting link, Hylo toggle)</p>
+      <p><strong>Right column:</strong> Invitee picker + Smart scheduling panel (availability overlap, ranked suggestions)</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Preview: Two-Column Layout</div>
+        <div class="mockup-body" style="display:flex;gap:16px;min-height:300px">
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <div style="background:#3a3228;border:1px solid #5a4a3a;border-radius:6px;padding:12px">
+              <div style="font-size:11px;color:#c4935a;margin-bottom:4px">EVENT DETAILS</div>
+              <div class="mock-input" style="margin-bottom:6px">Event title</div>
+              <div class="mock-input" style="margin-bottom:6px;height:60px">Description</div>
+              <div style="display:flex;gap:6px">
+                <div class="mock-input" style="flex:1">Date & Time</div>
+                <div class="mock-input" style="width:80px">Duration</div>
+              </div>
+              <div class="mock-input" style="margin-top:6px">Meeting link</div>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <div class="mock-input" style="flex:1">Recurrence</div>
+                <div class="mock-input" style="flex:1">Post to Hylo</div>
+              </div>
+            </div>
+            <div class="mock-button" style="width:100%">Create Event</div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <div style="background:#3a3228;border:1px solid #5a4a3a;border-radius:6px;padding:12px">
+              <div style="font-size:11px;color:#c4935a;margin-bottom:4px">INVITE PEOPLE</div>
+              <div class="mock-input" style="margin-bottom:6px">Search members...</div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <span style="background:#6a8b80;color:white;padding:2px 8px;border-radius:12px;font-size:10px">Erik H</span>
+                <span style="background:#6a8b80;color:white;padding:2px 8px;border-radius:12px;font-size:10px">Danielle J</span>
+                <span style="background:#6a8b80;color:white;padding:2px 8px;border-radius:12px;font-size:10px">James B</span>
+              </div>
+            </div>
+            <div style="background:#3a3228;border:1px solid #5a4a3a;border-radius:6px;padding:12px;flex:1">
+              <div style="font-size:11px;color:#c4935a;margin-bottom:8px">BEST TIMES (3/3 available)</div>
+              <div style="background:#447a6b33;border:1px solid #447a6b;border-radius:4px;padding:8px;margin-bottom:6px;cursor:pointer">
+                <div style="font-size:12px;color:#6a8b80;font-weight:600">Sat 2:00 PM - 3:30 PM</div>
+                <div style="font-size:10px;color:#9a8570">3/3 available &middot; Click to use</div>
+              </div>
+              <div style="background:#c4935a22;border:1px solid #c4935a44;border-radius:4px;padding:8px;margin-bottom:6px;cursor:pointer">
+                <div style="font-size:12px;color:#c4935a;font-weight:600">Tue 4:00 PM - 5:30 PM</div>
+                <div style="font-size:10px;color:#9a8570">2/3 available &middot; Missing: James B</div>
+              </div>
+              <div style="background:#c4935a22;border:1px solid #c4935a44;border-radius:4px;padding:8px;cursor:pointer">
+                <div style="font-size:12px;color:#c4935a;font-weight:600">Wed 6:00 PM - 7:30 PM</div>
+                <div style="font-size:10px;color:#9a8570">2/3 available &middot; Missing: Erik H</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Single Column + Expandable Sections</h3>
+      <p>All in one scrollable column. Invitees section expands to show smart scheduling when people are added.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Preview: Single Column Layout</div>
+        <div class="mockup-body" style="max-width:500px;margin:0 auto;display:flex;flex-direction:column;gap:8px;min-height:300px">
+          <div style="background:#3a3228;border:1px solid #5a4a3a;border-radius:6px;padding:12px">
+            <div class="mock-input" style="margin-bottom:6px">Event title</div>
+            <div class="mock-input" style="margin-bottom:6px;height:40px">Description</div>
+            <div style="display:flex;gap:6px">
+              <div class="mock-input" style="flex:1">Date & Time</div>
+              <div class="mock-input" style="width:80px">Duration</div>
+            </div>
+            <div class="mock-input" style="margin-top:6px">Meeting link</div>
+          </div>
+          <div style="background:#3a3228;border:1px solid #5a4a3a;border-radius:6px;padding:12px">
+            <div style="font-size:11px;color:#c4935a;margin-bottom:4px">INVITE PEOPLE</div>
+            <div class="mock-input">Search members...</div>
+            <div style="margin-top:6px;display:flex;gap:4px">
+              <span style="background:#6a8b80;color:white;padding:2px 8px;border-radius:12px;font-size:10px">Erik H</span>
+              <span style="background:#6a8b80;color:white;padding:2px 8px;border-radius:12px;font-size:10px">Danielle J</span>
+            </div>
+          </div>
+          <div style="background:#447a6b22;border:1px solid #447a6b44;border-radius:6px;padding:12px">
+            <div style="font-size:11px;color:#6a8b80;margin-bottom:6px">SUGGESTED TIMES (2/2 available)</div>
+            <div style="font-size:12px;color:#6a8b80">Sat 2:00 PM &middot; Tue 4:00 PM &middot; Wed 6:00 PM</div>
+          </div>
+          <div class="mock-button" style="width:100%">Create Event</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

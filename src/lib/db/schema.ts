@@ -49,6 +49,8 @@ export const members = pgTable('members', {
   email: text('email'),
   image: text('image'),
   role: text('role').notNull().default('member'), // 'member' | 'host' | 'admin'
+  timezone: text('timezone').default('UTC'),
+  availability: text('availability').default('[]'), // JSON array of UTC slot indices 0-335
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

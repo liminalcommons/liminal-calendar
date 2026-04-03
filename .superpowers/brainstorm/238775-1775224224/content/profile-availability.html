@@ -1,0 +1,162 @@
+<h2>Profile & Availability Page (/profile)</h2>
+<p class="subtitle">Where users set their timezone and weekly availability blocks. How should the availability input work?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Weekly Grid — Click to Paint</h3>
+      <p>A 7-day x 48-slot grid (matching the calendar). Click or drag to paint available blocks. Visual and intuitive.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Preview: Paintable Weekly Grid</div>
+        <div class="mockup-body" style="min-height:280px">
+          <!-- Timezone picker -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="font-size:11px;color:#c4935a">YOUR TIMEZONE</span>
+            <div class="mock-input" style="flex:1;max-width:250px">America/Los_Angeles (PDT, UTC-7)</div>
+          </div>
+
+          <!-- Mini weekly grid -->
+          <div style="font-size:10px;color:#9a8570;margin-bottom:4px">Click or drag to mark when you're available</div>
+          <div style="display:grid;grid-template-columns:40px repeat(7,1fr);gap:1px;background:#3d362a;border-radius:6px;overflow:hidden">
+            <!-- Header row -->
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570"></div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Mon</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Tue</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Wed</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Thu</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Fri</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Sat</div>
+            <div style="background:#2a2219;padding:4px;text-align:center;font-size:9px;color:#9a8570">Sun</div>
+
+            <!-- 9 AM row -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">9am</div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+
+            <!-- 10 AM -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">10am</div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+
+            <!-- 11 AM -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">11am</div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+
+            <!-- 12 PM -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">12pm</div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+
+            <!-- 1 PM -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">1pm</div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+
+            <!-- 2 PM -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">2pm</div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+
+            <!-- 3-6 PM sparse -->
+            <div style="background:#2a2219;padding:4px;text-align:right;font-size:9px;color:#9a8570">3pm</div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#447a6b44;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+            <div style="background:#1a1610;padding:4px;height:16px"></div>
+          </div>
+
+          <div style="display:flex;gap:12px;margin-top:8px;font-size:10px">
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#447a6b44;border-radius:2px"></span> Available</span>
+            <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1a1610;border-radius:2px"></span> Not set</span>
+          </div>
+
+          <div class="mock-button" style="margin-top:12px;width:160px">Save Availability</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Day-by-Day Time Ranges</h3>
+      <p>For each day of the week, add one or more time ranges (e.g., "Mon: 9am-12pm, 2pm-5pm"). Structured and precise.</p>
+      <div class="mockup" style="margin-top:12px">
+        <div class="mockup-header">Preview: Time Range List</div>
+        <div class="mockup-body" style="min-height:200px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <span style="font-size:11px;color:#c4935a">YOUR TIMEZONE</span>
+            <div class="mock-input" style="flex:1;max-width:250px">America/Los_Angeles (PDT, UTC-7)</div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#2a2219;border-radius:4px">
+              <span style="width:40px;font-size:11px;color:#9a8570;font-weight:600">Mon</span>
+              <div class="mock-input" style="width:80px;font-size:10px">9:00 AM</div>
+              <span style="font-size:10px;color:#9a8570">to</span>
+              <div class="mock-input" style="width:80px;font-size:10px">12:00 PM</div>
+              <span style="font-size:10px;color:#6a8b80;cursor:pointer">+ add</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#2a2219;border-radius:4px">
+              <span style="width:40px;font-size:11px;color:#9a8570;font-weight:600">Tue</span>
+              <div class="mock-input" style="width:80px;font-size:10px">2:00 PM</div>
+              <span style="font-size:10px;color:#9a8570">to</span>
+              <div class="mock-input" style="width:80px;font-size:10px">6:00 PM</div>
+              <span style="font-size:10px;color:#6a8b80;cursor:pointer">+ add</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#2a2219;border-radius:4px">
+              <span style="width:40px;font-size:11px;color:#9a8570;font-weight:600">Wed</span>
+              <span style="font-size:10px;color:#9a8570;font-style:italic">No availability set</span>
+              <span style="font-size:10px;color:#6a8b80;cursor:pointer;margin-left:auto">+ add</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:#2a2219;border-radius:4px">
+              <span style="width:40px;font-size:11px;color:#9a8570;font-weight:600">Thu</span>
+              <div class="mock-input" style="width:80px;font-size:10px">10:00 AM</div>
+              <span style="font-size:10px;color:#9a8570">to</span>
+              <div class="mock-input" style="width:80px;font-size:10px">3:00 PM</div>
+              <span style="font-size:10px;color:#6a8b80;cursor:pointer">+ add</span>
+            </div>
+            <div style="font-size:10px;color:#9a8570;margin-top:4px">... Fri, Sat, Sun</div>
+          </div>
+
+          <div class="mock-button" style="margin-top:12px;width:160px">Save Availability</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
