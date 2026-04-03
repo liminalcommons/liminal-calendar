@@ -39,7 +39,7 @@ export function InviteePicker({ selected, onChange, disabled }: InviteePickerPro
             .map(m => ({ hyloId: m.hyloId, name: m.name, image: m.image }));
           setResults(filtered);
         }
-      } catch {} finally { setSearching(false); }
+      } catch { /* silent */ } finally { setSearching(false); }
     }, 200);
   }, [selected]);
 

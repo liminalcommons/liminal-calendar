@@ -113,7 +113,7 @@ export default function ProfilePage() {
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-2">Weekly Availability</h2>
           <p className="text-xs text-grove-text-muted mb-4">
-            Mark the times you're generally available. This helps others find the best time for events.
+            Mark the times you&apos;re generally available. This helps others find the best time for events.
           </p>
           {loading ? (
             <div className="h-64 bg-grove-surface rounded-lg animate-pulse" />

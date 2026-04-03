@@ -28,7 +28,7 @@ export function SchedulingSuggestions({ inviteeIds, durationMinutes, onSelect }:
         if (res.ok) {
           setSuggestions(await res.json());
         }
-      } catch {} finally { setLoading(false); }
+      } catch { /* silent */ } finally { setLoading(false); }
     }, 300);
     return () => clearTimeout(timer);
   }, [inviteeIds, durationMinutes]);
