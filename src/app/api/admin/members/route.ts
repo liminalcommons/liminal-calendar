@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   }
   const assignRole = (typeof role === 'string' && ['member', 'host', 'admin'].includes(role))
     ? role
-    : 'member';
+    : 'host';
 
   try {
     const [created] = await db
