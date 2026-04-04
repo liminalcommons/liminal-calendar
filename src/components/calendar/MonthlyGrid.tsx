@@ -21,6 +21,25 @@ import { calendarSFX } from '@/lib/sound-manager';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// Same color palette as EventBlock — 6 event colors
+const EVENT_COLORS = [
+  { bg: 'bg-[#7a8b6a]/25', border: 'border-[#7a8b6a]/50', text: 'text-[#7a8b6a]' },  // forest green
+  { bg: 'bg-[#c4935a]/25', border: 'border-[#c4935a]/50', text: 'text-[#c4935a]' },  // warm brown
+  { bg: 'bg-[#6a7f8b]/25', border: 'border-[#6a7f8b]/50', text: 'text-[#6a7f8b]' },  // slate blue
+  { bg: 'bg-[#8b6a7f]/25', border: 'border-[#8b6a7f]/50', text: 'text-[#8b6a7f]' },  // plum
+  { bg: 'bg-[#8b836a]/25', border: 'border-[#8b836a]/50', text: 'text-[#8b836a]' },  // olive
+  { bg: 'bg-[#6a8b80]/25', border: 'border-[#6a8b80]/50', text: 'text-[#6a8b80]' },  // teal
+];
+
+function hashEventId(id: string): number {
+  const baseId = id.replace(/-\d{8}$/, '');
+  let h = 0;
+  for (let i = 0; i < baseId.length; i++) {
+    h = (h * 31 + baseId.charCodeAt(i)) >>> 0;
+  }
+  return h % 6;
+}
+
 interface MonthlyGridProps {
   events: DisplayEvent[];
 }
@@ -151,25 +170,55 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                     )}
                   </div>
 
-                  {/* Events (max 3 shown) */}
+                  {/* Events (max 3 shown, colored) */}
                   <div className="flex-1 space-y-0.5 overflow-hidden">
-                    {dayEvents.slice(0, 3).map(event => (
-                      <Link
-                        key={event.id}
-                        href={`/events/${event.id}`}
-                        className="block text-[10px] leading-tight truncate rounded px-1 py-0.5
-                                   bg-grove-green/20 text-grove-green dark:text-grove-green hover:bg-grove-green/30 transition-colors
-                                   border-l-2 border-grove-green/50"
-                        title={`${event.title} — ${formatShortTime(event.starts_at)}`}
-                      >
-                        <span className="text-grove-text-muted">{formatShortTime(event.starts_at)}</span>{' '}
-                        {event.title}
-                      </Link>
-                    ))}
+                    {dayEvents.slice(0, 3).map(event => {
+                      const color = EVENT_COLORS[hashEventId(event.id)];
+                      return (
+                        <Link
+                          key={event.id}
+                          href={`/events/${event.id}`}
+                          className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
+                                     ${color.bg} ${color.text} hover:opacity-80 transition-opacity
+                                     border-l-2 ${color.border}`}
+                          title={`${event.title} — ${formatShortTime(event.starts_at)}`}
+                        >
+                          <span className="opacity-70">{formatShortTime(event.starts_at)}</span>{' '}
+                          {event.title}
+                        </Link>
+                      );
+                    })}
                     {dayEvents.length > 3 && (
-                      <span className="text-[9px] text-grove-text-muted pl-1">
+                      <button
+                        onClick={() => {
+                          // Show remaining events in a tooltip-style expansion
+                          const el = document.getElementById(`more-${key}`);
+                          if (el) el.classList.toggle('hidden');
+                        }}
+                        className="text-[9px] text-grove-accent-deep hover:text-grove-accent pl-1 cursor-pointer transition-colors"
+                      >
                         +{dayEvents.length - 3} more
-                      </span>
+                      </button>
+                    )}
+                    {dayEvents.length > 3 && (
+                      <div id={`more-${key}`} className="hidden space-y-0.5">
+                        {dayEvents.slice(3).map(event => {
+                          const color = EVENT_COLORS[hashEventId(event.id)];
+                          return (
+                            <Link
+                              key={event.id}
+                              href={`/events/${event.id}`}
+                              className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
+                                         ${color.bg} ${color.text} hover:opacity-80 transition-opacity
+                                         border-l-2 ${color.border}`}
+                              title={`${event.title} — ${formatShortTime(event.starts_at)}`}
+                            >
+                              <span className="opacity-70">{formatShortTime(event.starts_at)}</span>{' '}
+                              {event.title}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
