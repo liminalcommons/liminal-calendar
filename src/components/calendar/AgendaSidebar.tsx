@@ -49,7 +49,7 @@ export function AgendaSidebar({ events, weekDays, onEventClick }: AgendaSidebarP
   const totalEvents = dayGroups.reduce((s, g) => s + g.events.length, 0);
 
   return (
-    <div className="w-full border-l border-grove-border bg-grove-surface/95 backdrop-blur-sm flex flex-col h-full overflow-hidden">
+    <div className="w-48 flex-shrink-0 border-l border-grove-border bg-grove-surface flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b border-grove-border flex-shrink-0">
         <h3 className="text-[10px] font-semibold uppercase tracking-wider text-grove-text-muted">

@@ -214,37 +214,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         </div>
       </div>
 
-      {/* ── Day headers row ── */}
-      <div className="flex-shrink-0 flex bg-grove-surface border-b border-grove-border">
-        <div className="w-14 flex-shrink-0" />
-
-        {weekDays.map((day, i) => {
-          const today = isToday(day);
-          const dayNum = format(day, 'd');
-          const dayName = DAY_NAMES[i];
-
-          return (
-            <div
-              key={i}
-              className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border"
-            >
-              <span className={`text-[10px] font-medium uppercase tracking-wider ${
-                today ? 'text-grove-accent' : 'text-grove-text-muted'
-              }`}>
-                {dayName}
-              </span>
-              <span className={`text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center mt-0.5 ${
-                today
-                  ? 'bg-grove-accent text-grove-surface'
-                  : 'text-grove-text'
-              }`}>
-                {dayNum}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
       {/* ── Popovers ── */}
       {expansion && (
         <EventExpansion
@@ -265,68 +234,99 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         />
       )}
 
-      {/* ── Main area: grid + agenda sidebar overlay ── */}
-      <div className="relative flex-1 min-h-0">
-        {/* Grid body — scrollable, full width */}
-        <div
-          ref={gridRef}
-          className="absolute inset-0 overflow-y-auto"
-        >
-          <div className="flex" style={{ height: totalGridHeight }}>
-            {/* Time gutter */}
-            <TimeGutter hourHeights={hourHeights} />
+      {/* ── Main area: calendar + sidebar side by side ── */}
+      <div className="flex flex-1 min-h-0">
+        {/* Calendar section (headers + grid) */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Day headers row */}
+          <div className="flex-shrink-0 flex bg-grove-surface border-b border-grove-border">
+            <div className="w-14 flex-shrink-0" />
 
-            {/* Day columns + NowIndicator */}
-            <div className="relative flex flex-1 min-w-0">
-              {isCurrentWeek(currentWeekStart) && (
-                <NowIndicator hourHeights={hourHeights} hourOffsets={hourOffsets} />
-              )}
+            {weekDays.map((day, i) => {
+              const today = isToday(day);
+              const dayNum = format(day, 'd');
+              const dayName = DAY_NAMES[i];
 
-              {/* Empty week hint */}
-              {(() => {
-                const weekEnd = addDays(currentWeekStart, 7);
-                return !events.some(e => {
-                  const start = parseISO(e.starts_at);
-                  return !isBefore(start, currentWeekStart) && isBefore(start, weekEnd);
-                });
-              })() && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                  <div className="text-center text-grove-text-muted/50 select-none">
-                    <p className="text-sm">No events this week</p>
-                    <p className="text-xs mt-1">Click any time slot to create one</p>
-                  </div>
-                </div>
-              )}
-
-              {weekDays.map((day, i) => (
-                <DayColumn
+              return (
+                <div
                   key={i}
-                  day={day}
-                  events={events}
-                  isToday={isToday(day)}
-                  currentHour={currentSlot}
-                  hourHeights={hourHeights}
-                  hourOffsets={hourOffsets}
-                  dissolvingIds={dissolvingIds}
-                  spawningIds={spawningIds}
-                  onCellClick={canCreate ? handleCellClick : undefined}
-                  onEventClick={handleEventClick}
-                />
-              ))}
+                  className="flex-1 min-w-0 flex flex-col items-center justify-center py-1 border-l border-grove-border"
+                >
+                  <span className={`text-[10px] font-medium uppercase tracking-wider ${
+                    today ? 'text-grove-accent' : 'text-grove-text-muted'
+                  }`}>
+                    {dayName}
+                  </span>
+                  <span className={`text-xs font-semibold rounded-full w-6 h-6 flex items-center justify-center mt-0.5 ${
+                    today
+                      ? 'bg-grove-accent text-grove-surface'
+                      : 'text-grove-text'
+                  }`}>
+                    {dayNum}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Grid body — scrollable */}
+          <div
+            ref={gridRef}
+            className="flex-1 overflow-y-auto"
+            style={{ minHeight: 0 }}
+          >
+            <div className="flex" style={{ height: totalGridHeight }}>
+              {/* Time gutter */}
+              <TimeGutter hourHeights={hourHeights} />
+
+              {/* Day columns + NowIndicator */}
+              <div className="relative flex flex-1 min-w-0">
+                {isCurrentWeek(currentWeekStart) && (
+                  <NowIndicator hourHeights={hourHeights} hourOffsets={hourOffsets} />
+                )}
+
+                {/* Empty week hint */}
+                {(() => {
+                  const weekEnd = addDays(currentWeekStart, 7);
+                  return !events.some(e => {
+                    const start = parseISO(e.starts_at);
+                    return !isBefore(start, currentWeekStart) && isBefore(start, weekEnd);
+                  });
+                })() && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                    <div className="text-center text-grove-text-muted/50 select-none">
+                      <p className="text-sm">No events this week</p>
+                      <p className="text-xs mt-1">Click any time slot to create one</p>
+                    </div>
+                  </div>
+                )}
+
+                {weekDays.map((day, i) => (
+                  <DayColumn
+                    key={i}
+                    day={day}
+                    events={events}
+                    isToday={isToday(day)}
+                    currentHour={currentSlot}
+                    hourHeights={hourHeights}
+                    hourOffsets={hourOffsets}
+                    dissolvingIds={dissolvingIds}
+                    spawningIds={spawningIds}
+                    onCellClick={canCreate ? handleCellClick : undefined}
+                    onEventClick={handleEventClick}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Agenda sidebar — overlay on right */}
-        <div className="absolute top-0 right-0 bottom-0 w-52 z-20 pointer-events-none">
-          <div className="pointer-events-auto h-full">
-            <AgendaSidebar
-              events={events}
-              weekDays={weekDays}
-              onEventClick={handleEventClick}
-            />
-          </div>
-        </div>
+        {/* Agenda sidebar */}
+        <AgendaSidebar
+          events={events}
+          weekDays={weekDays}
+          onEventClick={handleEventClick}
+        />
       </div>
     </div>
   );
