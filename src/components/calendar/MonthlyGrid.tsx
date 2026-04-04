@@ -43,13 +43,16 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const allDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-  // Group events by date key
+  // Group events by date key, sorted by start time
   const eventsByDate = new Map<string, DisplayEvent[]>();
   for (const event of events) {
     const key = toDateKey(new Date(event.starts_at));
     const list = eventsByDate.get(key) ?? [];
     list.push(event);
     eventsByDate.set(key, list);
+  }
+  for (const [key, list] of eventsByDate) {
+    list.sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
   }
 
   const goToPrevMonth = useCallback(() => {
