@@ -137,17 +137,17 @@ export function AvailabilityGrid({ value, onChange, timezone }: AvailabilityGrid
       {/* Presets */}
       <div className="flex flex-wrap gap-2 mb-4">
         <span className="text-[10px] text-grove-text-muted font-medium self-center mr-1">Quick fill:</span>
-        <button onClick={() => applyPreset(0, 4, 18, 34)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
-          Weekdays 9am-5pm
+        <button onClick={() => applyPreset(0, 4, 34, 42)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
+          Weekday evenings 5-9pm
         </button>
         <button onClick={() => applyPreset(0, 4, 24, 36)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
-          Weekdays 12-6pm
+          Weekday afternoons 12-6pm
+        </button>
+        <button onClick={() => applyPreset(5, 6, 18, 40)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
+          Weekends 9am-8pm
         </button>
         <button onClick={() => applyPreset(5, 6, 20, 28)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
           Weekends 10am-2pm
-        </button>
-        <button onClick={() => applyPreset(0, 6, 14, 46)} className="text-[10px] px-2.5 py-1 rounded-full border border-grove-border text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors">
-          All days 7am-11pm
         </button>
         <button onClick={clearAll} className="text-[10px] px-2.5 py-1 rounded-full border border-red-800/30 text-red-400 hover:bg-red-900/20 transition-colors">
           Clear all
