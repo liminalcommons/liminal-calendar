@@ -265,12 +265,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         />
       )}
 
-      {/* ── Main area: grid + agenda sidebar ── */}
-      <div className="flex flex-1 min-h-0">
-        {/* Grid body — scrollable */}
+      {/* ── Main area: grid + agenda sidebar overlay ── */}
+      <div className="relative flex-1 min-h-0">
+        {/* Grid body — scrollable, full width */}
         <div
           ref={gridRef}
-          className="flex-1 overflow-y-auto min-w-0"
+          className="absolute inset-0 overflow-y-auto"
         >
           <div className="flex" style={{ height: totalGridHeight }}>
             {/* Time gutter */}
@@ -317,12 +317,16 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           </div>
         </div>
 
-        {/* Agenda sidebar — always visible */}
-        <AgendaSidebar
-          events={events}
-          weekDays={weekDays}
-          onEventClick={handleEventClick}
-        />
+        {/* Agenda sidebar — overlay on right */}
+        <div className="absolute top-0 right-0 bottom-0 w-52 z-20 pointer-events-none">
+          <div className="pointer-events-auto h-full">
+            <AgendaSidebar
+              events={events}
+              weekDays={weekDays}
+              onEventClick={handleEventClick}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

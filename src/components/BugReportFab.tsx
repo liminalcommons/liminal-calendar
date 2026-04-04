@@ -14,6 +14,7 @@ export function BugReportFab() {
   const [type, setType] = useState<'bug' | 'feature' | 'feedback'>('bug');
   const [status, setStatus] = useState<SubmitStatus>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [issueUrl, setIssueUrl] = useState<string | null>(null);
 
   const user = session?.user as any;
 
@@ -42,14 +43,17 @@ export function BugReportFab() {
       });
 
       if (!res.ok) throw new Error('Server error');
+      const data = await res.json();
       setStatus('success');
+      if (data.issueUrl) setIssueUrl(data.issueUrl);
       setTimeout(() => {
         setTitle('');
         setDescription('');
         setType('bug');
         setStatus('idle');
+        setIssueUrl(null);
         setOpen(false);
-      }, 2000);
+      }, data.issueUrl ? 8000 : 2000);
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.message || 'Failed to submit');
@@ -82,9 +86,21 @@ export function BugReportFab() {
 
           <div className="px-4 pb-4 space-y-3">
             {status === 'success' ? (
-              <div className="flex items-center gap-2 py-4 text-grove-green">
-                <Check size={16} />
-                <span className="text-sm font-medium">Thank you! Report submitted.</span>
+              <div className="py-3 space-y-2">
+                <div className="flex items-center gap-2 text-grove-green">
+                  <Check size={16} />
+                  <span className="text-sm font-medium">Thank you! Report submitted.</span>
+                </div>
+                {issueUrl && (
+                  <a
+                    href={issueUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xs text-grove-accent-deep hover:text-grove-accent underline"
+                  >
+                    View issue on GitHub →
+                  </a>
+                )}
               </div>
             ) : (
               <>

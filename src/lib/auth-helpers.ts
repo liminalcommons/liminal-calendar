@@ -7,7 +7,9 @@ export async function getServerSession() {
 }
 
 export function getUserRole(session: any): UserRole {
-  return session?.user?.role || 'member';
+  const role = session?.user?.role;
+  if (role === 'admin') return 'admin';
+  return 'host';
 }
 
 export function canCreateEvents(role: UserRole): boolean {
