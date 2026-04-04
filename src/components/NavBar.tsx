@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon, Settings, Bug } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { ViewToggle } from './ViewToggle';
@@ -130,17 +130,6 @@ export function NavBar() {
             </div>
           )}
         </div>
-
-        {/* Bug report */}
-        <a
-          href="https://github.com/liminalcommons/liminal-calendar/issues/new"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
-        >
-          <Bug size={14} />
-          <span className="text-[8px] leading-none">Report</span>
-        </a>
 
         {status === 'authenticated' && user ? (
           <>
