@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Bug, X, Send } from 'lucide-react';
+import { Bug, X, Send, Check, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 
-const GITHUB_REPO = 'liminalcommons/liminal-calendar';
+type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function BugReportFab() {
   const { data: session } = useSession();
@@ -12,40 +12,48 @@ export function BugReportFab() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<'bug' | 'feature' | 'feedback'>('bug');
+  const [status, setStatus] = useState<SubmitStatus>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const user = session?.user as any;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) return;
+    setStatus('submitting');
+    setErrorMsg('');
 
-    const labels = type === 'bug' ? 'bug' : type === 'feature' ? 'enhancement' : 'feedback';
-    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
-    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    const screenSize = typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '';
+    try {
+      const res = await fetch('/api/bug-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          type,
+          metadata: {
+            url: window.location.href,
+            reporter: user?.name || 'Anonymous',
+            screenSize: `${window.innerWidth}x${window.innerHeight}`,
+            userAgent: navigator.userAgent,
+            theme: document.documentElement.classList.contains('dark') ? 'Dark' : 'Light',
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      });
 
-    const body = [
-      `## Description`,
-      description || '_No description provided_',
-      '',
-      `## Context`,
-      `- **Page:** ${currentUrl}`,
-      `- **Reporter:** ${user?.name || 'Anonymous'}`,
-      `- **Screen:** ${screenSize}`,
-      `- **Browser:** ${userAgent.split(' ').slice(-2).join(' ')}`,
-      `- **Theme:** ${document.documentElement.classList.contains('dark') ? 'Dark' : 'Light'}`,
-      '',
-      `---`,
-      `_Reported from Liminal Calendar bug report button_`,
-    ].join('\n');
-
-    const url = `https://github.com/${GITHUB_REPO}/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}&labels=${labels}`;
-    window.open(url, '_blank');
-
-    // Reset
-    setTitle('');
-    setDescription('');
-    setType('bug');
-    setOpen(false);
+      if (!res.ok) throw new Error('Server error');
+      setStatus('success');
+      setTimeout(() => {
+        setTitle('');
+        setDescription('');
+        setType('bug');
+        setStatus('idle');
+        setOpen(false);
+      }, 2000);
+    } catch (err: any) {
+      setStatus('error');
+      setErrorMsg(err.message || 'Failed to submit');
+    }
   };
 
   return (
@@ -73,55 +81,75 @@ export function BugReportFab() {
           </div>
 
           <div className="px-4 pb-4 space-y-3">
-            {/* Type selector */}
-            <div className="flex gap-1.5">
-              {(['bug', 'feature', 'feedback'] as const).map(t => (
+            {status === 'success' ? (
+              <div className="flex items-center gap-2 py-4 text-grove-green">
+                <Check size={16} />
+                <span className="text-sm font-medium">Thank you! Report submitted.</span>
+              </div>
+            ) : (
+              <>
+                {status === 'error' && (
+                  <div className="flex items-center gap-2 text-red-400 text-xs">
+                    <AlertCircle size={14} />
+                    <span>{errorMsg || 'Something went wrong'}</span>
+                  </div>
+                )}
+
+                {/* Type selector */}
+                <div className="flex gap-1.5">
+                  {(['bug', 'feature', 'feedback'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setType(t)}
+                      className={`text-[10px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                        type === t
+                          ? 'bg-grove-accent-deep text-grove-surface border-grove-accent-deep'
+                          : 'border-grove-border text-grove-text-muted hover:text-grove-text'
+                      }`}
+                    >
+                      {t === 'bug' ? 'Bug' : t === 'feature' ? 'Feature' : 'Feedback'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Title */}
+                <input
+                  type="text"
+                  placeholder={type === 'bug' ? 'What went wrong?' : type === 'feature' ? 'What would you like?' : 'Your thoughts...'}
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  className="w-full text-sm bg-grove-bg border border-grove-border rounded-lg px-3 py-2
+                             text-grove-text placeholder:text-grove-text-dim
+                             focus:outline-none focus:ring-1 focus:ring-grove-accent"
+                />
+
+                {/* Description */}
+                <textarea
+                  placeholder="Details (optional)"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={3}
+                  className="w-full text-xs bg-grove-bg border border-grove-border rounded-lg px-3 py-2
+                             text-grove-text placeholder:text-grove-text-dim resize-none
+                             focus:outline-none focus:ring-1 focus:ring-grove-accent"
+                />
+
+                {/* Submit */}
                 <button
-                  key={t}
-                  onClick={() => setType(t)}
-                  className={`text-[10px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                    type === t
-                      ? 'bg-grove-accent-deep text-grove-surface border-grove-accent-deep'
-                      : 'border-grove-border text-grove-text-muted hover:text-grove-text'
-                  }`}
+                  onClick={handleSubmit}
+                  disabled={!title.trim() || status === 'submitting'}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-grove-accent-deep text-grove-surface
+                             text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
-                  {t === 'bug' ? 'Bug' : t === 'feature' ? 'Feature' : 'Feedback'}
+                  <Send size={12} />
+                  {status === 'submitting' ? 'Submitting...' : 'Submit Report'}
                 </button>
-              ))}
-            </div>
 
-            {/* Title */}
-            <input
-              type="text"
-              placeholder={type === 'bug' ? 'What went wrong?' : type === 'feature' ? 'What would you like?' : 'Your thoughts...'}
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="w-full text-sm bg-grove-bg border border-grove-border rounded-lg px-3 py-2
-                         text-grove-text placeholder:text-grove-text-dim
-                         focus:outline-none focus:ring-1 focus:ring-grove-accent"
-            />
-
-            {/* Description */}
-            <textarea
-              placeholder="Details (optional)"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={3}
-              className="w-full text-xs bg-grove-bg border border-grove-border rounded-lg px-3 py-2
-                         text-grove-text placeholder:text-grove-text-dim resize-none
-                         focus:outline-none focus:ring-1 focus:ring-grove-accent"
-            />
-
-            {/* Submit */}
-            <button
-              onClick={handleSubmit}
-              disabled={!title.trim()}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg bg-grove-accent-deep text-grove-surface
-                         text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              <Send size={12} />
-              Open on GitHub
-            </button>
+                <p className="text-[9px] text-grove-text-dim text-center">
+                  Your page URL and browser info will be included automatically.
+                </p>
+              </>
+            )}
           </div>
         </div>
       )}

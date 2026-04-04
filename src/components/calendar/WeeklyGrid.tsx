@@ -16,6 +16,7 @@ import { DayColumn } from './DayColumn';
 import { NowIndicator } from './NowIndicator';
 import { EventExpansion } from './EventExpansion';
 import { QuickCreatePopover } from './QuickCreatePopover';
+import { AgendaSidebar } from './AgendaSidebar';
 
 interface WeeklyGridProps {
   events: DisplayEvent[];
@@ -264,55 +265,64 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         />
       )}
 
-      {/* ── Grid body — fills remaining space, scrollable ── */}
-      <div
-        ref={gridRef}
-        className="flex-1 overflow-y-auto"
-        style={{ minHeight: 0 }}
-      >
-        <div className="flex" style={{ height: totalGridHeight }}>
-          {/* Time gutter */}
-          <TimeGutter hourHeights={hourHeights} />
+      {/* ── Main area: grid + agenda sidebar ── */}
+      <div className="flex flex-1 min-h-0">
+        {/* Grid body — scrollable */}
+        <div
+          ref={gridRef}
+          className="flex-1 overflow-y-auto min-w-0"
+        >
+          <div className="flex" style={{ height: totalGridHeight }}>
+            {/* Time gutter */}
+            <TimeGutter hourHeights={hourHeights} />
 
-          {/* Day columns + NowIndicator */}
-          <div className="relative flex flex-1 min-w-0">
-            {isCurrentWeek(currentWeekStart) && (
-              <NowIndicator hourHeights={hourHeights} hourOffsets={hourOffsets} />
-            )}
+            {/* Day columns + NowIndicator */}
+            <div className="relative flex flex-1 min-w-0">
+              {isCurrentWeek(currentWeekStart) && (
+                <NowIndicator hourHeights={hourHeights} hourOffsets={hourOffsets} />
+              )}
 
-            {/* Empty week hint */}
-            {(() => {
-              const weekEnd = addDays(currentWeekStart, 7);
-              return !events.some(e => {
-                const start = parseISO(e.starts_at);
-                return !isBefore(start, currentWeekStart) && isBefore(start, weekEnd);
-              });
-            })() && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                <div className="text-center text-grove-text-muted/50 select-none">
-                  <p className="text-sm">No events this week</p>
-                  <p className="text-xs mt-1">Click any time slot to create one</p>
+              {/* Empty week hint */}
+              {(() => {
+                const weekEnd = addDays(currentWeekStart, 7);
+                return !events.some(e => {
+                  const start = parseISO(e.starts_at);
+                  return !isBefore(start, currentWeekStart) && isBefore(start, weekEnd);
+                });
+              })() && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+                  <div className="text-center text-grove-text-muted/50 select-none">
+                    <p className="text-sm">No events this week</p>
+                    <p className="text-xs mt-1">Click any time slot to create one</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {weekDays.map((day, i) => (
-              <DayColumn
-                key={i}
-                day={day}
-                events={events}
-                isToday={isToday(day)}
-                currentHour={currentSlot}
-                hourHeights={hourHeights}
-                hourOffsets={hourOffsets}
-                dissolvingIds={dissolvingIds}
-                spawningIds={spawningIds}
-                onCellClick={canCreate ? handleCellClick : undefined}
-                onEventClick={handleEventClick}
-              />
-            ))}
+              {weekDays.map((day, i) => (
+                <DayColumn
+                  key={i}
+                  day={day}
+                  events={events}
+                  isToday={isToday(day)}
+                  currentHour={currentSlot}
+                  hourHeights={hourHeights}
+                  hourOffsets={hourOffsets}
+                  dissolvingIds={dissolvingIds}
+                  spawningIds={spawningIds}
+                  onCellClick={canCreate ? handleCellClick : undefined}
+                  onEventClick={handleEventClick}
+                />
+              ))}
+            </div>
           </div>
         </div>
+
+        {/* Agenda sidebar — always visible */}
+        <AgendaSidebar
+          events={events}
+          weekDays={weekDays}
+          onEventClick={handleEventClick}
+        />
       </div>
     </div>
   );

@@ -15,8 +15,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1024.0",
     "@neondatabase/serverless": "^1.0.2",
-    "@vercel/blob": "^2.3.2",
+    "@octokit/rest": "^22.0.1",
     "@vercel/kv": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
     "date-fns": "^4.0.0",
