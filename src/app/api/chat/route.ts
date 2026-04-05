@@ -1,3 +1,5 @@
+export const maxDuration = 60
+
 import { auth } from '../../../../auth'
 import { uploadToR2 } from '@/lib/r2'
 import { EVENT_TOOLS, buildSystemPrompt } from '@/lib/chat-tools'
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
             result: { success: true, imageUrl },
           })
         } catch (err) {
+          console.error('Image generation failed:', err)
           toolResults.push({
             tool_call_id: tc.id,
             result: { success: false, error: 'Image generation failed' },

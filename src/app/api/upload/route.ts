@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
+import { uploadToR2 } from '@/lib/r2'
 import { auth } from '../../../../auth'
 
 export async function POST(request: Request) {
@@ -25,12 +25,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large. Maximum 5MB' }, { status: 400 })
     }
 
-    // Upload to Vercel Blob
-    const blob = await put(`events/${Date.now()}-${file.name}`, file, {
-      access: 'public',
-    })
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const key = `calendar/events/${Date.now()}-${file.name}`
+    const url = await uploadToR2(key, buffer, file.type)
 
-    return NextResponse.json({ url: blob.url })
+    return NextResponse.json({ url })
   } catch (error) {
     console.error('Upload error:', error)
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 })

@@ -436,7 +436,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {/* Page heading */}
       <h1 className="text-xl font-semibold text-grove-text">
         {mode === 'create' ? 'Create Event' : 'Edit Event'}
@@ -626,22 +626,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
       {/* Image upload */}
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} eventTitle={title} eventDescription={description} />
-
-      {/* TimeZoneStrip preview */}
-      <div className="rounded-lg border border-grove-border overflow-hidden">
-        <div className="px-3 pt-2 pb-1 bg-grove-surface border-b border-grove-border">
-          <span className="text-xs font-medium text-grove-text-muted uppercase tracking-wide">
-            Time across the world
-          </span>
-        </div>
-        <div className="p-2 bg-grove-surface">
-          <TimeZoneStrip
-            selectedTime={selectedStartDate}
-            userTimezone={timezone}
-            showLabels={false}
-          />
-        </div>
-      </div>
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
