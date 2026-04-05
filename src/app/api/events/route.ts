@@ -112,10 +112,7 @@ export async function POST(request: NextRequest) {
       : groupId ? [groupId] : [];
 
     if (groupIds.length > 0 && !accessToken) {
-      console.warn('[POST /api/events] Hylo groups selected but no accessToken in session — cannot sync to Hylo. Session keys:', Object.keys(session || {}), 'User keys:', Object.keys((session as any)?.user || {}));
-    }
-    if (groupIds.length > 0) {
-      console.warn('[POST /api/events] Hylo debug: groupIds=', groupIds, 'hasAccessToken=', !!accessToken, 'sessionType=', typeof session);
+      console.warn('[POST /api/events] Hylo groups selected but no accessToken — cannot sync');
     }
     if (groupIds.length > 0 && accessToken) {
       const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
@@ -150,9 +147,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = dbEventToDisplayEvent(created) as any;
-    result._hyloDebug = { groupIds, hasAccessToken: !!accessToken, posted: !!created.hyloPostId };
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
