@@ -6,6 +6,7 @@ import { BugReportFab } from "@/components/BugReportFab";
 import { SubscribePrompt } from "@/components/SubscribePrompt";
 import { MobileRedirect } from "@/components/MobileRedirect";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -41,6 +42,7 @@ export default function RootLayout({
           <MobileRedirect />
           <SubscribePrompt />
           <ServiceWorkerRegistration />
+          <InstallPrompt />
           <BugReportFab />
         </Providers>
       </body>
