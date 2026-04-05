@@ -149,7 +149,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
+    const result = dbEventToDisplayEvent(created) as any;
+    if ((created as any)._hyloError) result._hyloError = (created as any)._hyloError;
+    return NextResponse.json(result, { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });

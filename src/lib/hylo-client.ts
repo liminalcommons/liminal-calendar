@@ -236,10 +236,7 @@ export async function createEvent(
   if (eventData.details) postInput.details = eventData.details;
   if (eventData.location) postInput.location = eventData.location;
   if (eventData.eventInviteeIds?.length) postInput.eventInviteeIds = eventData.eventInviteeIds;
-  if (eventData.imageUrl) {
-    postInput.imageUrl = eventData.imageUrl;
-    postInput.imageUrls = [eventData.imageUrl];
-  }
+  if (eventData.imageUrl) postInput.imageUrl = eventData.imageUrl;
 
   const data = await hyloGraphQL<{ createPost: HyloEvent }>(
     token, CREATE_POST_MUTATION, { data: postInput },
