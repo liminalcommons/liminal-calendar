@@ -77,14 +77,18 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
           if (updates) {
             onFormUpdate(updates)
           }
-        }
 
-        // Apply side-effect tool results
-        if (data.toolResults) {
-          for (const tr of data.toolResults) {
-            if (tr.result?.imageUrl) {
-              onFormUpdate({ imageUrl: tr.result.imageUrl })
-            }
+          // Handle image generation asynchronously
+          if (tc.function.name === 'generate_image') {
+            const args = JSON.parse(tc.function.arguments)
+            fetch('/api/generate-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: formValues.title || 'event', prompt: args.prompt }),
+            })
+              .then(r => r.ok ? r.json() : Promise.reject())
+              .then(d => { if (d.url) onFormUpdate({ imageUrl: d.url }) })
+              .catch(() => { /* silent — user can retry via AI Generate button */ })
           }
         }
       }

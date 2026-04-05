@@ -1,3 +1,5 @@
+export const maxDuration = 60
+
 import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
 import { auth } from '../../../../auth'
@@ -14,13 +16,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { title, description } = await request.json()
-    if (!title) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    const { title, description, prompt: directPrompt } = await request.json()
+    if (!title && !directPrompt) {
+      return NextResponse.json({ error: 'Title or prompt is required' }, { status: 400 })
     }
 
-    // Build a prompt for an event banner
-    const prompt = `A beautiful, vibrant event banner illustration for: "${title}". ${description ? `Context: ${description}.` : ''} Modern, clean design with warm colors. No text or letters in the image. Abstract and evocative, suitable as a wide banner.`
+    // Use direct prompt from AI tool call, or build one from title
+    const prompt = directPrompt
+      || `A beautiful, vibrant event banner illustration for: "${title}". ${description ? `Context: ${description}.` : ''} Modern, clean design with warm colors. No text or letters in the image. Abstract and evocative, suitable as a wide banner.`
 
     // Call fal.ai FLUX 2 Flash (same as weaver agent)
     const falRes = await fetch('https://fal.run/fal-ai/flux-2/flash', {
