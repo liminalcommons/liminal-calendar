@@ -111,6 +111,9 @@ export async function POST(request: NextRequest) {
       ? hyloGroupIds.filter((id: unknown) => typeof id === 'string' && id)
       : groupId ? [groupId] : [];
 
+    if (groupIds.length > 0 && !accessToken) {
+      console.warn('[POST /api/events] Hylo groups selected but no accessToken in session — cannot sync to Hylo');
+    }
     if (groupIds.length > 0 && accessToken) {
       const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
       const hyloDetails = [
