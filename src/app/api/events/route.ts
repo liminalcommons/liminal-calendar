@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule, hyloGroupId } =
+  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule, hyloGroupId, hyloGroupIds } =
     body as Record<string, unknown>;
 
   if (!title || typeof title !== 'string' || !title.trim()) {
@@ -105,34 +105,42 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    // Sync to Hylo if a group was selected and we have an access token
+    // Sync to Hylo — supports multiple groups
     const accessToken = (session as any).accessToken as string | undefined;
-    if (groupId && accessToken) {
-      try {
-        const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
-        const hyloDetails = [
-          typeof details === 'string' ? details : '',
-          `\n\n---\n📅 [View on Liminal Calendar](${calendarLink})`,
-        ].join('').trim();
+    const groupIds: string[] = Array.isArray(hyloGroupIds)
+      ? hyloGroupIds.filter((id: unknown) => typeof id === 'string' && id)
+      : groupId ? [groupId] : [];
 
-        const hyloEvent = await createHyloEvent(accessToken, groupId, {
-          title: (title as string).trim(),
-          details: hyloDetails,
-          startTime: startDate,
-          endTime: endDate,
-          timezone: typeof timezone === 'string' ? timezone : undefined,
-          location: typeof location === 'string' ? location : undefined,
-        });
+    if (groupIds.length > 0 && accessToken) {
+      const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
+      const hyloDetails = [
+        typeof details === 'string' ? details : '',
+        `\n\n---\n📅 [View on Liminal Calendar](${calendarLink})`,
+      ].join('').trim();
 
-        // Store the Hylo post ID back on the local event
-        await db
-          .update(events)
-          .set({ hyloPostId: hyloEvent.id })
-          .where(eq(events.id, created.id));
+      for (const gid of groupIds) {
+        try {
+          const hyloEvent = await createHyloEvent(accessToken, gid, {
+            title: (title as string).trim(),
+            details: hyloDetails,
+            startTime: startDate,
+            endTime: endDate,
+            timezone: typeof timezone === 'string' ? timezone : undefined,
+            location: typeof location === 'string' ? location : undefined,
+            imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
+          });
 
-        created.hyloPostId = hyloEvent.id;
-      } catch (hyloErr) {
-        console.warn('[POST /api/events] Hylo sync failed (event saved locally):', hyloErr);
+          // Store the first Hylo post ID
+          if (!created.hyloPostId) {
+            await db
+              .update(events)
+              .set({ hyloPostId: hyloEvent.id })
+              .where(eq(events.id, created.id));
+            created.hyloPostId = hyloEvent.id;
+          }
+        } catch (hyloErr) {
+          console.warn(`[POST /api/events] Hylo sync to group ${gid} failed:`, hyloErr);
+        }
       }
     }
 
