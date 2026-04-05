@@ -4,25 +4,36 @@ import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
 import { auth } from '../../../../auth'
 
-// Rate limit: 10 image generations per user per day (resets on cold start)
-const DAILY_LIMIT = 10
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+import { getDb } from '@/lib/db'
+import { sql } from 'drizzle-orm'
 
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
-  const now = Date.now()
-  const entry = rateLimitMap.get(userId)
-  if (!entry || now > entry.resetAt) {
-    // Reset at midnight UTC
-    const tomorrow = new Date()
-    tomorrow.setUTCHours(24, 0, 0, 0)
-    rateLimitMap.set(userId, { count: 1, resetAt: tomorrow.getTime() })
-    return { allowed: true, remaining: DAILY_LIMIT - 1 }
-  }
-  if (entry.count >= DAILY_LIMIT) {
-    return { allowed: false, remaining: 0 }
-  }
-  entry.count++
-  return { allowed: true, remaining: DAILY_LIMIT - entry.count }
+// Rate limits per user
+const LIMITS = { daily: 10, weekly: 30, monthly: 60 }
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; error?: string }> {
+  const db = getDb()
+  const result = await db.execute(sql`
+    SELECT
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '1 day') AS daily,
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') AS weekly,
+      COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') AS monthly
+    FROM image_generations
+    WHERE user_id = ${userId}
+  `)
+  const row = result.rows[0] as any
+  if (!row) return { allowed: true }
+
+  if (Number(row.daily) >= LIMITS.daily) return { allowed: false, error: `Daily limit reached (${LIMITS.daily}/day)` }
+  if (Number(row.weekly) >= LIMITS.weekly) return { allowed: false, error: `Weekly limit reached (${LIMITS.weekly}/week)` }
+  if (Number(row.monthly) >= LIMITS.monthly) return { allowed: false, error: `Monthly limit reached (${LIMITS.monthly}/month)` }
+  return { allowed: true }
+}
+
+async function recordGeneration(userId: string) {
+  const db = getDb()
+  await db.execute(sql`
+    INSERT INTO image_generations (user_id, created_at) VALUES (${userId}, NOW())
+  `)
 }
 
 export async function POST(request: Request) {
@@ -32,12 +43,9 @@ export async function POST(request: Request) {
   }
 
   const userId = (session.user as any).id || (session.user as any).hyloId || session.user.email || 'unknown'
-  const { allowed, remaining } = checkRateLimit(userId)
-  if (!allowed) {
-    return NextResponse.json(
-      { error: 'Daily image generation limit reached (10/day). Try again tomorrow.' },
-      { status: 429 },
-    )
+  const rateCheck = await checkRateLimit(userId)
+  if (!rateCheck.allowed) {
+    return NextResponse.json({ error: rateCheck.error }, { status: 429 })
   }
 
   const FAL_KEY = process.env.FAL_KEY
@@ -92,6 +100,8 @@ export async function POST(request: Request) {
 
     const key = `calendar/generated/${Date.now()}.${ext}`
     const permanentUrl = await uploadToR2(key, imageBuffer, contentType)
+
+    await recordGeneration(userId)
 
     return NextResponse.json({ url: permanentUrl })
   } catch (error) {
