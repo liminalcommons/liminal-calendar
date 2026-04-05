@@ -45,7 +45,7 @@ export default function NewEventPage() {
 
         <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: 'calc(100vh - 160px)' }}>
           {/* Left: Chat Panel */}
-          <div className="w-full lg:w-[40%] lg:min-h-0">
+          <div className="w-full lg:w-1/2 lg:min-h-0">
             <div className="lg:sticky lg:top-4 h-[400px] lg:h-[calc(100vh-180px)]">
               <ChatPanel
                 formValues={externalValues}
@@ -56,7 +56,7 @@ export default function NewEventPage() {
           </div>
 
           {/* Right: Event Form */}
-          <div className="w-full lg:w-[60%]">
+          <div className="w-full lg:w-1/2">
             <EventForm
               mode="create"
               externalValues={externalValues}

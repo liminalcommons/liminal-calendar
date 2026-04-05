@@ -2,11 +2,12 @@
 
 import { toolCallLabel } from '@/lib/chat-tools'
 import type { ChatMessage as ChatMessageType, ToolCall } from '@/lib/chat-tools'
-import { Check, Loader2, Sparkles } from 'lucide-react'
+import { Check, Loader2, Sparkles, ImagePlus } from 'lucide-react'
 
 interface ChatMessageProps {
-  message: ChatMessageType
+  message: ChatMessageType & { _imageUrl?: string }
   isStreaming?: boolean
+  onInsertImage?: (url: string) => void
 }
 
 function ToolCallBadge({ toolCall, completed }: { toolCall: ToolCall; completed: boolean }) {
@@ -31,10 +32,32 @@ function ToolCallBadge({ toolCall, completed }: { toolCall: ToolCall; completed:
   )
 }
 
-export function ChatMessage({ message, isStreaming }: ChatMessageProps) {
+export function ChatMessage({ message, isStreaming, onInsertImage }: ChatMessageProps) {
   const isUser = message.role === 'user'
 
   if (message.role === 'tool') return null
+
+  // Image message
+  if ((message as any)._imageUrl) {
+    const imageUrl = (message as any)._imageUrl
+    return (
+      <div className="flex justify-start">
+        <div className="max-w-[85%] rounded-xl overflow-hidden border border-grove-border/30 bg-grove-surface">
+          <img src={imageUrl} alt="Generated banner" className="w-full h-auto" />
+          {onInsertImage && (
+            <button
+              type="button"
+              onClick={() => onInsertImage(imageUrl)}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-grove-accent hover:bg-grove-accent/5 transition-colors"
+            >
+              <ImagePlus size={12} />
+              Use as event banner
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>

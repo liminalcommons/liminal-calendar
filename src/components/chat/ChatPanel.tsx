@@ -78,7 +78,7 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
             onFormUpdate(updates)
           }
 
-          // Handle image generation asynchronously
+          // Handle image generation asynchronously — show in chat
           if (tc.function.name === 'generate_image') {
             const args = JSON.parse(tc.function.arguments)
             fetch('/api/generate-image', {
@@ -87,8 +87,22 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
               body: JSON.stringify({ title: formValues.title || 'event', prompt: args.prompt }),
             })
               .then(r => r.ok ? r.json() : Promise.reject())
-              .then(d => { if (d.url) onFormUpdate({ imageUrl: d.url }) })
-              .catch(() => { /* silent — user can retry via AI Generate button */ })
+              .then(d => {
+                if (d.url) {
+                  // Add image message to chat
+                  setMessages(prev => [...prev, {
+                    role: 'assistant' as const,
+                    content: null,
+                    _imageUrl: d.url,
+                  } as any])
+                }
+              })
+              .catch(() => {
+                setMessages(prev => [...prev, {
+                  role: 'assistant' as const,
+                  content: 'Image generation failed. You can try the AI Generate button on the form.',
+                }])
+              })
           }
         }
       }
@@ -131,7 +145,11 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
         )}
 
         {messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          <ChatMessage
+            key={i}
+            message={msg}
+            onInsertImage={(url) => onFormUpdate({ imageUrl: url })}
+          />
         ))}
 
         {isLoading && (
