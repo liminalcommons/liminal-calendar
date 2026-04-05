@@ -112,7 +112,10 @@ export async function POST(request: NextRequest) {
       : groupId ? [groupId] : [];
 
     if (groupIds.length > 0 && !accessToken) {
-      console.warn('[POST /api/events] Hylo groups selected but no accessToken in session — cannot sync to Hylo');
+      console.warn('[POST /api/events] Hylo groups selected but no accessToken in session — cannot sync to Hylo. Session keys:', Object.keys(session || {}), 'User keys:', Object.keys((session as any)?.user || {}));
+    }
+    if (groupIds.length > 0) {
+      console.warn('[POST /api/events] Hylo debug: groupIds=', groupIds, 'hasAccessToken=', !!accessToken, 'sessionType=', typeof session);
     }
     if (groupIds.length > 0 && accessToken) {
       const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
