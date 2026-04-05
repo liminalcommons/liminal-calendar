@@ -26,6 +26,7 @@ export interface EventFormValues {
   imageUrl?: string
   meetingLink?: string
   timezone?: string
+  hyloGroupNames?: string[]
 }
 
 export const EVENT_TOOLS = [
@@ -114,6 +115,20 @@ export const EVENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'set_hylo_groups',
+      description: 'Set which Hylo groups this event should be posted to',
+      parameters: {
+        type: 'object',
+        properties: {
+          groupNames: { type: 'array', items: { type: 'string' }, description: 'Names of Hylo groups to post to' },
+        },
+        required: ['groupNames'],
+      },
+    },
+  },
 ]
 
 export function buildSystemPrompt(formState: EventFormValues): string {
@@ -168,7 +183,8 @@ TOOL USAGE
 - Interpret relative dates ("next Friday", "tomorrow") from today
 - If a title or description feels generic, set it first then suggest a more evocative alternative
 - The form is directly editable — you're a creative partner, not a gatekeeper
-- If the host just wants to fill the form quickly, respect that and help efficiently`
+- If the host just wants to fill the form quickly, respect that and help efficiently
+- Ask which Hylo groups the event should be posted to — use set_hylo_groups with the group names`
 }
 
 /** Map a tool call to form state updates. Returns null for side-effect tools. */
@@ -191,6 +207,8 @@ export function applyToolCall(toolCall: ToolCall): Partial<EventFormValues> | nu
       return null // side-effect, handled server-side
     case 'suggest_times':
       return null // side-effect, handled server-side
+    case 'set_hylo_groups':
+      return { hyloGroupNames: args.groupNames }
     default:
       return null
   }
@@ -205,6 +223,7 @@ export function toolCallLabel(name: string): string {
     case 'set_recurrence': return 'Set recurrence'
     case 'generate_image': return 'Generating image...'
     case 'suggest_times': return 'Finding best times...'
+    case 'set_hylo_groups': return 'Set Hylo groups'
     default: return name
   }
 }

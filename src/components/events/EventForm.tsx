@@ -73,10 +73,10 @@ function getWeekDays(weekStart: Date): Date[] {
 
 // ─── Hylo Group Picker ──────────────────────────────────────────────────────
 
-function HyloGroupPicker({ groups, selectedId, onChange }: {
+function HyloGroupPicker({ groups, selectedIds, onChange }: {
   groups: Array<{ id: string; name: string }>
-  selectedId: string
-  onChange: (id: string) => void
+  selectedIds: string[]
+  onChange: (ids: string[]) => void
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -95,7 +95,19 @@ function HyloGroupPicker({ groups, selectedId, onChange }: {
     ? groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
     : groups
 
-  const selectedName = groups.find(g => g.id === selectedId)?.name
+  const toggleGroup = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(g => g !== id))
+    } else {
+      onChange([...selectedIds, id])
+    }
+  }
+
+  const label = selectedIds.length === 0
+    ? "Don't post to Hylo"
+    : selectedIds.length === 1
+    ? groups.find(g => g.id === selectedIds[0])?.name || '1 group'
+    : `${selectedIds.length} groups selected`
 
   return (
     <div>
@@ -108,32 +120,36 @@ function HyloGroupPicker({ groups, selectedId, onChange }: {
           onClick={() => { setOpen(!open); setSearch('') }}
           className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text text-sm text-left focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent"
         >
-          {selectedId ? selectedName : "Don't post to Hylo"}
+          {label}
         </button>
 
         {open && (
           <div className="absolute z-50 left-0 right-0 bottom-full mb-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg overflow-hidden">
             <div className="max-h-40 overflow-y-auto">
-              <button
-                type="button"
-                onClick={() => { onChange(''); setOpen(false) }}
-                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                  !selectedId ? 'text-grove-accent bg-grove-accent/5' : 'text-grove-text-muted hover:bg-grove-border/30'
-                }`}
-              >
-                Don&apos;t post to Hylo
-              </button>
-              {filtered.map(g => (
+              {selectedIds.length > 0 && (
                 <button
                   type="button"
-                  key={g.id}
-                  onClick={() => { onChange(g.id); setOpen(false) }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                    selectedId === g.id ? 'text-grove-accent bg-grove-accent/5' : 'text-grove-text hover:bg-grove-border/30'
-                  }`}
+                  onClick={() => onChange([])}
+                  className="w-full text-left px-3 py-1.5 text-xs text-grove-text-muted hover:bg-grove-border/30 transition-colors"
                 >
-                  {g.name}
+                  Clear all
                 </button>
+              )}
+              {filtered.map(g => (
+                <label
+                  key={g.id}
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-grove-border/30 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(g.id)}
+                    onChange={() => toggleGroup(g.id)}
+                    className="rounded border-grove-border text-grove-accent focus:ring-grove-accent"
+                  />
+                  <span className={selectedIds.includes(g.id) ? 'text-grove-accent' : 'text-grove-text'}>
+                    {g.name}
+                  </span>
+                </label>
               ))}
               {filtered.length === 0 && (
                 <p className="px-3 py-2 text-xs text-grove-text-dim italic">No groups found</p>
@@ -219,7 +235,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
   // Hylo posting
   const [hyloGroups, setHyloGroups] = useState<Array<{ id: string; name: string }>>([])
-  const [selectedHyloGroup, setSelectedHyloGroup] = useState<string>('')
+  const [selectedHyloGroups, setSelectedHyloGroups] = useState<string[]>([])
   const [postToHylo, setPostToHylo] = useState(false)
 
   // UI state
@@ -250,7 +266,17 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       const dayOfWeek = d.getDay()
       setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
     }
-  }, [externalValues, durationMinutes])
+    if ((externalValues as any).hyloGroupNames && hyloGroups.length > 0) {
+      const names = (externalValues as any).hyloGroupNames as string[]
+      const matchedIds = hyloGroups
+        .filter(g => names.some(n => g.name.toLowerCase().includes(n.toLowerCase())))
+        .map(g => g.id)
+      if (matchedIds.length > 0) {
+        setSelectedHyloGroups(matchedIds)
+        setPostToHylo(true)
+      }
+    }
+  }, [externalValues, durationMinutes, hyloGroups])
 
   // Notify parent of internal value changes
   useEffect(() => {
@@ -494,7 +520,8 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
         recurrenceEndCount: recurrence !== 'none' && recurrenceEndType === 'after_count' ? recurrenceEndCount : undefined,
         imageUrl: imageUrl || undefined,
-        hyloGroupId: postToHylo && selectedHyloGroup ? selectedHyloGroup : undefined,
+        hyloGroupId: postToHylo && selectedHyloGroups.length > 0 ? selectedHyloGroups[0] : undefined,
+        hyloGroupIds: postToHylo && selectedHyloGroups.length > 0 ? selectedHyloGroups : undefined,
       };
 
       if (mode === 'create') {
@@ -736,10 +763,10 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           <div className="flex-1">
             <HyloGroupPicker
               groups={hyloGroups}
-              selectedId={selectedHyloGroup}
-              onChange={(id) => {
-                setSelectedHyloGroup(id)
-                setPostToHylo(id !== '')
+              selectedIds={selectedHyloGroups}
+              onChange={(ids) => {
+                setSelectedHyloGroups(ids)
+                setPostToHylo(ids.length > 0)
               }}
             />
           </div>
