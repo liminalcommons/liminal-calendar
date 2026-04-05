@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles } from 'lucide-react'
+import { Send, Sparkles, RotateCcw } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { applyToolCall } from '@/lib/chat-tools'
 import type { ChatMessage as ChatMessageType, EventFormValues, ToolCall } from '@/lib/chat-tools'
@@ -129,9 +129,24 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
   return (
     <div className="flex flex-col h-full bg-grove-bg rounded-xl border border-grove-border/30 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-grove-border/20 bg-grove-surface/50">
-        <Sparkles size={16} className="text-grove-accent" />
-        <span className="text-sm font-medium text-grove-text">Event Assistant</span>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-grove-border/20 bg-grove-surface/50">
+        <div className="flex items-center gap-2">
+          <Sparkles size={16} className="text-grove-accent" />
+          <span className="text-sm font-medium text-grove-text">Event Assistant</span>
+        </div>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setMessages([])
+              localStorage.removeItem(storageKey)
+            }}
+            className="p-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
+            title="Reset conversation"
+          >
+            <RotateCcw size={14} />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
