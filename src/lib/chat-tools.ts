@@ -27,6 +27,7 @@ export interface EventFormValues {
   meetingLink?: string
   timezone?: string
   hyloGroupNames?: string[]
+  availableHyloGroups?: string[]
 }
 
 export const EVENT_TOOLS = [
@@ -136,6 +137,10 @@ export function buildSystemPrompt(formState: EventFormValues): string {
   const tz = formState.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   const stateJson = JSON.stringify(formState, null, 2)
 
+  const hyloGroups = formState.availableHyloGroups?.length
+    ? `\n\nAvailable Hylo groups to post to (ONLY use these exact names with set_hylo_groups):\n${formState.availableHyloGroups.map(g => `- ${g}`).join('\n')}`
+    : ''
+
   return `You are an intentional event creation coach for the Liminal Commons community calendar — an online gathering space for sensemaking, metamodern dialogue, and collective intelligence.
 
 Your role is to help hosts craft events that are meaningful, inviting, and clearly communicated.
@@ -143,7 +148,7 @@ Your role is to help hosts craft events that are meaningful, inviting, and clear
 Current form state:
 ${stateJson}
 
-Today is ${today}. User timezone: ${tz}.
+Today is ${today}. User timezone: ${tz}.${hyloGroups}
 
 YOUR APPROACH: INQUIRY-DRIVEN CO-CREATION
 

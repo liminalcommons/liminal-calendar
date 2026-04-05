@@ -26,8 +26,21 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
   })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [hyloGroups, setHyloGroups] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch Hylo groups for AI context
+  useEffect(() => {
+    fetch('/api/groups')
+      .then(r => r.ok ? r.json() : [])
+      .then(groups => {
+        if (Array.isArray(groups)) {
+          setHyloGroups(groups.map((g: any) => g.name))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Persist to localStorage
   useEffect(() => {
@@ -57,7 +70,7 @@ export function ChatPanel({ formValues, onFormUpdate, storageKey }: ChatPanelPro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: updatedMessages,
-          formState: formValues,
+          formState: { ...formValues, availableHyloGroups: hyloGroups },
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       })
