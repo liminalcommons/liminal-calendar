@@ -76,11 +76,31 @@ function getWeekDays(weekStart: Date): Date[] {
 interface EventFormProps {
   mode: 'create' | 'edit';
   eventId?: string;
+  externalValues?: Partial<{
+    title: string
+    description: string
+    startTime: string
+    endTime: string
+    date: string
+    recurrence: string
+    imageUrl: string
+    meetingLink: string
+  }>
+  onSuccess?: () => void
+  onValuesChange?: (values: {
+    title: string
+    description: string
+    startTime: string
+    endTime: string
+    recurrence: string
+    imageUrl: string | null
+    meetingLink: string
+  }) => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EventForm({ mode, eventId }: EventFormProps) {
+export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuccess }: EventFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
 
@@ -117,6 +137,44 @@ export function EventForm({ mode, eventId }: EventFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(mode === 'edit');
   const [error, setError] = useState<string | null>(null);
+
+  // Sync external values from chat panel
+  useEffect(() => {
+    if (!externalValues) return
+    if (externalValues.title !== undefined) setTitle(externalValues.title)
+    if (externalValues.description !== undefined) setDescription(externalValues.description)
+    if (externalValues.meetingLink !== undefined) setMeetingLink(externalValues.meetingLink)
+    if (externalValues.imageUrl !== undefined) setImageUrl(externalValues.imageUrl)
+    if (externalValues.startTime !== undefined) {
+      setStartTime(externalValues.startTime)
+      const newEnd = addMinutesToTimeStr(externalValues.startTime, durationMinutes)
+      setEndTime(newEnd)
+    }
+    if (externalValues.endTime !== undefined) setEndTime(externalValues.endTime)
+    if (externalValues.recurrence !== undefined) {
+      setRecurrence(externalValues.recurrence as RecurrenceValue)
+    }
+    if (externalValues.date !== undefined) {
+      const d = new Date(externalValues.date + 'T00:00:00')
+      setCurrentWeekStart(getWeekStart(d))
+      const dayOfWeek = d.getDay()
+      setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
+    }
+  }, [externalValues])
+
+  // Notify parent of internal value changes
+  useEffect(() => {
+    if (!onValuesChange) return
+    onValuesChange({
+      title,
+      description,
+      startTime,
+      endTime,
+      recurrence,
+      imageUrl,
+      meetingLink,
+    })
+  }, [title, description, startTime, endTime, recurrence, imageUrl, meetingLink, onValuesChange])
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const weekDays = useMemo(() => getWeekDays(currentWeekStart), [currentWeekStart]);
@@ -347,6 +405,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
         // API returns DisplayEvent directly
         const newId = data.id || data.event?.id;
         router.push(`/events/${newId}`);
+        onSuccess?.()
       } else {
         const res = await apiFetch(`/api/events/${eventId}`, {
           method: 'PATCH',
@@ -566,7 +625,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
       </div>
 
       {/* Image upload */}
-      <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
+      <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} eventTitle={title} eventDescription={description} />
 
       {/* TimeZoneStrip preview */}
       <div className="rounded-lg border border-grove-border overflow-hidden">
