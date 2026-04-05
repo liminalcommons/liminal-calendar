@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         prompt,
-        image_size: { width: 1024, height: 384 },
+        image_size: { width: 1024, height: 512 },
         num_images: 1,
       }),
     })
