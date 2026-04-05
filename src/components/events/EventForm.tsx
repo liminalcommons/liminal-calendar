@@ -646,6 +646,28 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       {/* Image upload */}
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
+      {/* Post to Hylo — create mode only */}
+      {mode === 'create' && hyloGroups.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-grove-text mb-1">
+            Post to Hylo
+          </label>
+          <select
+            value={selectedHyloGroup}
+            onChange={(e) => {
+              setSelectedHyloGroup(e.target.value)
+              setPostToHylo(e.target.value !== '')
+            }}
+            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+          >
+            <option value="">Don&apos;t post to Hylo</option>
+            {hyloGroups.map(g => (
+              <option key={g.id} value={g.id}>{g.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         <button
@@ -667,32 +689,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           Cancel
         </button>
       </div>
-
-      {/* Hylo posting — create mode only */}
-      {mode === 'create' && hyloGroups.length > 0 && (
-        <div className="flex items-center gap-3 pt-1">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={postToHylo}
-              onChange={(e) => setPostToHylo(e.target.checked)}
-              className="rounded border-grove-border text-grove-accent focus:ring-grove-accent"
-            />
-            <span className="text-sm text-grove-text-muted">Also post to Hylo</span>
-          </label>
-          {postToHylo && (
-            <select
-              value={selectedHyloGroup}
-              onChange={(e) => setSelectedHyloGroup(e.target.value)}
-              className="text-xs px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text"
-            >
-              {hyloGroups.map(g => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
     </form>
   );
 }
