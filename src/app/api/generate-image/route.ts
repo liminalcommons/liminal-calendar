@@ -6,7 +6,7 @@ import { auth } from '../../../../auth'
 
 export async function POST(request: Request) {
   const session = await auth()
-  if (!(session as any)?.accessToken) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

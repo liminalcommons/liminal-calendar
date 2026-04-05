@@ -7,7 +7,7 @@ const LITELLM_API_KEY = process.env.LITELLM_API_KEY || ''
 
 export async function POST(request: Request) {
   const session = await auth()
-  if (!(session as any)?.accessToken) {
+  if (!session?.user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 
