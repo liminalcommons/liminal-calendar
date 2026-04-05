@@ -474,7 +474,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          rows={3}
+          rows={2}
           placeholder="What is this event about?"
           className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm resize-none"
         />
@@ -601,27 +601,27 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         </div>
       )}
 
-      {/* Recurrence */}
-      <div>
-        <label className="block text-sm font-medium text-grove-text mb-2">
-          Recurrence
-        </label>
-        <RecurrenceSelector value={recurrence} onChange={handleRecurrenceChange} />
-      </div>
-
-      {/* Meeting link */}
-      <div>
-        <label htmlFor="meeting-link" className="block text-sm font-medium text-grove-text mb-1">
-          Meeting link <span className="text-grove-text-muted text-xs">(optional)</span>
-        </label>
-        <input
-          id="meeting-link"
-          type="url"
-          value={meetingLink}
-          onChange={(e) => setMeetingLink(e.target.value)}
-          placeholder="https://..."
-          className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
-        />
+      {/* Recurrence + Meeting link */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-grove-text mb-1">
+            Recurrence
+          </label>
+          <RecurrenceSelector value={recurrence} onChange={handleRecurrenceChange} />
+        </div>
+        <div>
+          <label htmlFor="meeting-link" className="block text-sm font-medium text-grove-text mb-1">
+            Meeting link <span className="text-grove-text-muted text-xs">(optional)</span>
+          </label>
+          <input
+            id="meeting-link"
+            type="url"
+            value={meetingLink}
+            onChange={(e) => setMeetingLink(e.target.value)}
+            placeholder="https://..."
+            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+          />
+        </div>
       </div>
 
       {/* Image upload */}
