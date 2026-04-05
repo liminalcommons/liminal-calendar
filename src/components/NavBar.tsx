@@ -1,7 +1,7 @@
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon, Settings } from 'lucide-react';
+import { Volume2, VolumeX, LogOut, CalendarPlus, Sun, Moon, Settings, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { ViewToggle } from './ViewToggle';
@@ -133,6 +133,18 @@ export function NavBar() {
 
         {status === 'authenticated' && user ? (
           <>
+            {/* Create event — hosts + admins */}
+            {(user.role === 'admin' || user.role === 'host') && (
+              <Link
+                href="/events/new"
+                className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-accent hover:text-grove-accent-deep hover:bg-grove-accent/10 transition-colors"
+                title="Create new event"
+              >
+                <Plus size={14} />
+                <span className="text-[8px] leading-none">New</span>
+              </Link>
+            )}
+
             {/* Admin link */}
             {user.role === 'admin' && (
               <Link
