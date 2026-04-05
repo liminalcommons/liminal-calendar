@@ -1,0 +1,256 @@
+<h2>AI Event Creation Flow</h2>
+<p class="subtitle">Form-first with ambient AI companion</p>
+
+<h3>Step 1: User opens /events/new — just the form</h3>
+<div class="mockup">
+  <div class="mockup-header">Initial State — Clean Form</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="background:#1a1612;min-height:400px;padding:24px 32px;font-family:system-ui;">
+      <!-- Nav -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:12px;border-bottom:1px solid #3a3228;">
+        <span style="color:#e8d5b5;font-weight:600;font-size:13px;">Liminal Commons</span>
+        <div style="display:flex;gap:12px;align-items:center;font-size:10px;color:#a89880;">
+          <span>Week</span><span>Month</span><span>List</span>
+          <span style="background:#c9a227;color:#1a1612;padding:3px 10px;border-radius:6px;font-weight:600;">+ New</span>
+        </div>
+      </div>
+
+      <!-- Form centered, no chat -->
+      <div style="max-width:520px;margin:0 auto;">
+        <h2 style="color:#e8d5b5;font-size:18px;margin-bottom:20px;font-weight:500;">Create Event</h2>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Title *</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:13px;">
+          <span style="color:#5a4a38;">What's your event called?</span>
+        </div>
+
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Date *</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#5a4a38;font-size:13px;">Select date</div>
+          </div>
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Time *</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#5a4a38;font-size:13px;">6:00 PM</div>
+          </div>
+        </div>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Description</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#5a4a38;font-size:13px;min-height:60px;">What is this event about?</div>
+
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Recurrence</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0;color:#a89880;font-size:13px;">Does not repeat</div>
+          </div>
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Meeting link</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0;color:#5a4a38;font-size:13px;">https://...</div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;padding:16px;border:2px dashed #3a3228;border-radius:8px;text-align:center;color:#5a4a38;font-size:12px;">
+          Event Image — Drop or AI Generate
+        </div>
+
+        <button style="width:100%;margin-top:20px;padding:10px;background:#c9a227;color:#1a1612;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Create Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:32px;">Step 2: User starts typing title — AI wakes up</h3>
+<div class="mockup">
+  <div class="mockup-header">AI Panel Slides In (after ~2s pause in typing)</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="background:#1a1612;min-height:400px;display:flex;font-family:system-ui;">
+
+      <!-- Form (left, primary) -->
+      <div style="flex:1;padding:24px;border-right:1px solid #3a3228;">
+        <h2 style="color:#e8d5b5;font-size:18px;margin-bottom:20px;font-weight:500;">Create Event</h2>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Title *</label>
+        <div style="background:#2a2218;border:1px solid #c9a227;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:13px;">
+          Meditation Circle<span style="animation:blink 1s infinite;color:#c9a227;">|</span>
+        </div>
+
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Date *</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#5a4a38;font-size:13px;">Select date</div>
+          </div>
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Time *</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#a89880;font-size:13px;">6:00 PM</div>
+          </div>
+        </div>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Description</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#5a4a38;font-size:13px;min-height:60px;">What is this event about?</div>
+
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Recurrence</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0;color:#a89880;font-size:13px;">Does not repeat</div>
+          </div>
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Meeting link</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0;color:#5a4a38;font-size:13px;">https://...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Panel (right, slides in) -->
+      <div style="width:320px;display:flex;flex-direction:column;background:#1e1a14;">
+        <div style="padding:12px 16px;border-bottom:1px solid #3a3228;display:flex;align-items:center;gap:8px;">
+          <span style="color:#c9a227;font-size:14px;">&#10024;</span>
+          <span style="color:#e8d5b5;font-size:12px;font-weight:500;">Event Assistant</span>
+          <span style="margin-left:auto;color:#5a4a38;font-size:16px;cursor:pointer;">&times;</span>
+        </div>
+
+        <div style="flex:1;padding:16px;overflow-y:auto;">
+          <div style="background:#2a2218;border:1px solid #3a3228;border-radius:12px;padding:10px 14px;margin-bottom:12px;max-width:90%;">
+            <p style="color:#e8d5b5;font-size:12px;line-height:1.5;margin:0;">
+              A meditation circle &mdash; beautiful. &#127807;
+            </p>
+            <p style="color:#e8d5b5;font-size:12px;line-height:1.5;margin:8px 0 0;">
+              What kind of experience are you creating? A guided session, silent sit, movement meditation, or something else entirely?
+            </p>
+          </div>
+        </div>
+
+        <div style="padding:12px;border-top:1px solid #3a3228;">
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:8px 12px;color:#5a4a38;font-size:12px;">Describe your vision...</div>
+            <div style="background:#c9a227;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#1a1612;font-size:14px;">&#9654;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:32px;">Step 3: After conversation — form filled, image in chat</h3>
+<div class="mockup">
+  <div class="mockup-header">AI has filled the form + generated image preview in chat</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="background:#1a1612;min-height:400px;display:flex;font-family:system-ui;">
+
+      <!-- Form (filled) -->
+      <div style="flex:1;padding:24px;border-right:1px solid #3a3228;">
+        <h2 style="color:#e8d5b5;font-size:18px;margin-bottom:20px;font-weight:500;">Create Event</h2>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Title *</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:13px;">Sunset Meditation Circle</div>
+
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Date *</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:13px;">Fri, Apr 11</div>
+          </div>
+          <div style="flex:1;">
+            <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Time</label>
+            <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:13px;">6:00 PM &ndash; 7:30 PM</div>
+          </div>
+        </div>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Description</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 16px;color:#e8d5b5;font-size:12px;line-height:1.5;">
+          Join us as the sun dips below the horizon for a gentle guided meditation. We'll begin with breathwork, settle into stillness, and close with a sharing circle. All experience levels welcome. Bring a cushion or blanket.
+        </div>
+
+        <!-- Banner preview -->
+        <div style="margin:16px 0;border-radius:8px;overflow:hidden;background:linear-gradient(135deg,#c97b2a,#8b4513,#2a1810);height:100px;display:flex;align-items:end;padding:8px 12px;">
+          <div>
+            <span style="color:white;font-size:11px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,0.5);">Sunset Meditation Circle</span><br>
+            <span style="color:rgba(255,255,255,0.8);font-size:10px;text-shadow:0 1px 3px rgba(0,0,0,0.5);">Fri Apr 11 &bull; 6:00 PM</span>
+          </div>
+        </div>
+
+        <button style="width:100%;padding:10px;background:#c9a227;color:#1a1612;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Create Event</button>
+        <button style="width:100%;margin-top:8px;padding:8px;background:transparent;color:#a89880;border:1px solid #3a3228;border-radius:8px;font-size:12px;cursor:pointer;">Also post to Hylo</button>
+      </div>
+
+      <!-- AI Panel (with image) -->
+      <div style="width:320px;display:flex;flex-direction:column;background:#1e1a14;">
+        <div style="padding:12px 16px;border-bottom:1px solid #3a3228;display:flex;align-items:center;gap:8px;">
+          <span style="color:#c9a227;font-size:14px;">&#10024;</span>
+          <span style="color:#e8d5b5;font-size:12px;font-weight:500;">Event Assistant</span>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+            <span style="color:#5a4a38;font-size:12px;cursor:pointer;" title="Reset">&#8634;</span>
+            <span style="color:#5a4a38;font-size:16px;cursor:pointer;">&times;</span>
+          </div>
+        </div>
+
+        <div style="flex:1;padding:16px;overflow-y:auto;font-size:12px;">
+          <!-- Conversation -->
+          <div style="background:#c9a227;color:#1a1612;border-radius:12px;padding:8px 12px;margin-bottom:8px;margin-left:20%;font-size:11px;">
+            A guided sunset meditation, outdoors if possible
+          </div>
+          <div style="background:#2a2218;border:1px solid #3a3228;border-radius:12px;padding:8px 12px;margin-bottom:8px;max-width:85%;">
+            <p style="color:#e8d5b5;font-size:11px;line-height:1.4;margin:0;">Lovely. I've set it up as "Sunset Meditation Circle" for next Friday at 6 PM.</p>
+            <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
+              <span style="background:rgba(201,162,39,0.15);color:#c9a227;padding:2px 6px;border-radius:8px;font-size:9px;">&#10003; Set title</span>
+              <span style="background:rgba(201,162,39,0.15);color:#c9a227;padding:2px 6px;border-radius:8px;font-size:9px;">&#10003; Set time</span>
+              <span style="background:rgba(201,162,39,0.15);color:#c9a227;padding:2px 6px;border-radius:8px;font-size:9px;">&#10003; Set description</span>
+            </div>
+          </div>
+
+          <!-- Generated image in chat -->
+          <div style="max-width:85%;margin-bottom:8px;">
+            <div style="border-radius:12px;overflow:hidden;border:1px solid #3a3228;">
+              <div style="background:linear-gradient(135deg,#c97b2a,#8b4513,#2a1810);height:120px;"></div>
+              <button style="width:100%;padding:8px;background:#2a2218;border:none;color:#c9a227;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
+                &#128248; Use as event banner
+              </button>
+            </div>
+          </div>
+
+          <div style="background:#2a2218;border:1px solid #3a3228;border-radius:12px;padding:8px 12px;max-width:85%;">
+            <p style="color:#e8d5b5;font-size:11px;line-height:1.4;margin:0;">Your event is ready. Review the form and hit Create when you're happy with it.</p>
+          </div>
+        </div>
+
+        <div style="padding:12px;border-top:1px solid #3a3228;">
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:8px 12px;color:#5a4a38;font-size:11px;">Make the description shorter...</div>
+            <div style="background:#c9a227;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#1a1612;font-size:14px;">&#9654;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:32px;">Mobile: Chat as bottom sheet</h3>
+<div class="mockup" style="max-width:375px;margin:0 auto;">
+  <div class="mockup-header">Mobile — AI as expandable bottom sheet</div>
+  <div class="mockup-body" style="padding:0;">
+    <div style="background:#1a1612;min-height:500px;position:relative;font-family:system-ui;overflow:hidden;">
+      <!-- Form -->
+      <div style="padding:16px;">
+        <h2 style="color:#e8d5b5;font-size:16px;margin-bottom:16px;font-weight:500;">Create Event</h2>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Title *</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 12px;color:#e8d5b5;font-size:13px;">Sunset Meditation Circle</div>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Date & Time</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 12px;color:#e8d5b5;font-size:13px;">Fri Apr 11 &bull; 6:00 PM &ndash; 7:30 PM</div>
+
+        <label style="color:#a89880;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Description</label>
+        <div style="background:#2a2218;border:1px solid #3a3228;border-radius:8px;padding:10px 12px;margin:4px 0 12px;color:#e8d5b5;font-size:11px;line-height:1.4;">
+          Join us as the sun dips below the horizon for a gentle guided meditation...
+        </div>
+      </div>
+
+      <!-- AI bottom sheet (collapsed) -->
+      <div style="position:absolute;bottom:0;left:0;right:0;background:#1e1a14;border-top:1px solid #3a3228;border-radius:12px 12px 0 0;">
+        <div style="width:40px;height:4px;background:#3a3228;border-radius:2px;margin:8px auto;"></div>
+        <div style="padding:8px 16px 12px;display:flex;align-items:center;gap:8px;">
+          <span style="color:#c9a227;font-size:14px;">&#10024;</span>
+          <span style="color:#a89880;font-size:12px;">AI Assistant ready &mdash; swipe up to chat</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

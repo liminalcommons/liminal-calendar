@@ -1,5 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { EventCard } from '@/components/events/EventCard'
 import { EventCountdown } from '@/components/events/EventCountdown'
 import { NavBar } from '@/components/NavBar'
@@ -7,8 +10,10 @@ import { getUpcomingEvents, groupEventsByDateLabel } from '@/lib/calendar-utils'
 import type { DisplayEvent } from '@/lib/display-event'
 
 export default function ListPage() {
+  const { data: session } = useSession()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [loading, setLoading] = useState(true)
+  const userRole = (session?.user as any)?.role
 
   useEffect(() => {
     fetch('/api/events')
@@ -37,11 +42,22 @@ export default function ListPage() {
     <div className="min-h-screen bg-grove-bg">
       <NavBar />
       <main className="max-w-2xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-serif text-grove-text font-light">
-            Upcoming Events
-          </h1>
-          <p className="text-sm text-grove-text-muted">Next {events.length} events</p>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-serif text-grove-text font-light">
+              Upcoming Events
+            </h1>
+            <p className="text-sm text-grove-text-muted">Next {events.length} events</p>
+          </div>
+          {(userRole === 'admin' || userRole === 'host') && (
+            <Link
+              href="/events/new"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-grove-accent-deep text-grove-surface text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <Plus size={16} />
+              New Event
+            </Link>
+          )}
         </div>
 
         {nextEvent && <EventCountdown event={nextEvent} />}
