@@ -11,10 +11,12 @@ const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeU
 
 const STORAGE_KEY = 'calendar-subscribe-dismissed'
 
+type Step = 'prompt' | 'confirm' | 'done'
+
 export function SubscribePrompt() {
   const { data: session, status } = useSession()
   const [show, setShow] = useState(false)
-  const [subscribed, setSubscribed] = useState(false)
+  const [step, setStep] = useState<Step>('prompt')
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -26,36 +28,78 @@ export function SubscribePrompt() {
 
   const handleSubscribe = (url: string) => {
     window.open(url, '_blank')
-    setSubscribed(true)
-    // Auto-close after subscribing
-    setTimeout(() => {
-      setShow(false)
-      localStorage.setItem(STORAGE_KEY, Date.now().toString())
-    }, 2000)
+    setStep('confirm')
+  }
+
+  const handleConfirm = () => {
+    setStep('done')
+    localStorage.setItem(STORAGE_KEY, Date.now().toString())
+    setTimeout(() => setShow(false), 1500)
+  }
+
+  const handleNotYet = () => {
+    setStep('prompt')
   }
 
   const handleSkip = () => {
-    // Don't fully dismiss — show again next session
-    // Only set a session-level flag, not permanent localStorage
     setShow(false)
   }
 
   if (!show) return null
 
-  if (subscribed) {
+  // Step 3: Success
+  if (step === 'done') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-sm w-full mx-4 p-8 text-center">
           <div className="w-14 h-14 rounded-full bg-grove-accent/20 flex items-center justify-center mx-auto mb-4">
             <Check size={28} className="text-grove-accent" />
           </div>
-          <h2 className="text-lg font-semibold text-grove-text mb-2">Subscribed!</h2>
+          <h2 className="text-lg font-semibold text-grove-text mb-2">All set!</h2>
           <p className="text-sm text-grove-text-muted">Community events will now appear in your calendar.</p>
         </div>
       </div>
     )
   }
 
+  // Step 2: Confirm subscription
+  if (step === 'confirm') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+          <div className="px-6 pt-6 pb-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-grove-accent/20 flex items-center justify-center">
+                <Calendar size={20} className="text-grove-accent" />
+              </div>
+              <h2 className="text-lg font-semibold text-grove-text">Did you complete the subscription?</h2>
+            </div>
+            <p className="text-sm text-grove-text-muted leading-relaxed mb-5">
+              A new tab should have opened to add the calendar. If you completed the steps there, confirm below.
+            </p>
+
+            <div className="space-y-2">
+              <button
+                onClick={handleConfirm}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-grove-accent-deep text-grove-surface font-semibold text-sm hover:opacity-90 transition-opacity"
+              >
+                <Check size={16} />
+                Yes, I subscribed
+              </button>
+              <button
+                onClick={handleNotYet}
+                className="w-full px-4 py-2.5 rounded-lg border border-grove-border text-sm text-grove-text hover:bg-grove-border/20 transition-colors"
+              >
+                Not yet, show me the options again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Step 1: Subscribe prompt
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
@@ -77,7 +121,6 @@ export function SubscribePrompt() {
 
         {/* Subscribe options */}
         <div className="px-6 pb-4 space-y-2">
-          {/* Google — primary CTA */}
           <button
             onClick={() => handleSubscribe(GOOGLE_URL)}
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
@@ -107,7 +150,7 @@ export function SubscribePrompt() {
           </div>
         </div>
 
-        {/* Skip — small, de-emphasized, doesn't permanently dismiss */}
+        {/* Skip */}
         <div className="px-6 py-2.5 border-t border-grove-border/30">
           <button
             onClick={handleSkip}
