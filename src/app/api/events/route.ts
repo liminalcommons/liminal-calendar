@@ -141,13 +141,17 @@ export async function POST(request: NextRequest) {
               .where(eq(events.id, created.id));
             created.hyloPostId = hyloEvent.id;
           }
-        } catch (hyloErr) {
-          console.warn(`[POST /api/events] Hylo sync to group ${gid} failed:`, hyloErr);
+        } catch (hyloErr: any) {
+          console.warn(`[POST /api/events] Hylo sync to group ${gid} failed:`, hyloErr?.message || hyloErr);
+          // Store error for debugging
+          (created as any)._hyloError = hyloErr?.message || String(hyloErr);
         }
       }
     }
 
-    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
+    const result = dbEventToDisplayEvent(created) as any;
+    if ((created as any)._hyloError) result._hyloError = (created as any)._hyloError;
+    return NextResponse.json(result, { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
