@@ -14,7 +14,7 @@ const RECURRENCE_OPTIONS: { value: RecurrenceValue; label: string }[] = [
   { value: 'none', label: 'Does not repeat' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'fortnightly', label: 'Fortnightly (every 2 weeks)' },
+  { value: 'fortnightly', label: 'Fortnightly' },
   { value: 'monthly', label: 'Monthly' },
 ];
 
@@ -58,8 +58,7 @@ export function RecurrenceSelector({ value, onChange }: RecurrenceSelectorProps)
   };
 
   return (
-    <div className="space-y-3">
-      {/* Recurrence dropdown */}
+    <div className="space-y-2">
       <select
         value={value}
         onChange={(e) => handleRecurrenceChange(e.target.value as RecurrenceValue)}
@@ -72,68 +71,39 @@ export function RecurrenceSelector({ value, onChange }: RecurrenceSelectorProps)
         ))}
       </select>
 
-      {/* End condition — only shown when recurrence is set */}
       {value !== 'none' && (
-        <div className="pl-3 border-l-2 border-grove-border space-y-2">
-          <p className="text-xs font-medium text-grove-text-muted uppercase tracking-wide">Ends</p>
-
-          {/* Never */}
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-grove-text-muted">Ends:</span>
+          <select
+            value={endType}
+            onChange={(e) => handleEndTypeChange(e.target.value as RecurrenceEndType)}
+            className="px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text text-xs focus:outline-none focus:ring-1 focus:ring-grove-accent"
+          >
+            <option value="never">Never</option>
+            <option value="on_date">On date</option>
+            <option value="after_count">After</option>
+          </select>
+          {endType === 'on_date' && (
             <input
-              type="radio"
-              name="recurrence-end"
-              value="never"
-              checked={endType === 'never'}
-              onChange={() => handleEndTypeChange('never')}
-              className="accent-grove-accent"
+              type="date"
+              value={endDate}
+              onChange={(e) => handleEndDateChange(e.target.value)}
+              className="px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text text-xs focus:outline-none focus:ring-1 focus:ring-grove-accent"
             />
-            <span className="text-sm text-grove-text">Never</span>
-          </label>
-
-          {/* On date */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="recurrence-end"
-              value="on_date"
-              checked={endType === 'on_date'}
-              onChange={() => handleEndTypeChange('on_date')}
-              className="accent-grove-accent"
-            />
-            <span className="text-sm text-grove-text">On date</span>
-            {endType === 'on_date' && (
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => handleEndDateChange(e.target.value)}
-                className="ml-2 px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text text-sm focus:outline-none focus:ring-1 focus:ring-grove-accent"
-              />
-            )}
-          </label>
-
-          {/* After N occurrences */}
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="recurrence-end"
-              value="after_count"
-              checked={endType === 'after_count'}
-              onChange={() => handleEndTypeChange('after_count')}
-              className="accent-grove-accent"
-            />
-            <span className="text-sm text-grove-text">After</span>
-            {endType === 'after_count' && (
+          )}
+          {endType === 'after_count' && (
+            <>
               <input
                 type="number"
                 min={1}
                 max={365}
                 value={endCount}
                 onChange={(e) => handleEndCountChange(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                className="w-16 px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text text-sm text-center focus:outline-none focus:ring-1 focus:ring-grove-accent"
+                className="w-14 px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text text-xs text-center focus:outline-none focus:ring-1 focus:ring-grove-accent"
               />
-            )}
-            <span className="text-sm text-grove-text-muted">occurrences</span>
-          </label>
+              <span className="text-xs text-grove-text-muted">times</span>
+            </>
+          )}
         </div>
       )}
     </div>

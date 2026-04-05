@@ -250,7 +250,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       const dayOfWeek = d.getDay()
       setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
     }
-  }, [externalValues])
+  }, [externalValues, durationMinutes])
 
   // Notify parent of internal value changes
   useEffect(() => {

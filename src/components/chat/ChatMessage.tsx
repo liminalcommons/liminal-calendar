@@ -66,8 +66,8 @@ export function ChatMessage({ message, isStreaming, onInsertImage }: ChatMessage
           ? 'bg-grove-accent-deep text-grove-surface'
           : 'bg-grove-surface border border-grove-border/30 text-grove-text'
       }`}>
-        {message.content && (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+        {(message.content || (!isStreaming && message.tool_calls?.length && !message.content)) && (
+          <p className="whitespace-pre-wrap">{message.content || 'Updated the form with your details.'}</p>
         )}
 
         {message.tool_calls && message.tool_calls.length > 0 && (
