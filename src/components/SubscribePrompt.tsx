@@ -64,7 +64,7 @@ export function SubscribePrompt() {
         {/* Body */}
         <div className="px-6 pb-4">
           <p className="text-sm text-grove-text-muted leading-relaxed mb-4">
-            Subscribe to the Liminal Commons Calendar so events show up automatically in your calendar app. You'll see all community events alongside your personal schedule.
+            Subscribe to the Liminal Commons Calendar so events show up automatically in your calendar app. All community events will appear alongside your personal schedule.
           </p>
 
           <div className="space-y-2">
