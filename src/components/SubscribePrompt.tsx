@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { X, Calendar, ExternalLink } from 'lucide-react'
+import { Calendar, ExternalLink, Check } from 'lucide-react'
 
 const WEBCAL_URL = 'webcal://calendar.castalia.one/api/calendar/feed.ics'
 const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics'
@@ -14,102 +14,106 @@ const STORAGE_KEY = 'calendar-subscribe-dismissed'
 export function SubscribePrompt() {
   const { data: session, status } = useSession()
   const [show, setShow] = useState(false)
+  const [subscribed, setSubscribed] = useState(false)
 
   useEffect(() => {
     if (status !== 'authenticated') return
-    // Don't show if already dismissed
     const dismissed = localStorage.getItem(STORAGE_KEY)
     if (dismissed) return
-    // Small delay so it doesn't flash immediately on page load
     const timer = setTimeout(() => setShow(true), 1500)
     return () => clearTimeout(timer)
   }, [status])
 
-  const dismiss = () => {
-    setShow(false)
-    localStorage.setItem(STORAGE_KEY, Date.now().toString())
-  }
-
   const handleSubscribe = (url: string) => {
     window.open(url, '_blank')
-    dismiss()
+    setSubscribed(true)
+    // Auto-close after subscribing
+    setTimeout(() => {
+      setShow(false)
+      localStorage.setItem(STORAGE_KEY, Date.now().toString())
+    }, 2000)
+  }
+
+  const handleSkip = () => {
+    // Don't fully dismiss — show again next session
+    // Only set a session-level flag, not permanent localStorage
+    setShow(false)
   }
 
   if (!show) return null
+
+  if (subscribed) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-sm w-full mx-4 p-8 text-center">
+          <div className="w-14 h-14 rounded-full bg-grove-accent/20 flex items-center justify-center mx-auto mb-4">
+            <Check size={28} className="text-grove-accent" />
+          </div>
+          <h2 className="text-lg font-semibold text-grove-text mb-2">Subscribed!</h2>
+          <p className="text-sm text-grove-text-muted">Community events will now appear in your calendar.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="px-6 pt-6 pb-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-grove-accent/20 flex items-center justify-center">
-                <Calendar size={20} className="text-grove-accent" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-grove-text">Stay in sync</h2>
-                <p className="text-sm text-grove-text-muted">Never miss a community event</p>
-              </div>
+        <div className="px-6 pt-6 pb-3">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-grove-accent/20 flex items-center justify-center">
+              <Calendar size={20} className="text-grove-accent" />
             </div>
-            <button
-              onClick={dismiss}
-              className="p-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
-            >
-              <X size={16} />
-            </button>
+            <div>
+              <h2 className="text-lg font-semibold text-grove-text">One more step</h2>
+              <p className="text-sm text-grove-text-muted">Sync events to your calendar</p>
+            </div>
           </div>
+          <p className="text-sm text-grove-text leading-relaxed">
+            Subscribe so community events appear alongside your personal schedule. No more missing gatherings or double-booking.
+          </p>
         </div>
 
-        {/* Body */}
-        <div className="px-6 pb-4">
-          <p className="text-sm text-grove-text-muted leading-relaxed mb-4">
-            Subscribe to the Liminal Commons Calendar so events show up automatically in your calendar app. All community events will appear alongside your personal schedule.
-          </p>
+        {/* Subscribe options */}
+        <div className="px-6 pb-4 space-y-2">
+          {/* Google — primary CTA */}
+          <button
+            onClick={() => handleSubscribe(GOOGLE_URL)}
+            className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-lg">📅</span>
+              <span className="text-sm font-semibold">Subscribe with Google Calendar</span>
+            </div>
+            <ExternalLink size={14} />
+          </button>
 
-          <div className="space-y-2">
-            <button
-              onClick={() => handleSubscribe(GOOGLE_URL)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-lg">📅</span>
-                <span className="text-sm font-medium text-grove-text">Google Calendar</span>
-              </div>
-              <ExternalLink size={14} className="text-grove-text-muted group-hover:text-grove-accent transition-colors" />
-            </button>
-
+          <div className="flex gap-2">
             <button
               onClick={() => handleSubscribe(WEBCAL_URL)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors group"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-lg">🍎</span>
-                <span className="text-sm font-medium text-grove-text">Apple Calendar</span>
-              </div>
-              <ExternalLink size={14} className="text-grove-text-muted group-hover:text-grove-accent transition-colors" />
+              <span>🍎</span>
+              <span className="text-xs font-medium text-grove-text">Apple</span>
             </button>
-
             <button
               onClick={() => handleSubscribe(OUTLOOK_URL)}
-              className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors group"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
-              <div className="flex items-center gap-3">
-                <span className="text-lg">📧</span>
-                <span className="text-sm font-medium text-grove-text">Outlook</span>
-              </div>
-              <ExternalLink size={14} className="text-grove-text-muted group-hover:text-grove-accent transition-colors" />
+              <span>📧</span>
+              <span className="text-xs font-medium text-grove-text">Outlook</span>
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 bg-grove-bg/50 border-t border-grove-border/50">
+        {/* Skip — small, de-emphasized, doesn't permanently dismiss */}
+        <div className="px-6 py-2.5 border-t border-grove-border/30">
           <button
-            onClick={dismiss}
-            className="w-full text-center text-xs text-grove-text-muted hover:text-grove-text transition-colors py-1"
+            onClick={handleSkip}
+            className="w-full text-center text-[11px] text-grove-text-dim hover:text-grove-text-muted transition-colors"
           >
-            Maybe later
+            Skip for now
           </button>
         </div>
       </div>
