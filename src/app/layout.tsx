@@ -4,6 +4,7 @@ import "@/styles/glitch-effects.css";
 import { Providers } from "@/components/providers/Providers";
 import { BugReportFab } from "@/components/BugReportFab";
 import { SubscribePrompt } from "@/components/SubscribePrompt";
+import { MobileRedirect } from "@/components/MobileRedirect";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body>
         <Providers>
           {children}
+          <MobileRedirect />
           <SubscribePrompt />
           <BugReportFab />
         </Providers>
