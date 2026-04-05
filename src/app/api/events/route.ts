@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
       const hyloDetails = [
         typeof details === 'string' ? details : '',
-        `\n\n---\n📅 [View on Liminal Calendar](${calendarLink})`,
+        `<p>---</p><p>📅 <a href="${calendarLink}">View on Liminal Calendar</a></p>`,
       ].join('').trim();
 
       for (const gid of groupIds) {
@@ -149,10 +149,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = dbEventToDisplayEvent(created) as any;
-    if ((created as any)._hyloError) result._hyloError = (created as any)._hyloError;
-    result._debug = { groupIds, hasAccessToken: !!accessToken, accessTokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : null };
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
