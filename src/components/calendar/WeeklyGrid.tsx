@@ -324,11 +324,13 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         </div>
 
         {/* Agenda sidebar */}
-        <AgendaSidebar
-          events={events}
-          weekDays={weekDays}
-          onEventClick={handleEventClick}
-        />
+        <div className="hidden lg:block">
+          <AgendaSidebar
+            events={events}
+            weekDays={weekDays}
+            onEventClick={handleEventClick}
+          />
+        </div>
       </div>
     </div>
   );

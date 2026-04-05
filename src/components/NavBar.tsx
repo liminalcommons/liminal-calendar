@@ -38,7 +38,7 @@ export function NavBar() {
       {/* Left: rune glyph + title */}
       <div className="flex items-center gap-2">
         <RuneAccent size="md" seed={2} />
-        <span className="text-grove-text font-semibold text-sm tracking-wide">
+        <span className="hidden sm:inline text-grove-text font-semibold text-sm tracking-wide">
           Liminal Commons
         </span>
       </div>
