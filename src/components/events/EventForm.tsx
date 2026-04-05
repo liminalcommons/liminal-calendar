@@ -132,6 +132,11 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   // Image
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
+  // Hylo posting
+  const [hyloGroups, setHyloGroups] = useState<Array<{ id: string; name: string }>>([])
+  const [selectedHyloGroup, setSelectedHyloGroup] = useState<string>('')
+  const [postToHylo, setPostToHylo] = useState(false)
+
   // UI state
   const [timezone, setTimezone] = useState('UTC');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -229,6 +234,19 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   useEffect(() => {
     setTimezone(getUserTimezone());
   }, []);
+
+  // Fetch Hylo groups for posting
+  useEffect(() => {
+    apiFetch('/api/groups')
+      .then(r => r.ok ? r.json() : [])
+      .then(groups => {
+        if (Array.isArray(groups) && groups.length > 0) {
+          setHyloGroups(groups)
+          setSelectedHyloGroup(groups[0].id)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (mode === 'create') {
@@ -392,6 +410,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
         recurrenceEndCount: recurrence !== 'none' && recurrenceEndType === 'after_count' ? recurrenceEndCount : undefined,
         imageUrl: imageUrl || undefined,
+        hyloGroupId: postToHylo && selectedHyloGroup ? selectedHyloGroup : undefined,
       };
 
       if (mode === 'create') {
@@ -648,6 +667,32 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           Cancel
         </button>
       </div>
+
+      {/* Hylo posting — create mode only */}
+      {mode === 'create' && hyloGroups.length > 0 && (
+        <div className="flex items-center gap-3 pt-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={postToHylo}
+              onChange={(e) => setPostToHylo(e.target.checked)}
+              className="rounded border-grove-border text-grove-accent focus:ring-grove-accent"
+            />
+            <span className="text-sm text-grove-text-muted">Also post to Hylo</span>
+          </label>
+          {postToHylo && (
+            <select
+              value={selectedHyloGroup}
+              onChange={(e) => setSelectedHyloGroup(e.target.value)}
+              className="text-xs px-2 py-1 border border-grove-border rounded bg-grove-surface text-grove-text"
+            >
+              {hyloGroups.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
     </form>
   );
 }
