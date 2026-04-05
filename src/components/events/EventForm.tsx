@@ -112,17 +112,7 @@ function HyloGroupPicker({ groups, selectedId, onChange }: {
         </button>
 
         {open && (
-          <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg overflow-hidden">
-            <div className="p-2 border-b border-grove-border/50">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search groups..."
-                autoFocus
-                className="w-full px-2 py-1.5 text-sm bg-grove-bg border border-grove-border rounded text-grove-text placeholder:text-grove-text-dim focus:outline-none focus:ring-1 focus:ring-grove-accent"
-              />
-            </div>
+          <div className="absolute z-50 left-0 right-0 bottom-full mb-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg overflow-hidden">
             <div className="max-h-40 overflow-y-auto">
               <button
                 type="button"
@@ -148,6 +138,16 @@ function HyloGroupPicker({ groups, selectedId, onChange }: {
               {filtered.length === 0 && (
                 <p className="px-3 py-2 text-xs text-grove-text-dim italic">No groups found</p>
               )}
+            </div>
+            <div className="p-2 border-t border-grove-border/50">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search groups..."
+                autoFocus
+                className="w-full px-2 py-1.5 text-sm bg-grove-bg border border-grove-border rounded text-grove-text placeholder:text-grove-text-dim focus:outline-none focus:ring-1 focus:ring-grove-accent"
+              />
             </div>
           </div>
         )}
@@ -730,24 +730,26 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       {/* Image upload */}
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
-      {/* Post to Hylo — create mode only */}
-      {mode === 'create' && hyloGroups.length > 0 && (
-        <HyloGroupPicker
-          groups={hyloGroups}
-          selectedId={selectedHyloGroup}
-          onChange={(id) => {
-            setSelectedHyloGroup(id)
-            setPostToHylo(id !== '')
-          }}
-        />
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3 pt-2">
+      {/* Actions + Hylo */}
+      <div className="flex items-end gap-3 pt-2">
+        {mode === 'create' && hyloGroups.length > 0 && (
+          <div className="flex-1">
+            <HyloGroupPicker
+              groups={hyloGroups}
+              selectedId={selectedHyloGroup}
+              onChange={(id) => {
+                setSelectedHyloGroup(id)
+                setPostToHylo(id !== '')
+              }}
+            />
+          </div>
+        )}
         <button
           type="submit"
           disabled={isSubmitting || !selectedDay}
-          className="flex-1 py-2 px-4 bg-grove-accent-deep hover:opacity-90 disabled:opacity-50 text-grove-surface font-medium rounded-lg transition-opacity text-sm"
+          className={`py-2 px-6 bg-grove-accent-deep hover:opacity-90 disabled:opacity-50 text-grove-surface font-medium rounded-lg transition-opacity text-sm ${
+            mode === 'edit' || hyloGroups.length === 0 ? 'flex-1' : ''
+          }`}
         >
           {isSubmitting
             ? 'Saving…'
