@@ -17,8 +17,8 @@ export function canCreateEvents(role: UserRole): boolean {
 }
 
 export function canEditEvent(role: UserRole, isCreator: boolean): boolean {
-  if (role === 'admin') return true;
-  if (role === 'host' && isCreator) return true;
+  // Only the creator can edit — admins can delete but not edit others' events
+  if (isCreator && (role === 'host' || role === 'admin')) return true;
   return false;
 }
 
