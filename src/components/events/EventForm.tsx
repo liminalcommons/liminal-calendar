@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
@@ -69,6 +69,91 @@ function getWeekDays(weekStart: Date): Date[] {
     d.setDate(d.getDate() + i);
     return d;
   });
+}
+
+// ─── Hylo Group Picker ──────────────────────────────────────────────────────
+
+function HyloGroupPicker({ groups, selectedId, onChange }: {
+  groups: Array<{ id: string; name: string }>
+  selectedId: string
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const filtered = search
+    ? groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
+    : groups
+
+  const selectedName = groups.find(g => g.id === selectedId)?.name
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-grove-text mb-1">
+        Post to Hylo
+      </label>
+      <div className="relative" ref={ref}>
+        <button
+          type="button"
+          onClick={() => { setOpen(!open); setSearch('') }}
+          className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text text-sm text-left focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent"
+        >
+          {selectedId ? selectedName : "Don't post to Hylo"}
+        </button>
+
+        {open && (
+          <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg overflow-hidden">
+            <div className="p-2 border-b border-grove-border/50">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search groups..."
+                autoFocus
+                className="w-full px-2 py-1.5 text-sm bg-grove-bg border border-grove-border rounded text-grove-text placeholder:text-grove-text-dim focus:outline-none focus:ring-1 focus:ring-grove-accent"
+              />
+            </div>
+            <div className="max-h-40 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => { onChange(''); setOpen(false) }}
+                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                  !selectedId ? 'text-grove-accent bg-grove-accent/5' : 'text-grove-text-muted hover:bg-grove-border/30'
+                }`}
+              >
+                Don&apos;t post to Hylo
+              </button>
+              {filtered.map(g => (
+                <button
+                  type="button"
+                  key={g.id}
+                  onClick={() => { onChange(g.id); setOpen(false) }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    selectedId === g.id ? 'text-grove-accent bg-grove-accent/5' : 'text-grove-text hover:bg-grove-border/30'
+                  }`}
+                >
+                  {g.name}
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <p className="px-3 py-2 text-xs text-grove-text-dim italic">No groups found</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -242,7 +327,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       .then(groups => {
         if (Array.isArray(groups) && groups.length > 0) {
           setHyloGroups(groups)
-          setSelectedHyloGroup(groups[0].id)
         }
       })
       .catch(() => {})
@@ -648,24 +732,14 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
       {/* Post to Hylo — create mode only */}
       {mode === 'create' && hyloGroups.length > 0 && (
-        <div>
-          <label className="block text-sm font-medium text-grove-text mb-1">
-            Post to Hylo
-          </label>
-          <select
-            value={selectedHyloGroup}
-            onChange={(e) => {
-              setSelectedHyloGroup(e.target.value)
-              setPostToHylo(e.target.value !== '')
-            }}
-            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
-          >
-            <option value="">Don&apos;t post to Hylo</option>
-            {hyloGroups.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
-        </div>
+        <HyloGroupPicker
+          groups={hyloGroups}
+          selectedId={selectedHyloGroup}
+          onChange={(id) => {
+            setSelectedHyloGroup(id)
+            setPostToHylo(id !== '')
+          }}
+        />
       )}
 
       {/* Actions */}
