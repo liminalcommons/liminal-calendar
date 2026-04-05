@@ -644,7 +644,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       </div>
 
       {/* Image upload */}
-      <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} eventTitle={title} eventDescription={description} />
+      <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
