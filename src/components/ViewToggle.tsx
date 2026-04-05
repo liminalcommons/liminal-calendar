@@ -4,9 +4,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { calendarSFX } from '@/lib/sound-manager';
 
 const VIEWS = [
-  { label: 'Week', path: '/' },
-  { label: 'Month', path: '/month' },
-  { label: 'List', path: '/list' },
+  { label: 'Week', path: '/', desktopOnly: true },
+  { label: 'Month', path: '/month', desktopOnly: true },
+  { label: 'List', path: '/list', desktopOnly: false },
 ] as const;
 
 export function ViewToggle() {
@@ -27,12 +27,13 @@ export function ViewToggle() {
 
   return (
     <div className="flex items-center rounded-full border border-grove-border bg-grove-bg overflow-hidden">
-      {VIEWS.map(({ label, path }) => (
+      {VIEWS.map(({ label, path, desktopOnly }) => (
         <button
           key={path}
           onClick={() => handleSwitch(path)}
           className={[
             'px-3 py-1 text-xs font-medium transition-colors',
+            desktopOnly ? 'hidden sm:block' : '',
             isActive(path)
               ? 'bg-grove-accent-deep text-grove-surface'
               : 'text-grove-text-muted hover:text-grove-text',
