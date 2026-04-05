@@ -1,13 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bug, X, Send, Check, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { installConsoleInterceptors, getRecentLogsAsString } from '@/lib/client-logger';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function BugReportFab() {
   const { data: session } = useSession();
+
+  useEffect(() => {
+    installConsoleInterceptors();
+  }, []);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -31,6 +36,7 @@ export function BugReportFab() {
           title: title.trim(),
           description: description.trim() || undefined,
           type,
+          clientLogs: getRecentLogsAsString(100),
           metadata: {
             url: window.location.href,
             reporter: user?.name || 'Anonymous',

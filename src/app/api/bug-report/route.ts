@@ -14,9 +14,41 @@ function parseBrowser(ua: string): string {
   return ua.slice(0, 60);
 }
 
+function processLogs(raw: string): { errors: string; all: string } {
+  const lines = raw.split('\n').filter(Boolean);
+  const parsed = lines.map(line => {
+    const m = line.match(/^\[([^\]]+)\] \[([A-Z]+)\] ([\s\S]+)$/);
+    if (m) return { timestamp: m[1], level: m[2], message: m[3], count: 1 };
+    return { timestamp: '', level: 'LOG', message: line, count: 1 };
+  });
+
+  // Deduplicate consecutive identical messages
+  const deduped: typeof parsed = [];
+  for (const entry of parsed) {
+    const prev = deduped[deduped.length - 1];
+    if (prev && prev.level === entry.level && prev.message === entry.message) {
+      prev.count++;
+    } else {
+      deduped.push({ ...entry });
+    }
+  }
+
+  const fmt = (e: typeof deduped[0]) => {
+    const prefix: Record<string, string> = { ERROR: '🔴', WARN: '🟡', LOG: '⚪', INFO: '🔵' };
+    const icon = prefix[e.level] ?? '⚪';
+    const msg = e.message.length > 300 ? e.message.slice(0, 300) + '…' : e.message;
+    const repeat = e.count > 1 ? ` _(×${e.count})_` : '';
+    return `${icon} ${msg}${repeat}`;
+  };
+
+  const errorLines = deduped.filter(e => e.level === 'ERROR' || e.level === 'WARN').map(fmt).join('\n');
+  const allLines = deduped.map(fmt).join('\n');
+  return { errors: errorLines, all: allLines };
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const { title, description, type, metadata } = body;
+  const { title, description, type, clientLogs, metadata } = body;
 
   const ts = metadata?.timestamp ?? new Date().toISOString();
   const browser = parseBrowser(metadata?.userAgent ?? '');
@@ -25,10 +57,17 @@ export async function POST(req: NextRequest) {
     : type === 'feature' ? ['enhancement', 'user-reported']
     : ['feedback', 'user-reported'];
 
+  const logs = clientLogs ? processLogs(clientLogs) : null;
+
   // Build issue body
   let issueBody = '';
   if (description) {
     issueBody += `${description}\n\n`;
+  }
+
+  // Errors & warnings (prominent)
+  if (logs?.errors) {
+    issueBody += `### Errors & Warnings\n\n${logs.errors}\n\n`;
   }
 
   issueBody += `### Environment\n\n`;
@@ -39,6 +78,13 @@ export async function POST(req: NextRequest) {
   issueBody += `| **Screen** | ${metadata?.screenSize ?? 'N/A'} |\n`;
   issueBody += `| **Theme** | ${metadata?.theme ?? 'N/A'} |\n`;
   issueBody += `| **Time** | ${ts} |\n\n`;
+
+  // Full logs (collapsed)
+  if (logs?.all) {
+    issueBody += `<details>\n<summary>Console log (${logs.all.split('\n').length} entries)</summary>\n\n`;
+    issueBody += `${logs.all}\n`;
+    issueBody += `</details>\n\n`;
+  }
 
   issueBody += `---\n_Submitted via Liminal Calendar bug reporter_\n`;
 
