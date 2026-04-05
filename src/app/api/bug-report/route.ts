@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
     : `Report (${ts.slice(0, 10)})`;
 
   if (!GITHUB_TOKEN) {
-    console.log('[BugReport] GITHUB_TOKEN not set — report received but not filed on GitHub');
-    console.log('[BugReport]', JSON.stringify({ title, description, type, metadata }, null, 2));
+    console.warn('[BugReport] GITHUB_TOKEN not set — report received but not filed on GitHub');
+    console.warn('[BugReport]', JSON.stringify({ title, description, type, metadata }, null, 2));
     return NextResponse.json(
       { success: true, message: 'Report received (GitHub not configured).' },
       { status: 201 },
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       labels,
     });
 
-    console.log(`[BugReport] Created GitHub issue #${issue.number}: ${issue.html_url}`);
+    console.warn(`[BugReport] Created GitHub issue #${issue.number}: ${issue.html_url}`);
     return NextResponse.json(
       { success: true, issueNumber: issue.number, issueUrl: issue.html_url },
       { status: 201 },
