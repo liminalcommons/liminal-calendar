@@ -97,11 +97,10 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   const isLoaded = status !== 'loading';
   const hyloId = user?.hyloId || user?.id;
   const role = user?.role || 'member';
-  const isCreator = isLoaded && user && event && (
-    String(hyloId) === String(event.creator_id) || role === 'admin'
-  );
-  const canEdit = isCreator;
-  const canDelete = isCreator;
+  const isOwner = isLoaded && user && event && String(hyloId) === String(event.creator_id);
+  const isAdmin = isLoaded && user && role === 'admin';
+  const canEdit = isOwner;
+  const canDelete = isOwner || isAdmin;
 
   // Loading skeleton
   if (loading) {
