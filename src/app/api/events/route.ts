@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
 
     const result = dbEventToDisplayEvent(created) as any;
     if ((created as any)._hyloError) result._hyloError = (created as any)._hyloError;
+    result._debug = { groupIds, hasAccessToken: !!accessToken, accessTokenPrefix: accessToken ? accessToken.substring(0, 10) + '...' : null };
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
