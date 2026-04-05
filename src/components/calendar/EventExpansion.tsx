@@ -19,7 +19,7 @@ interface EventExpansionProps {
   onUpdate?: (id: string, patch: Partial<DisplayEvent>) => void;
 }
 
-const POPOVER_WIDTH = 360;
+const POPOVER_WIDTH = typeof window !== 'undefined' ? Math.min(360, window.innerWidth - 16) : 360
 const POPOVER_APPROX_HEIGHT = 420;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
@@ -235,7 +235,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
         transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
         closing ? 'opacity-0 scale-95 translate-y-2' : 'opacity-100 scale-100 translate-y-0'
       }`}
-      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH, maxHeight: 'calc(100vh - 16px)' }}
+      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)' }}
       role="dialog"
       aria-label={`Event details: ${event.title}`}
     >

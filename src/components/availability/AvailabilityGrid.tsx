@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SLOTS_PER_DAY = 48;
@@ -87,6 +87,14 @@ function clearDays(current: Set<string>, dayStart: number, dayEnd: number): Set<
 }
 
 export function AvailabilityGrid({ value, onChange, timezone }: AvailabilityGridProps) {
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    setIsMobile(window.innerWidth < 768)
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+
   const offset = getTzOffset(timezone);
   const localSet = buildLocalSet(value, offset);
 
@@ -131,6 +139,15 @@ export function AvailabilityGrid({ value, onChange, timezone }: AvailabilityGrid
   }, [localSet, toggleSlot]);
 
   const handleMouseUp = useCallback(() => { paintingRef.current = false; }, []);
+
+  if (isMobile) {
+    return (
+      <div className="py-6 text-center text-grove-text-muted">
+        <p className="text-sm mb-2">Availability editing works best on desktop.</p>
+        <p className="text-xs">Open this page on a larger screen to set your detailed availability.</p>
+      </div>
+    )
+  }
 
   return (
     <div onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} className="select-none">

@@ -245,6 +245,7 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="bg-grove-surface border border-grove-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-grove-border text-left">
@@ -323,6 +324,7 @@ export default function AdminPage() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </main>

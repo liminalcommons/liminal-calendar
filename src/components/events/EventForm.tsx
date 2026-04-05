@@ -758,9 +758,9 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
       {/* Actions + Hylo */}
-      <div className="flex items-end gap-3 pt-2">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-2">
         {mode === 'create' && hyloGroups.length > 0 && (
-          <div className="flex-1">
+          <div className="w-full sm:flex-1">
             <HyloGroupPicker
               groups={hyloGroups}
               selectedIds={selectedHyloGroups}
