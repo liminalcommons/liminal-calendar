@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { X, Image as ImageIcon, Sparkles } from 'lucide-react'
 
 interface ImageUploadProps {
@@ -14,6 +14,12 @@ interface ImageUploadProps {
 
 export function ImageUpload({ onImageUrl, currentUrl, eventTitle, eventDescription }: ImageUploadProps) {
   const [preview, setPreview] = useState<string | null>(currentUrl ?? null)
+
+  // Sync preview when currentUrl changes externally (e.g. from chat "Use as banner")
+  useEffect(() => {
+    setPreview(currentUrl ?? null)
+  }, [currentUrl])
+
   const [uploading, setUploading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
