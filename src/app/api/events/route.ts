@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
             endTime: endDate,
             timezone: typeof timezone === 'string' ? timezone : undefined,
             location: typeof location === 'string' ? location : undefined,
-            imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
+            // Note: Hylo doesn't accept imageUrl in PostInput — image shows via OG tags on calendar link
           });
 
           // Store the first Hylo post ID
