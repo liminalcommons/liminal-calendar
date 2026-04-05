@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -24,6 +25,7 @@ interface WeeklyGridProps {
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const { data: session } = useSession();
+  const router = useRouter();
   const userRole = (session?.user as any)?.role || 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
@@ -138,8 +140,8 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
 
   const handleCellClick = useCallback((day: Date, hour: number, rect: DOMRect) => {
     setExpansion(null);
-    setQuickCreate({ day, hour, rect });
-  }, []);
+    router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+  }, [router]);
 
   const handleEventClick = useCallback((event: DisplayEvent, rect: DOMRect) => {
     setQuickCreate(null);
