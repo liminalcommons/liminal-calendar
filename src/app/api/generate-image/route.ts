@@ -4,10 +4,40 @@ import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
 import { auth } from '../../../../auth'
 
+// Rate limit: 10 image generations per user per day (resets on cold start)
+const DAILY_LIMIT = 10
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number } {
+  const now = Date.now()
+  const entry = rateLimitMap.get(userId)
+  if (!entry || now > entry.resetAt) {
+    // Reset at midnight UTC
+    const tomorrow = new Date()
+    tomorrow.setUTCHours(24, 0, 0, 0)
+    rateLimitMap.set(userId, { count: 1, resetAt: tomorrow.getTime() })
+    return { allowed: true, remaining: DAILY_LIMIT - 1 }
+  }
+  if (entry.count >= DAILY_LIMIT) {
+    return { allowed: false, remaining: 0 }
+  }
+  entry.count++
+  return { allowed: true, remaining: DAILY_LIMIT - entry.count }
+}
+
 export async function POST(request: Request) {
   const session = await auth()
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const userId = (session.user as any).id || (session.user as any).hyloId || session.user.email || 'unknown'
+  const { allowed, remaining } = checkRateLimit(userId)
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Daily image generation limit reached (10/day). Try again tomorrow.' },
+      { status: 429 },
+    )
   }
 
   const FAL_KEY = process.env.FAL_KEY
