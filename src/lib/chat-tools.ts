@@ -201,8 +201,12 @@ export function applyToolCall(toolCall: ToolCall): Partial<EventFormValues> | nu
         endTime: args.endTime,
         ...(args.date ? { date: args.date } : {}),
       }
-    case 'set_recurrence':
-      return { recurrence: args.rule }
+    case 'set_recurrence': {
+      // Normalize — MiniMax may return "weekly on Wednesday" instead of just "weekly"
+      const rule = (args.rule || '').toLowerCase()
+      const normalized = ['daily', 'weekly', 'fortnightly', 'monthly'].find(r => rule.includes(r)) || 'none'
+      return { recurrence: normalized }
+    }
     case 'generate_image':
       return null // side-effect, handled server-side
     case 'suggest_times':
