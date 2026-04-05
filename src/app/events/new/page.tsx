@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { NavBar } from '@/components/NavBar'
 import { EventForm } from '@/components/events/EventForm'
 import { ChatPanel } from '@/components/chat/ChatPanel'
+import { MobileTabLayout } from '@/components/MobileTabLayout'
 import type { EventFormValues } from '@/lib/chat-tools'
 
 export default function NewEventPage() {
@@ -20,6 +21,18 @@ export default function NewEventPage() {
   const handleSuccess = useCallback(() => {
     localStorage.removeItem('calendar-chat-new')
   }, [])
+
+  const filledCount = useMemo(() => {
+    let count = 0
+    if (externalValues.title) count++
+    if (externalValues.description) count++
+    if (externalValues.startTime) count++
+    if (externalValues.endTime) count++
+    if (externalValues.date) count++
+    if (externalValues.recurrence && externalValues.recurrence !== 'none') count++
+    if (externalValues.imageUrl) count++
+    return count
+  }, [externalValues])
 
   if (status === 'loading') {
     return (
@@ -43,27 +56,23 @@ export default function NewEventPage() {
           &larr; Back
         </button>
 
-        <div className="flex flex-col lg:flex-row gap-4" style={{ minHeight: 'calc(100vh - 160px)' }}>
-          {/* Left: Chat Panel */}
-          <div className="w-full lg:w-1/2 lg:min-h-0">
-            <div className="lg:sticky lg:top-4 h-[400px] lg:h-[calc(100vh-180px)]">
-              <ChatPanel
-                formValues={externalValues}
-                onFormUpdate={handleFormUpdate}
-                storageKey="calendar-chat-new"
-              />
-            </div>
-          </div>
-
-          {/* Right: Event Form */}
-          <div className="w-full lg:w-1/2">
+        <MobileTabLayout
+          filledFieldCount={filledCount}
+          chatPanel={
+            <ChatPanel
+              formValues={externalValues}
+              onFormUpdate={handleFormUpdate}
+              storageKey="calendar-chat-new"
+            />
+          }
+          formPanel={
             <EventForm
               mode="create"
               externalValues={externalValues}
               onSuccess={handleSuccess}
             />
-          </div>
-        </div>
+          }
+        />
       </main>
     </div>
   )
