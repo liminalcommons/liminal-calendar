@@ -143,15 +143,11 @@ export async function POST(request: NextRequest) {
           }
         } catch (hyloErr: any) {
           console.warn(`[POST /api/events] Hylo sync to group ${gid} failed:`, hyloErr?.message || hyloErr);
-          // Store error for debugging
-          (created as any)._hyloError = hyloErr?.message || String(hyloErr);
         }
       }
     }
 
-    const result = dbEventToDisplayEvent(created) as any;
-    if ((created as any)._hyloError) result._hyloError = (created as any)._hyloError;
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
     console.error('[POST /api/events]', err);
     return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
