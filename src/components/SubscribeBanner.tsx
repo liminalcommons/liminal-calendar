@@ -27,48 +27,49 @@ export function SubscribeBanner() {
 
   return (
     <div
-      className={`bg-grove-accent-deep/10 border-b border-grove-border px-4 py-2.5 flex items-center justify-between gap-3 transition-all duration-300 ${
+      className={`bg-grove-accent-deep/10 border-b border-grove-border px-3 py-2 transition-all duration-300 ${
         show ? 'opacity-100 max-h-20' : 'opacity-0 max-h-0 overflow-hidden py-0 border-b-0'
       }`}
     >
-      <div className="flex items-center gap-2 min-w-0">
-        <Calendar size={16} className="text-grove-accent shrink-0" />
-        <span className="text-sm text-grove-text truncate">
-          Subscribe to stay updated with upcoming events
-        </span>
-      </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Calendar size={14} className="text-grove-accent shrink-0" />
+          <span className="text-xs text-grove-text truncate hidden sm:inline">
+            Subscribe to stay updated
+          </span>
+        </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        <a
-          href={GOOGLE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs px-2.5 py-1 rounded-md bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
-        >
-          Google
-        </a>
-        <a
-          href={WEBCAL_URL}
-          className="text-xs px-2.5 py-1 rounded-md bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
-        >
-          Apple
-        </a>
-        <a
-          href={OUTLOOK_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs px-2.5 py-1 rounded-md bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
-        >
-          Outlook
-        </a>
-        <button
-          onClick={dismiss}
-          className="p-1 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
-          aria-label="Dismiss subscribe banner"
-          title="Don't show again"
-        >
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <a
+            href={GOOGLE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
+          >
+            Google
+          </a>
+          <a
+            href={WEBCAL_URL}
+            className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
+          >
+            Apple
+          </a>
+          <a
+            href={OUTLOOK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
+          >
+            Outlook
+          </a>
+          <button
+            onClick={dismiss}
+            className="p-0.5 rounded text-grove-text-muted hover:text-grove-text transition-colors"
+            aria-label="Dismiss"
+          >
+            <X size={12} />
+          </button>
+        </div>
       </div>
     </div>
   );
