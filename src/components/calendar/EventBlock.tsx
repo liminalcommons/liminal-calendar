@@ -87,6 +87,7 @@ const EventBlock = React.memo(function EventBlock({
   const widthPct = (1 / colTotal) * 100;
 
   const bgGradient = EVENT_GRADIENTS[hashId(event.id)];
+  const hasImage = !!event.imageUrl;
 
   const recurrenceLabel = getRecurrenceLabel(event.recurrenceRule);
 
@@ -98,7 +99,7 @@ const EventBlock = React.memo(function EventBlock({
   return (
     <div
       ref={blockRef}
-      className={`absolute rounded-md px-1.5 py-0.5 overflow-hidden cursor-pointer
+      className={`absolute rounded-md overflow-hidden cursor-pointer
                  shadow-sm hover:shadow-md hover:brightness-110
                  transition-all duration-300 ease-out z-10
                  border border-white/20 select-none
@@ -108,35 +109,50 @@ const EventBlock = React.memo(function EventBlock({
         height: heightPx,
         left: `calc(${leftPct}% + 1px)`,
         width: `calc(${widthPct}% - 2px)`,
-        background: bgGradient,
+        background: hasImage ? undefined : bgGradient,
       }}
       onClick={(e) => onEventClick(event, (e.currentTarget as HTMLDivElement).getBoundingClientRect())}
       title={event.title}
     >
-      <p className="text-white text-[11px] font-semibold leading-tight truncate">
-        {event.title}
-      </p>
+      {/* Banner image background */}
+      {hasImage && (
+        <>
+          <img
+            src={event.imageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
+        </>
+      )}
 
-      {heightPx >= 28 && (
-        <p className="text-white/80 text-[10px] leading-tight truncate">
-          {formatTime(event.starts_at)}
-          {event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+      {/* Content */}
+      <div className="relative px-1.5 py-0.5">
+        <p className="text-white text-[11px] font-semibold leading-tight truncate drop-shadow-sm">
+          {event.title}
         </p>
-      )}
 
-      {heightPx >= 40 && event.attendees.total > 0 && (
-        <p className="text-white/70 text-[10px] leading-tight">
-          {event.attendees.going > 0
-            ? `${event.attendees.going} going`
-            : `${event.attendees.total} invited`}
-        </p>
-      )}
+        {heightPx >= 28 && (
+          <p className="text-white/90 text-[10px] leading-tight truncate drop-shadow-sm">
+            {formatTime(event.starts_at)}
+            {event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+          </p>
+        )}
 
-      {recurrenceLabel && heightPx >= 28 && (
-        <span className="absolute bottom-0.5 right-1 text-[9px] text-white/60 font-mono">
-          {recurrenceLabel}
-        </span>
-      )}
+        {heightPx >= 40 && event.attendees.total > 0 && (
+          <p className="text-white/80 text-[10px] leading-tight drop-shadow-sm">
+            {event.attendees.going > 0
+              ? `${event.attendees.going} going`
+              : `${event.attendees.total} invited`}
+          </p>
+        )}
+
+        {recurrenceLabel && heightPx >= 28 && (
+          <span className="absolute bottom-0.5 right-1 text-[9px] text-white/70 font-mono drop-shadow-sm">
+            {recurrenceLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 });
