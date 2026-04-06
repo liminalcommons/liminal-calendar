@@ -120,48 +120,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // Refresh if: expired (with 60s buffer) OR no expiry stored
-      const expires = token.accessTokenExpires as number | undefined;
-      const needsRefresh = !expires || Date.now() > expires - 60_000;
-      const hasRefreshToken = !!token.refreshToken;
-
-      // No refresh token and expired → clear token so page can force re-auth
-      if (!hasRefreshToken && needsRefresh) {
-        return { ...token, accessToken: undefined, error: 'token_expired' };
-      }
-
-      if (hasRefreshToken && needsRefresh) {
-        try {
-          const clientId = process.env.HYLO_CLIENT_ID?.trim();
-          const clientSecret = process.env.HYLO_CLIENT_SECRET?.trim();
-          const res = await fetch('https://www.hylo.com/noo/oauth/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-              grant_type: 'refresh_token',
-              refresh_token: token.refreshToken as string,
-              client_id: clientId ?? '',
-              client_secret: clientSecret ?? '',
-            }),
-          });
-          if (res.ok) {
-            const refreshed = await res.json() as {
-              access_token: string;
-              refresh_token?: string;
-              expires_in?: number;
-            };
-            token.accessToken = refreshed.access_token;
-            if (refreshed.refresh_token) token.refreshToken = refreshed.refresh_token;
-            token.accessTokenExpires = Date.now() + (refreshed.expires_in ?? 3600) * 1000;
-            console.log('[auth] token refreshed OK, expires_in:', refreshed.expires_in);
-          } else {
-            const errText = await res.text().catch(() => '');
-            console.error('[auth] Hylo token refresh failed:', res.status, errText);
-          }
-        } catch (err) {
-          console.error('[auth] Hylo token refresh error:', err);
-        }
-      }
+      // Token refresh is handled by auth.castalia.one (the auth gateway).
+      // This app reads the shared .castalia.one cookie — do NOT refresh or
+      // invalidate tokens here. The gateway manages the token lifecycle.
 
       return token;
     },
