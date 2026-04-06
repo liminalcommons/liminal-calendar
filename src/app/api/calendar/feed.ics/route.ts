@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { events } from '@/lib/db/schema';
+import { events, members } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { generateCalendarFeed, type ICSEvent } from '@/lib/ics-generator';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +12,26 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const token = request.nextUrl.searchParams.get('token');
+
+    // Look up user by feed token (if provided)
+    let _userId: string | null = null;
+    if (token) {
+      const [member] = await db
+        .select({ hyloId: members.hyloId })
+        .from(members)
+        .where(eq(members.feedToken, token))
+        .limit(1);
+      if (member) {
+        _userId = member.hyloId;
+      }
+      // Invalid token: fall through to universal feed (backward compatible)
+    }
+
+    // Today: return all events regardless of user
+    // Future: use _userId to apply per-user algorithmic filtering
     const allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
     const displayEvents = allEvents.map((e) => dbEventToDisplayEvent(e));
 

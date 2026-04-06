@@ -3,20 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Calendar, ExternalLink, Check } from 'lucide-react'
-
-const WEBCAL_URL = 'webcal://calendar.castalia.one/api/calendar/feed.ics'
-const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics'
-const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(WEBCAL_URL)}`
-const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(FEED_URL)}`
+import { useFeedUrls } from '@/lib/use-feed-urls'
 
 const STORAGE_KEY = 'calendar-subscribe-dismissed'
 
 type Step = 'prompt' | 'confirm' | 'done'
 
 export function SubscribePrompt() {
-  const { data: session, status } = useSession()
+  const { status } = useSession()
   const [show, setShow] = useState(false)
   const [step, setStep] = useState<Step>('prompt')
+  const { webcalUrl, googleUrl, outlookUrl } = useFeedUrls()
 
   useEffect(() => {
     if (status !== 'authenticated') return
@@ -122,7 +119,7 @@ export function SubscribePrompt() {
         {/* Subscribe options */}
         <div className="px-6 pb-4 space-y-2">
           <button
-            onClick={() => handleSubscribe(GOOGLE_URL)}
+            onClick={() => handleSubscribe(googleUrl)}
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
           >
             <div className="flex items-center gap-3">
@@ -134,14 +131,14 @@ export function SubscribePrompt() {
 
           <div className="flex gap-2">
             <button
-              onClick={() => handleSubscribe(WEBCAL_URL)}
+              onClick={() => handleSubscribe(webcalUrl)}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
               <span>🍎</span>
               <span className="text-xs font-medium text-grove-text">Apple</span>
             </button>
             <button
-              onClick={() => handleSubscribe(OUTLOOK_URL)}
+              onClick={() => handleSubscribe(outlookUrl)}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
               <span>📧</span>

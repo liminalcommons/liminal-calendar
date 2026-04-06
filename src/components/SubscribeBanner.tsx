@@ -2,16 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
-
-const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics';
-const WEBCAL_URL = `webcal://calendar.castalia.one/api/calendar/feed.ics`;
-const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(WEBCAL_URL)}`;
-const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(FEED_URL)}`;
+import { useFeedUrls } from '@/lib/use-feed-urls';
 
 const STORAGE_KEY = 'calendar-subscribed';
 
 export function SubscribeBanner() {
   const [show, setShow] = useState(false);
+  const { webcalUrl, googleUrl, outlookUrl } = useFeedUrls();
 
   useEffect(() => {
     const dismissed = localStorage.getItem(STORAGE_KEY) === 'true';
@@ -41,7 +38,7 @@ export function SubscribeBanner() {
 
         <div className="flex items-center gap-1.5 shrink-0">
           <a
-            href={GOOGLE_URL}
+            href={googleUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
@@ -49,13 +46,13 @@ export function SubscribeBanner() {
             Google
           </a>
           <a
-            href={WEBCAL_URL}
+            href={webcalUrl}
             className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
           >
             Apple
           </a>
           <a
-            href={OUTLOOK_URL}
+            href={outlookUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-[11px] px-2 py-0.5 rounded bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"

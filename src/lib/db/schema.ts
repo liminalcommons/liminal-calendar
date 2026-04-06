@@ -51,6 +51,7 @@ export const members = pgTable('members', {
   role: text('role').notNull().default('host'), // 'host' | 'admin'
   timezone: text('timezone').default('UTC'),
   availability: text('availability').default('[]'), // JSON array of UTC slot indices 0-335
+  feedToken: text('feed_token').unique(), // Per-user ICS subscription token
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
