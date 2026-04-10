@@ -117,32 +117,49 @@ function TalkZonePicker({ selectedZoneId, onChange, autoSelect }: {
       {zones.map(z => {
         const isSelected = selectedZoneId === z.zoneId;
         return (
-          <button
-            key={z.zoneId}
-            type="button"
-            onClick={() => onChange(
-              isSelected ? null : z.zoneId,
-              isSelected ? null : z.deepLink,
+          <div key={z.zoneId} className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onChange(
+                isSelected ? null : z.zoneId,
+                isSelected ? null : z.deepLink,
+              )}
+              className={`
+                px-3 py-1.5 rounded-full text-xs font-medium transition-all border
+                ${isSelected
+                  ? 'text-white shadow-sm scale-105'
+                  : 'text-grove-text hover:scale-105 border-grove-border/50 bg-grove-surface'
+                }
+              `}
+              style={isSelected ? { backgroundColor: z.color, borderColor: z.color } : undefined}
+              title={z.participantCount > 0 ? `${z.participantCount} people here` : z.name}
+            >
+              <span
+                className="inline-block w-2 h-2 rounded-full mr-1.5"
+                style={{ backgroundColor: isSelected ? '#fff' : z.color }}
+              />
+              {z.name}
+              {z.participantCount > 0 && (
+                <span className="ml-1 opacity-75">({z.participantCount})</span>
+              )}
+            </button>
+            {isSelected && (
+              <a
+                href={z.deepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 rounded-full hover:bg-grove-border/30 transition-colors text-grove-text-muted hover:text-grove-accent"
+                title="Preview this zone in Castalia"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
             )}
-            className={`
-              px-3 py-1.5 rounded-full text-xs font-medium transition-all border
-              ${isSelected
-                ? 'text-white shadow-sm scale-105'
-                : 'text-grove-text hover:scale-105 border-grove-border/50 bg-grove-surface'
-              }
-            `}
-            style={isSelected ? { backgroundColor: z.color, borderColor: z.color } : undefined}
-            title={z.participantCount > 0 ? `${z.participantCount} people here` : z.name}
-          >
-            <span
-              className="inline-block w-2 h-2 rounded-full mr-1.5"
-              style={{ backgroundColor: isSelected ? '#fff' : z.color }}
-            />
-            {z.name}
-            {z.participantCount > 0 && (
-              <span className="ml-1 opacity-75">({z.participantCount})</span>
-            )}
-          </button>
+          </div>
         );
       })}
     </div>
@@ -841,7 +858,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
               onClick={() => setLinkMode('zone')}
               className={`px-3 py-1 transition-colors ${linkMode === 'zone' ? 'bg-grove-accent text-grove-surface' : 'bg-grove-surface text-grove-text-muted hover:bg-grove-border/30'}`}
             >
-              Talk Zone
+              Castalia
             </button>
             <button
               type="button"
