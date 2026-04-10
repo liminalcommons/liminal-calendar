@@ -230,9 +230,13 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
             href={event.event_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-grove-accent text-grove-surface rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity ${
+              event.event_url.includes('castalia.one/')
+                ? 'bg-emerald-600 text-white'
+                : 'bg-grove-accent text-grove-surface'
+            }`}
           >
-            Join Meeting →
+            {event.event_url.includes('castalia.one/') ? 'Join in Castalia →' : 'Join Meeting →'}
           </a>
         )}
 

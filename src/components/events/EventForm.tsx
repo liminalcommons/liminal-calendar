@@ -71,6 +71,84 @@ function getWeekDays(weekStart: Date): Date[] {
   });
 }
 
+// ─── Talk Zone Picker ───────────────────────────────────────────────────────
+
+interface TalkZone {
+  zoneId: string;
+  name: string;
+  color: string;
+  participantCount: number;
+  deepLink: string;
+}
+
+function TalkZonePicker({ selectedZoneId, onChange, autoSelect }: {
+  selectedZoneId: string | null;
+  onChange: (zoneId: string | null, deepLink: string | null) => void;
+  autoSelect?: boolean;
+}) {
+  const [zones, setZones] = useState<TalkZone[]>([]);
+  const [loading, setLoading] = useState(true);
+  const didAutoSelect = useRef(false);
+
+  useEffect(() => {
+    apiFetch('/api/zones')
+      .then(res => res.json())
+      .then(data => {
+        const z = data.zones || [];
+        setZones(z);
+        // Auto-select first zone for new events
+        if (autoSelect && !didAutoSelect.current && z.length > 0 && !selectedZoneId) {
+          didAutoSelect.current = true;
+          onChange(z[0].zoneId, z[0].deepLink);
+        }
+      })
+      .catch(() => setZones([]))
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (loading) {
+    return <div className="text-xs text-grove-text-muted py-1">Loading zones...</div>;
+  }
+
+  if (zones.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {zones.map(z => {
+        const isSelected = selectedZoneId === z.zoneId;
+        return (
+          <button
+            key={z.zoneId}
+            type="button"
+            onClick={() => onChange(
+              isSelected ? null : z.zoneId,
+              isSelected ? null : z.deepLink,
+            )}
+            className={`
+              px-3 py-1.5 rounded-full text-xs font-medium transition-all border
+              ${isSelected
+                ? 'text-white shadow-sm scale-105'
+                : 'text-grove-text hover:scale-105 border-grove-border/50 bg-grove-surface'
+              }
+            `}
+            style={isSelected ? { backgroundColor: z.color, borderColor: z.color } : undefined}
+            title={z.participantCount > 0 ? `${z.participantCount} people here` : z.name}
+          >
+            <span
+              className="inline-block w-2 h-2 rounded-full mr-1.5"
+              style={{ backgroundColor: isSelected ? '#fff' : z.color }}
+            />
+            {z.name}
+            {z.participantCount > 0 && (
+              <span className="ml-1 opacity-75">({z.participantCount})</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Hylo Group Picker ──────────────────────────────────────────────────────
 
 function HyloGroupPicker({ groups, selectedIds, onChange }: {
@@ -209,6 +287,9 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [meetingLink, setMeetingLink] = useState('');
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [zoneDeepLink, setZoneDeepLink] = useState<string | null>(null);
+  const [linkMode, setLinkMode] = useState<'zone' | 'custom'>('zone');
 
   // Week / day selection
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -390,7 +471,18 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
         setTitle(event.title || '');
         setDescription(event.description || '');
-        setMeetingLink(event.location || '');
+        const loc = event.location || '';
+        if (loc.includes('castalia.one/')) {
+          // Extract zone ID from deep link: .../groupSlug/mapSlug/zoneId
+          const parts = loc.split('/');
+          const zoneId = parts[parts.length - 1];
+          setLinkMode('zone');
+          setSelectedZoneId(zoneId);
+          setZoneDeepLink(loc);
+        } else {
+          setMeetingLink(loc);
+          if (loc) setLinkMode('custom');
+        }
         if (event.imageUrl) setImageUrl(event.imageUrl);
 
         const startDate = new Date(event.starts_at);
@@ -514,7 +606,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         endTime: endDate.toISOString(),
         details: description.trim() || undefined,
         timezone,
-        location: meetingLink.trim() || undefined,
+        location: (linkMode === 'zone' && zoneDeepLink) ? zoneDeepLink : (meetingLink.trim() || undefined),
         recurrenceRule: recurrence !== 'none' ? recurrence : undefined,
         recurrenceEndType: recurrence !== 'none' ? recurrenceEndType : undefined,
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
@@ -731,27 +823,55 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         </div>
       )}
 
-      {/* Recurrence + Meeting link */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-grove-text mb-1">
-            Recurrence
-          </label>
-          <RecurrenceSelector value={recurrence} onChange={handleRecurrenceChange} />
+      {/* Recurrence */}
+      <div>
+        <label className="block text-sm font-medium text-grove-text mb-1">
+          Recurrence
+        </label>
+        <RecurrenceSelector value={recurrence} onChange={handleRecurrenceChange} />
+      </div>
+
+      {/* Meeting location — zone picker or custom link */}
+      <div>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-sm font-medium text-grove-text">Meeting location</span>
+          <div className="flex rounded-md border border-grove-border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setLinkMode('zone')}
+              className={`px-3 py-1 transition-colors ${linkMode === 'zone' ? 'bg-grove-accent text-grove-surface' : 'bg-grove-surface text-grove-text-muted hover:bg-grove-border/30'}`}
+            >
+              Talk Zone
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinkMode('custom')}
+              className={`px-3 py-1 transition-colors ${linkMode === 'custom' ? 'bg-grove-accent text-grove-surface' : 'bg-grove-surface text-grove-text-muted hover:bg-grove-border/30'}`}
+            >
+              Custom Link
+            </button>
+          </div>
         </div>
-        <div>
-          <label htmlFor="meeting-link" className="block text-sm font-medium text-grove-text mb-1">
-            Meeting link <span className="text-grove-text-muted text-xs">(optional)</span>
-          </label>
+
+        {linkMode === 'zone' ? (
+          <TalkZonePicker
+            selectedZoneId={selectedZoneId}
+            autoSelect={mode === 'create'}
+            onChange={(zoneId, deepLink) => {
+              setSelectedZoneId(zoneId);
+              setZoneDeepLink(deepLink);
+            }}
+          />
+        ) : (
           <input
             id="meeting-link"
             type="url"
             value={meetingLink}
             onChange={(e) => setMeetingLink(e.target.value)}
-            placeholder="https://..."
+            placeholder="https://zoom.us/... or any meeting URL"
             className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
           />
-        </div>
+        )}
       </div>
 
       {/* Image upload */}
