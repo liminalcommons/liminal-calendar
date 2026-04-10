@@ -13,6 +13,7 @@ interface AttendeeItem {
     avatarUrl?: string;
   };
   response: string;
+  remindMe?: boolean;
 }
 
 interface EventRSVPProps {
@@ -79,6 +80,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [remindMe, setRemindMe] = useState(false);
 
   async function fetchAttendees() {
     try {
@@ -87,6 +89,12 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
         const data = await res.json();
         const items: AttendeeItem[] = data.invitations?.items ?? [];
         setAttendees(items);
+        const user = session?.user as any;
+        const myUserId = user?.hyloId ?? user?.id;
+        if (myUserId) {
+          const myRsvp = items.find((a: any) => a.person.id === myUserId);
+          if (myRsvp) setRemindMe((myRsvp as any).remindMe ?? false);
+        }
       }
     } catch (e) {
       console.error('Failed to fetch attendees:', e);
@@ -113,7 +121,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
       const res = await apiFetch(`/api/events/${eventId}/rsvp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response }),
+        body: JSON.stringify({ response, remindMe: response === 'no' ? false : remindMe }),
       });
       if (res.ok) {
         calendarSFX.play('shimmer');
@@ -127,6 +135,18 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
       setCurrentResponse(prev);
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function handleToggleRemind() {
+    const next = !remindMe;
+    setRemindMe(next);
+    if (currentResponse && currentResponse !== 'no') {
+      await apiFetch(`/api/events/${eventId}/rsvp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ response: currentResponse, remindMe: next }),
+      });
     }
   }
 
@@ -187,6 +207,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
       {!isSignedIn ? (
         <p className="text-sm text-grove-text-muted">Sign in to RSVP for this event.</p>
       ) : (
+        <>
         <div className="flex flex-wrap gap-2">
           {/* Going */}
           <button
@@ -225,6 +246,21 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
             </button>
           )}
         </div>
+
+        {currentResponse && currentResponse !== 'no' && (
+          <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={remindMe}
+              onChange={handleToggleRemind}
+              className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
+            />
+            <span className="text-xs text-grove-text-muted">
+              Email me reminders (24hr, 1hr, 15min before)
+            </span>
+          </label>
+        )}
+        </>
       )}
     </div>
   );
