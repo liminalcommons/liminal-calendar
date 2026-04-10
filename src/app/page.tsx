@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const session = await auth();
-  const currentUserId = (session?.user as any)?.hyloId as string | undefined;
+  const currentUserId = session?.user?.hyloId as string | undefined;
 
   let displayEvents: DisplayEvent[] = [];
 

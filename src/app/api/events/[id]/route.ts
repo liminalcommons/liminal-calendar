@@ -32,7 +32,7 @@ export async function GET(
       .where(eq(rsvps.eventId, numId));
 
     const session = await auth();
-    const currentUserId = (session?.user as any)?.hyloId as string | undefined;
+    const currentUserId = session?.user?.hyloId as string | undefined;
 
     return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, currentUserId));
   } catch (err) {
@@ -68,7 +68,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = event.creatorId === (session.user as any)?.hyloId;
+  const isCreator = event.creatorId === session.user?.hyloId;
   if (!canEditEvent(role, isCreator)) {
     return NextResponse.json(
       { error: 'Forbidden: insufficient permissions to edit this event' },
@@ -107,7 +107,7 @@ export async function PATCH(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    const currentUserId = (session.user as any)?.hyloId as string | undefined;
+    const currentUserId = session.user?.hyloId as string | undefined;
     return NextResponse.json(dbEventToDisplayEvent(updated, eventRsvps, currentUserId));
   } catch (err) {
     console.error('[PATCH /api/events/[id]] update', err);
@@ -142,7 +142,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = event.creatorId === (session.user as any)?.hyloId;
+  const isCreator = event.creatorId === session.user?.hyloId;
   if (!canDeleteEvent(role, isCreator)) {
     return NextResponse.json(
       { error: 'Forbidden: insufficient permissions to delete this event' },

@@ -74,7 +74,7 @@ function AttendeeChip({ attendee, badge }: { attendee: AttendeeItem; badge: stri
 export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const { data: session, status } = useSession();
   const isSignedIn = status === 'authenticated';
-  const token = (session as any)?.accessToken;
+  const token = session?.accessToken;
 
   const [attendees, setAttendees] = useState<AttendeeItem[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
@@ -89,7 +89,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
         const data = await res.json();
         const items: AttendeeItem[] = data.invitations?.items ?? [];
         setAttendees(items);
-        const user = session?.user as any;
+        const user = session?.user;
         const myUserId = user?.hyloId ?? user?.id;
         if (myUserId) {
           const myRsvp = items.find((a: any) => a.person.id === myUserId);

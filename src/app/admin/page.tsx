@@ -42,7 +42,7 @@ export default function AdminPage() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const userRole = (session?.user as any)?.role;
+  const userRole = session?.user?.role;
 
   useEffect(() => {
     if (status === 'loading') return;

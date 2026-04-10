@@ -431,7 +431,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
   // ── Role guard ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const user = session?.user as any;
+    const user = session?.user;
     const role: string = user?.role || 'member';
     if (session !== undefined && role === 'member') {
       router.replace('/');

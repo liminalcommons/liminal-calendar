@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // GET — return the authenticated user's feed token (create if missing)
 export async function GET() {
   const session = await getServerSession();
-  const hyloId = (session?.user as any)?.hyloId as string | undefined;
+  const hyloId = session?.user?.hyloId as string | undefined;
   if (!hyloId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -39,7 +39,7 @@ export async function GET() {
 // POST — regenerate the user's feed token (revokes old URL)
 export async function POST() {
   const session = await getServerSession();
-  const hyloId = (session?.user as any)?.hyloId as string | undefined;
+  const hyloId = session?.user?.hyloId as string | undefined;
   if (!hyloId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

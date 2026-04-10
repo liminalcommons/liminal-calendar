@@ -9,7 +9,7 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const hyloId = (session.user as any).hyloId as string | undefined;
+  const hyloId = session.user.hyloId as string | undefined;
   if (!hyloId) {
     return NextResponse.json({ error: 'No Hylo ID' }, { status: 400 });
   }
@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const hyloId = (session.user as any).hyloId as string | undefined;
+  const hyloId = session.user.hyloId as string | undefined;
   if (!hyloId) {
     return NextResponse.json({ error: 'No Hylo ID' }, { status: 400 });
   }

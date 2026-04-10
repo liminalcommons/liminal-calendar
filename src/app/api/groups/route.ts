@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const accessToken = (session as any).accessToken as string | undefined;
+  const accessToken = session?.accessToken as string | undefined;
   if (!accessToken) {
     return NextResponse.json({ error: 'No Hylo access token' }, { status: 401 });
   }

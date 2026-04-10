@@ -26,7 +26,7 @@ interface WeeklyGridProps {
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const { data: session } = useSession();
   const router = useRouter();
-  const userRole = (session?.user as any)?.role || 'member';
+  const userRole = session?.user?.role || 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
 

@@ -88,7 +88,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const [closing, setClosing] = useState(false);
 
   const role = getUserRole(session);
-  const isCreator = session?.user?.id === event.creator_id || (session as any)?.user?.hyloId === event.creator_id;
+  const isCreator = session?.user?.id === event.creator_id || session?.user?.hyloId === event.creator_id;
   const canEdit = canEditEvent(role, isCreator);
   const canDelete = canDeleteEvent(role, isCreator);
 

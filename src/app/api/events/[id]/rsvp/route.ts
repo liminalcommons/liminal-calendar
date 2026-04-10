@@ -43,7 +43,7 @@ export async function POST(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const user = session.user as any;
+  const user = session.user;
   const userId = user.hyloId ?? user.id ?? 'unknown';
   const userName = user.name ?? 'Unknown';
   const userImage = user.image ?? null;

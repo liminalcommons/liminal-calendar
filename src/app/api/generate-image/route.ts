@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userId = (session.user as any).id || (session.user as any).hyloId || session.user.email || 'unknown'
+  const userId = session.user.id || session.user.hyloId || session.user.email || 'unknown'
   const rateCheck = await checkRateLimit(userId)
   if (!rateCheck.allowed) {
     return NextResponse.json({ error: rateCheck.error }, { status: 429 })

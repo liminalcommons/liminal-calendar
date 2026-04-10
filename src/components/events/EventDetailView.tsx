@@ -39,7 +39,7 @@ function getInitials(name: string): string {
 export function EventDetailView({ eventId }: EventDetailViewProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const user = session?.user as any;
+  const user = session?.user;
 
   const [event, setEvent] = useState<DisplayEvent | null>(null);
   const [loading, setLoading] = useState(true);

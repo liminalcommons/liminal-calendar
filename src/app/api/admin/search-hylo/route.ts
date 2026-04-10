@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const accessToken = (session as any).accessToken as string | undefined;
+  const accessToken = session?.accessToken as string | undefined;
   if (!accessToken) {
     return NextResponse.json({ error: 'No Hylo access token' }, { status: 401 });
   }

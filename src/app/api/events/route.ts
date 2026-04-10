@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Get current user for myResponse
     const session = await auth();
-    const currentUserId = (session?.user as any)?.hyloId as string | undefined;
+    const currentUserId = session?.user?.hyloId as string | undefined;
 
     const displayEvents = allEvents.map((event) =>
       dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'endTime is not a valid date' }, { status: 400 });
   }
 
-  const user = session.user as any;
+  const user = session.user;
 
   const groupId = typeof hyloGroupId === 'string' && hyloGroupId ? hyloGroupId : null;
 
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       .returning();
 
     // Sync to Hylo — supports multiple groups
-    const accessToken = (session as any).accessToken as string | undefined;
+    const accessToken = session?.accessToken as string | undefined;
     const groupIds: string[] = Array.isArray(hyloGroupIds)
       ? hyloGroupIds.filter((id: unknown) => typeof id === 'string' && id)
       : groupId ? [groupId] : [];

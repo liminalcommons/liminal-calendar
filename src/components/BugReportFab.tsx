@@ -21,7 +21,7 @@ export function BugReportFab() {
   const [errorMsg, setErrorMsg] = useState('');
   const [issueUrl, setIssueUrl] = useState<string | null>(null);
 
-  const user = session?.user as any;
+  const user = session?.user;
 
   const handleSubmit = async () => {
     if (!title.trim()) return;

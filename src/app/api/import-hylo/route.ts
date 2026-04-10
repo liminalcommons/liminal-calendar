@@ -21,7 +21,7 @@ export async function POST() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const token = (session as any).accessToken as string | undefined;
+  const token = session?.accessToken as string | undefined;
   if (!token) {
     return NextResponse.json({ error: 'No Hylo token in session' }, { status: 401 });
   }

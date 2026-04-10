@@ -13,7 +13,7 @@ export default function ListPage() {
   const { data: session } = useSession()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const userRole = (session?.user as any)?.role
+  const userRole = session?.user?.role
 
   useEffect(() => {
     const now = new Date()
