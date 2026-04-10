@@ -16,7 +16,10 @@ export default function ListPage() {
   const userRole = (session?.user as any)?.role
 
   useEffect(() => {
-    fetch('/api/events')
+    const now = new Date()
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+    const to = new Date(now.getFullYear(), now.getMonth() + 7, 1).toISOString()
+    fetch(`/api/events?from=${from}&to=${to}&limit=200`)
       .then(r => {
         if (r.status === 401) {
           // Token expired — redirect to gateway for fresh auth

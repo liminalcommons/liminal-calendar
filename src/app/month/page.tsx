@@ -11,7 +11,10 @@ export default function MonthPage() {
   const [events, setEvents] = useState<DisplayEvent[]>([]);
 
   useEffect(() => {
-    fetch('/api/events')
+    const now = new Date();
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const to = addMonths(now, 6).toISOString();
+    fetch(`/api/events?from=${from}&to=${to}&limit=200`)
       .then(r => {
         if (r.status === 401) {
           const gateway = 'https://auth.castalia.one';

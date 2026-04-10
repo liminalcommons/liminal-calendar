@@ -32,13 +32,18 @@ export function useEvents(initialEvents: DisplayEvent[]) {
   const refetch = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/events');
+      // Fetch events within the display window (1 month back, 6 months forward)
+      const now = new Date();
+      const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const rangeEnd = addMonths(now, 6);
+      const params = new URLSearchParams({
+        from: rangeStart.toISOString(),
+        to: rangeEnd.toISOString(),
+        limit: '200',
+      });
+      const res = await apiFetch(`/api/events?${params}`);
       if (res.ok) {
         const data: DisplayEvent[] = await res.json();
-        // Expand recurring events client-side (6-month window)
-        const now = new Date();
-        const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const rangeEnd = addMonths(now, 6);
         const expanded = expandRecurringEvents(data, rangeStart, rangeEnd);
         if (mounted.current) setEvents(expanded);
       }
