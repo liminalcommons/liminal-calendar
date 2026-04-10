@@ -4,6 +4,7 @@ import {
   text,
   timestamp,
   integer,
+  boolean,
   unique,
 } from 'drizzle-orm/pg-core';
 
@@ -37,6 +38,7 @@ export const rsvps = pgTable(
     userName: text('user_name').notNull(),
     userImage: text('user_image'),
     status: text('status').notNull(), // 'yes' | 'interested' | 'no'
+    remindMe: boolean('remind_me').default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
   (table) => [unique('rsvps_event_user_unique').on(table.eventId, table.userId)],
@@ -48,13 +50,31 @@ export const members = pgTable('members', {
   name: text('name').notNull(),
   email: text('email'),
   image: text('image'),
-  role: text('role').notNull().default('host'), // 'host' | 'admin'
+  role: text('role').notNull().default('member'), // 'member' | 'host' | 'admin'
   timezone: text('timezone').default('UTC'),
   availability: text('availability').default('[]'), // JSON array of UTC slot indices 0-335
   feedToken: text('feed_token').unique(), // Per-user ICS subscription token
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
+
+export const notificationLog = pgTable(
+  'notification_log',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(),
+    type: text('type').notNull(), // '24hr' | '1hr' | '15min'
+    sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    unique('notification_log_unique').on(table.eventId, table.userId, table.type),
+  ],
+);
+
+export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 
 // Type helpers
 export type Event = typeof events.$inferSelect;
