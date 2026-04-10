@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../../../auth';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -29,7 +29,7 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { response } = body as Record<string, unknown>;
+  const { response, remindMe } = body as Record<string, unknown>;
   if (!response || !VALID_RESPONSES.includes(response as ValidResponse)) {
     return NextResponse.json(
       { error: `response must be one of: ${VALID_RESPONSES.join(', ')}` },
@@ -49,16 +49,19 @@ export async function POST(
   const userImage = user.image ?? null;
 
   try {
-    // Upsert: try to update existing RSVP, insert if not found
+    const remindMeValue = typeof remindMe === 'boolean' ? remindMe : undefined;
+
     const [existing] = await db
       .select()
       .from(rsvps)
-      .where(and(eq(rsvps.eventId, numId), eq(rsvps.userId, userId)));
+      .where(eq(rsvps.eventId, numId));
 
     if (existing) {
+      const updateSet: Record<string, unknown> = { status: response as string, userName, userImage };
+      if (remindMeValue !== undefined) updateSet.remindMe = remindMeValue;
       await db
         .update(rsvps)
-        .set({ status: response as string, userName, userImage })
+        .set(updateSet)
         .where(eq(rsvps.id, existing.id));
     } else {
       await db.insert(rsvps).values({
@@ -67,6 +70,7 @@ export async function POST(
         userName,
         userImage,
         status: response as string,
+        remindMe: remindMeValue ?? false,
       });
     }
 
@@ -116,6 +120,7 @@ export async function GET(
           avatarUrl: r.userImage,
         },
         response: r.status,
+        remindMe: r.remindMe ?? false,
       })),
     };
 
