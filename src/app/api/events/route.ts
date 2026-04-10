@@ -5,15 +5,35 @@ import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { createEvent as createHyloEvent } from '@/lib/hylo-client';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray, gte, lte, and } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
+    const url = new URL(request.url);
+    const from = url.searchParams.get('from');
+    const to = url.searchParams.get('to');
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
 
-    // Fetch all RSVPs in one query
-    const allRsvps = allEvents.length > 0
-      ? await db.select().from(rsvps)
+    const conditions = [];
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) conditions.push(gte(events.startsAt, fromDate));
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) conditions.push(lte(events.startsAt, toDate));
+    }
+
+    const query = db.select().from(events).orderBy(asc(events.startsAt)).limit(limit).offset(offset);
+    const allEvents = conditions.length > 0
+      ? await query.where(and(...conditions))
+      : await query;
+
+    // Fetch RSVPs only for the returned events
+    const eventIds = allEvents.map((e) => e.id);
+    const allRsvps = eventIds.length > 0
+      ? await db.select().from(rsvps).where(inArray(rsvps.eventId, eventIds))
       : [];
 
     // Group RSVPs by event ID
