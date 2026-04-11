@@ -17,7 +17,10 @@ export interface ICSEvent {
 
 // Generate a unique ID for the event
 function generateUID(): string {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}@liminalcommons.com`;
+  const uuid = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  return `${uuid}@liminalcommons.com`;
 }
 
 // Format date to ICS format (YYYYMMDDTHHMMSSZ)
@@ -124,8 +127,18 @@ export function generateICS(event: ICSEvent): string {
     }
   }
 
-  // Add alarm 15 minutes before
+  // Reminders: 3hr, 1hr, 15min before
   lines.push(
+    'BEGIN:VALARM',
+    'TRIGGER:-PT3H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeICS(event.title)} starts in 3 hours`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT1H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeICS(event.title)} starts in 1 hour`,
+    'END:VALARM',
     'BEGIN:VALARM',
     'TRIGGER:-PT15M',
     'ACTION:DISPLAY',
@@ -214,7 +227,18 @@ function generateVEVENT(event: ICSEvent & { id: string }): string[] {
     }
   }
 
+  // Reminders: 3hr, 1hr, 15min before
   lines.push(
+    'BEGIN:VALARM',
+    'TRIGGER:-PT3H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeICS(event.title)} starts in 3 hours`,
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT1H',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${escapeICS(event.title)} starts in 1 hour`,
+    'END:VALARM',
     'BEGIN:VALARM',
     'TRIGGER:-PT15M',
     'ACTION:DISPLAY',
