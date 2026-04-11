@@ -7,7 +7,7 @@ import { calendarSFX } from '@/lib/sound-manager'
 
 const WEBCAL_URL = 'webcal://calendar.castalia.one/api/calendar/feed.ics'
 const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics'
-const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(WEBCAL_URL)}`
+const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(FEED_URL)}`
 const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(FEED_URL)}`
 
 interface NavGearMenuProps {

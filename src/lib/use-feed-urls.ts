@@ -9,7 +9,8 @@ function buildUrls(token?: string) {
   const suffix = token ? `?token=${token}` : '';
   const feedUrl = `https://${BASE}${suffix}`;
   const webcalUrl = `webcal://${BASE}${suffix}`;
-  const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
+  // Google Calendar works better with https:// in the cid param (webcal:// fails on mobile)
+  const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`;
   const outlookUrl = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(feedUrl)}`;
   return { feedUrl, webcalUrl, googleUrl, outlookUrl };
 }
