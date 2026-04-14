@@ -17,8 +17,6 @@ export function NotificationScheduler() {
     if (!('Notification' in window)) return
     if (Notification.permission !== 'granted') return
 
-    let timer: ReturnType<typeof setInterval>
-
     async function checkUpcoming() {
       try {
         const now = new Date()
@@ -70,7 +68,7 @@ export function NotificationScheduler() {
     }
 
     checkUpcoming()
-    timer = setInterval(checkUpcoming, CHECK_INTERVAL)
+    const timer = setInterval(checkUpcoming, CHECK_INTERVAL)
     return () => clearInterval(timer)
   }, [session])
 
