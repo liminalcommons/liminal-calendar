@@ -143,12 +143,12 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Back navigation */}
-      <button
-        onClick={() => router.back()}
+      <Link
+        href="/"
         className="inline-flex items-center gap-1 text-sm text-grove-text-muted hover:text-grove-text mb-6 transition-colors"
       >
         ← Back
-      </button>
+      </Link>
 
       {/* Hero image */}
       {event.imageUrl && (
