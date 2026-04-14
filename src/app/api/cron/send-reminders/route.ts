@@ -4,6 +4,7 @@ import { events, rsvps, members, notificationLog } from '@/lib/db/schema';
 import { and, eq, gte, lte, not, inArray } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email';
 import { buildReminderEmail, type ReminderType } from '@/lib/notifications/reminders';
+import { sendPushToUsers } from '@/lib/notifications/push';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -123,5 +124,52 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ sent, skipped, errors, timestamp: now.toISOString() });
+  // Send push notifications for 15min window events
+  const push15Start = new Date(now.getTime() + 10 * 60_000);
+  const push15End = new Date(now.getTime() + 20 * 60_000);
+
+  const pushDueEvents = await db
+    .select({
+      eventId: events.id,
+      title: events.title,
+      startsAt: events.startsAt,
+      location: events.location,
+      description: events.description,
+      userId: rsvps.userId,
+    })
+    .from(events)
+    .innerJoin(
+      rsvps,
+      and(eq(rsvps.eventId, events.id), eq(rsvps.remindMe, true), not(eq(rsvps.status, 'no'))),
+    )
+    .where(and(gte(events.startsAt, push15Start), lte(events.startsAt, push15End)));
+
+  // Group by event and send push
+  let pushSent = 0;
+  const eventMap = new Map<number, { title: string; location: string | null; description: string | null; userIds: string[] }>();
+  for (const e of pushDueEvents) {
+    const existing = eventMap.get(e.eventId);
+    if (existing) {
+      existing.userIds.push(e.userId);
+    } else {
+      eventMap.set(e.eventId, { title: e.title, location: e.location, description: e.description, userIds: [e.userId] });
+    }
+  }
+
+  for (const [eventId, info] of eventMap) {
+    // Extract meeting link for click action
+    const text = `${info.location || ''} ${info.description || ''}`;
+    const linkMatch = text.match(/https?:\/\/[^\s<"]+/);
+    const url = linkMatch ? linkMatch[0] : `https://calendar.castalia.one/events/${eventId}`;
+
+    const result = await sendPushToUsers(info.userIds, {
+      title: `${info.title} — starting soon`,
+      body: 'Starts in 15 minutes. Tap to join.',
+      url,
+      tag: `event-${eventId}-15min`,
+    });
+    pushSent += result.sent;
+  }
+
+  return NextResponse.json({ sent, skipped, errors, pushSent, timestamp: now.toISOString() });
 }

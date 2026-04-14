@@ -74,7 +74,21 @@ export const notificationLog = pgTable(
   ],
 );
 
+export const pushSubscriptions = pgTable(
+  'push_subscriptions',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    endpoint: text('endpoint').notNull(),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [unique('push_sub_user_endpoint').on(table.userId, table.endpoint)],
+);
+
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
 // Type helpers
 export type Event = typeof events.$inferSelect;

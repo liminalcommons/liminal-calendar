@@ -256,7 +256,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
               className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
             />
             <span className="text-xs text-grove-text-muted">
-              Email me reminders (24hr, 1hr, 15min before)
+              Remind me (15min before)
             </span>
           </label>
         )}
