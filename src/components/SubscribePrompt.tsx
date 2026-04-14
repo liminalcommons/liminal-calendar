@@ -8,7 +8,7 @@ import { apiFetch } from '@/lib/api-fetch'
 
 const STORAGE_KEY = 'calendar-subscribe-dismissed'
 
-type Step = 'prompt' | 'confirm' | 'notifications' | 'done'
+type Step = 'notifications' | 'subscribe' | 'confirm' | 'done'
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -23,7 +23,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 export function SubscribePrompt() {
   const { status } = useSession()
   const [show, setShow] = useState(false)
-  const [step, setStep] = useState<Step>('prompt')
+  const [step, setStep] = useState<Step>('notifications')
   const [pushLoading, setPushLoading] = useState(false)
   const { webcalUrl, googleUrl, outlookUrl } = useFeedUrls()
 
@@ -31,6 +31,12 @@ export function SubscribePrompt() {
     if (status !== 'authenticated') return
     const dismissed = localStorage.getItem(STORAGE_KEY)
     if (dismissed) return
+    // Skip notifications step if not supported or already granted
+    const initialStep: Step =
+      ('PushManager' in window && Notification.permission !== 'granted')
+        ? 'notifications'
+        : 'subscribe'
+    setStep(initialStep)
     const timer = setTimeout(() => setShow(true), 1500)
     return () => clearTimeout(timer)
   }, [status])
@@ -41,16 +47,11 @@ export function SubscribePrompt() {
   }
 
   const handleConfirm = () => {
-    // Check if push is available and not already granted
-    if ('PushManager' in window && Notification.permission !== 'granted') {
-      setStep('notifications')
-    } else {
-      finishOnboarding()
-    }
+    finishOnboarding()
   }
 
   const handleNotYet = () => {
-    setStep('prompt')
+    setStep('subscribe')
   }
 
   const handleEnableNotifications = async () => {
@@ -77,7 +78,7 @@ export function SubscribePrompt() {
       console.error('[push] subscribe failed:', err)
     } finally {
       setPushLoading(false)
-      finishOnboarding()
+      setStep('subscribe')
     }
   }
 
@@ -92,7 +93,7 @@ export function SubscribePrompt() {
   }
 
   const handleSkipNotifications = () => {
-    finishOnboarding()
+    setStep('subscribe')
   }
 
   if (!show) return null
@@ -106,7 +107,7 @@ export function SubscribePrompt() {
             <Check size={28} className="text-grove-accent" />
           </div>
           <h2 className="text-lg font-semibold text-grove-text mb-2">All set!</h2>
-          <p className="text-sm text-grove-text-muted">You&apos;re ready. Events will appear in your calendar and you&apos;ll be notified before they start.</p>
+          <p className="text-sm text-grove-text-muted">Community events will sync to your calendar and you&apos;ll get notified before they start.</p>
         </div>
       </div>
     )
@@ -124,7 +125,7 @@ export function SubscribePrompt() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-grove-text">Never miss a gathering</h2>
-                <p className="text-sm text-grove-text-muted">One last thing</p>
+                <p className="text-sm text-grove-text-muted">Step 1 of 2</p>
               </div>
             </div>
             <p className="text-sm text-grove-text leading-relaxed mb-5">
@@ -208,7 +209,7 @@ export function SubscribePrompt() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-grove-text">Stay in the loop</h2>
-              <p className="text-sm text-grove-text-muted">Step 1 of 2</p>
+              <p className="text-sm text-grove-text-muted">Step 2 of 2</p>
             </div>
           </div>
           <p className="text-sm text-grove-text leading-relaxed">
