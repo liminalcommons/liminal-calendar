@@ -58,7 +58,7 @@ function formatDuration(startsAt: string, endsAt: string | null): string {
 
 function formatEventTime(event: DisplayEvent): string {
   try {
-    const tz = event.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return formatInTimeZone(new Date(event.starts_at), tz, 'EEE MMM d, h:mm a zzz');
   } catch {
     return new Date(event.starts_at).toLocaleString();

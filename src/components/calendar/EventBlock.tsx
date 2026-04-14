@@ -33,8 +33,20 @@ const EVENT_GRADIENTS = [
   'linear-gradient(135deg, #6a8b80 0%, #447a6b 100%)', // teal
 ];
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, timezone?: string): string {
   const d = new Date(iso);
+  if (timezone) {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: timezone,
+      }).format(d).replace(':00', '').toLowerCase().replace(' ', '');
+    } catch {
+      // Fall through to local time on invalid timezone
+    }
+  }
   const h = d.getHours();
   const m = d.getMinutes();
   const period = h >= 12 ? 'pm' : 'am';
