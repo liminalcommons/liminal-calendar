@@ -2,17 +2,29 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { Calendar, ExternalLink, Check } from 'lucide-react'
+import { Calendar, ExternalLink, Check, Bell } from 'lucide-react'
 import { useFeedUrls } from '@/lib/use-feed-urls'
+import { apiFetch } from '@/lib/api-fetch'
 
 const STORAGE_KEY = 'calendar-subscribe-dismissed'
 
-type Step = 'prompt' | 'confirm' | 'done'
+type Step = 'prompt' | 'confirm' | 'notifications' | 'done'
+
+function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  const buffer = new ArrayBuffer(rawData.length)
+  const view = new Uint8Array(buffer)
+  for (let i = 0; i < rawData.length; i++) view[i] = rawData.charCodeAt(i)
+  return buffer
+}
 
 export function SubscribePrompt() {
   const { status } = useSession()
   const [show, setShow] = useState(false)
   const [step, setStep] = useState<Step>('prompt')
+  const [pushLoading, setPushLoading] = useState(false)
   const { webcalUrl, googleUrl, outlookUrl } = useFeedUrls()
 
   useEffect(() => {
@@ -29,22 +41,63 @@ export function SubscribePrompt() {
   }
 
   const handleConfirm = () => {
-    setStep('done')
-    localStorage.setItem(STORAGE_KEY, Date.now().toString())
-    setTimeout(() => setShow(false), 1500)
+    // Check if push is available and not already granted
+    if ('PushManager' in window && Notification.permission !== 'granted') {
+      setStep('notifications')
+    } else {
+      finishOnboarding()
+    }
   }
 
   const handleNotYet = () => {
     setStep('prompt')
   }
 
+  const handleEnableNotifications = async () => {
+    setPushLoading(true)
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready
+        const res = await apiFetch('/api/push/vapid-key')
+        const { publicKey } = await res.json()
+        if (publicKey) {
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          })
+          await apiFetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: sub.toJSON() }),
+          })
+        }
+      }
+    } catch (err) {
+      console.error('[push] subscribe failed:', err)
+    } finally {
+      setPushLoading(false)
+      finishOnboarding()
+    }
+  }
+
+  const finishOnboarding = () => {
+    setStep('done')
+    localStorage.setItem(STORAGE_KEY, Date.now().toString())
+    setTimeout(() => setShow(false), 1500)
+  }
+
   const handleSkip = () => {
     setShow(false)
   }
 
+  const handleSkipNotifications = () => {
+    finishOnboarding()
+  }
+
   if (!show) return null
 
-  // Step 3: Success
+  // Step 4: Success
   if (step === 'done') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -53,7 +106,54 @@ export function SubscribePrompt() {
             <Check size={28} className="text-grove-accent" />
           </div>
           <h2 className="text-lg font-semibold text-grove-text mb-2">All set!</h2>
-          <p className="text-sm text-grove-text-muted">Community events will now appear in your calendar.</p>
+          <p className="text-sm text-grove-text-muted">You&apos;re ready. Events will appear in your calendar and you&apos;ll be notified before they start.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Step 3: Enable notifications
+  if (step === 'notifications') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-grove-surface border border-grove-border rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+          <div className="px-6 pt-6 pb-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-grove-accent/20 flex items-center justify-center">
+                <Bell size={20} className="text-grove-accent" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-grove-text">Never miss a gathering</h2>
+                <p className="text-sm text-grove-text-muted">One last thing</p>
+              </div>
+            </div>
+            <p className="text-sm text-grove-text leading-relaxed mb-5">
+              Get a notification <strong>15 minutes before</strong> events you RSVP to. Just enough time to grab a drink and show up.
+            </p>
+
+            <div className="space-y-2">
+              <button
+                onClick={handleEnableNotifications}
+                disabled={pushLoading}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-grove-accent-deep text-grove-surface font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Bell size={16} />
+                {pushLoading ? 'Setting up...' : 'Enable notifications'}
+              </button>
+              <button
+                onClick={handleSkipNotifications}
+                className="w-full px-4 py-2.5 rounded-lg border border-grove-border text-sm text-grove-text hover:bg-grove-border/20 transition-colors"
+              >
+                Maybe later
+              </button>
+            </div>
+          </div>
+
+          <div className="px-6 py-2.5 border-t border-grove-border/30">
+            <p className="text-center text-[10px] text-grove-text-dim">
+              You can change this anytime in Settings
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -107,8 +207,8 @@ export function SubscribePrompt() {
               <Calendar size={20} className="text-grove-accent" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-grove-text">One more step</h2>
-              <p className="text-sm text-grove-text-muted">Sync events to your calendar</p>
+              <h2 className="text-lg font-semibold text-grove-text">Stay in the loop</h2>
+              <p className="text-sm text-grove-text-muted">Step 1 of 2</p>
             </div>
           </div>
           <p className="text-sm text-grove-text leading-relaxed">
@@ -123,7 +223,7 @@ export function SubscribePrompt() {
             className="w-full flex items-center justify-between px-4 py-3.5 rounded-lg bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
           >
             <div className="flex items-center gap-3">
-              <span className="text-lg">📅</span>
+              <span className="text-lg">G</span>
               <span className="text-sm font-semibold">Subscribe with Google Calendar</span>
             </div>
             <ExternalLink size={14} />
@@ -134,14 +234,12 @@ export function SubscribePrompt() {
               onClick={() => handleSubscribe(webcalUrl)}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
-              <span>🍎</span>
-              <span className="text-xs font-medium text-grove-text">Apple</span>
+              <span className="text-xs font-medium text-grove-text">Apple Calendar</span>
             </button>
             <button
               onClick={() => handleSubscribe(outlookUrl)}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-grove-border hover:bg-grove-border/20 transition-colors"
             >
-              <span>📧</span>
               <span className="text-xs font-medium text-grove-text">Outlook</span>
             </button>
           </div>
