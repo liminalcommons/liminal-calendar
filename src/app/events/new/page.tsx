@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { NavBar } from '@/components/NavBar'
@@ -13,6 +13,14 @@ export default function NewEventPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [externalValues, setExternalValues] = useState<Partial<EventFormValues>>({})
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') router.back()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [router])
 
   const handleFormUpdate = useCallback((updates: Partial<EventFormValues>) => {
     setExternalValues(prev => ({ ...prev, ...updates }))

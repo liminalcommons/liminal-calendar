@@ -50,6 +50,14 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   const [timezone, setTimezone] = useState('UTC');
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') router.push('/');
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router]);
+
+  useEffect(() => {
     setTimezone(getUserTimezone());
   }, []);
 
