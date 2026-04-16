@@ -1,15 +1,17 @@
 /**
- * Wrapper around fetch that handles 401 by redirecting to auth gateway.
- * Use this for all client-side API calls instead of raw fetch.
+ * Wrapper around fetch. Previously auto-redirected to auth gateway on 401,
+ * but that caused an infinite loop when the gateway's JWE cookie contained
+ * an expired Hylo token (the gateway doesn't refresh it during OAuth, and
+ * on mobile the Hylo app universal-link hijacks the OAuth start).
+ *
+ * Mirror of castalia fix 074ba137: just warn and let the app degrade
+ * gracefully. Users re-auth manually via the Sign In button.
  */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const res = await fetch(input, init);
 
   if (res.status === 401 && typeof window !== 'undefined') {
-    const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
-    window.location.href = `${gateway}/signin?callbackUrl=${encodeURIComponent(window.location.origin)}`;
-    // Return a never-resolving promise so the caller doesn't continue
-    return new Promise(() => {});
+    console.warn('[apiFetch] 401 — session expired. Sign out and back in to refresh.');
   }
 
   return res;

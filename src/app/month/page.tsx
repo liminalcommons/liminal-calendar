@@ -17,8 +17,7 @@ export default function MonthPage() {
     fetch(`/api/events?from=${from}&to=${to}&limit=200`)
       .then(r => {
         if (r.status === 401) {
-          const gateway = 'https://auth.castalia.one';
-          window.location.href = `${gateway}/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
+          console.warn('[month] 401 — session expired. Sign out and back in to refresh.');
           return [];
         }
         return r.json();

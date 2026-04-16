@@ -22,9 +22,7 @@ export default function ListPage() {
     fetch(`/api/events?from=${from}&to=${to}&limit=200`)
       .then(r => {
         if (r.status === 401) {
-          // Token expired — redirect to gateway for fresh auth
-          const gateway = 'https://auth.castalia.one';
-          window.location.href = `${gateway}/signin?callbackUrl=${encodeURIComponent(window.location.href)}`;
+          console.warn('[list] 401 — session expired. Sign out and back in to refresh.');
           return [];
         }
         return r.json();
