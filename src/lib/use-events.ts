@@ -25,9 +25,10 @@ export function useEvents(initialEvents: DisplayEvent[]) {
     return () => { mounted.current = false; };
   }, []);
 
-  useEffect(() => {
-    setEvents(initialEvents);
-  }, [initialEvents]);
+  // Intentionally do NOT sync `events` from `initialEvents` on every prop change.
+  // `useState(initialEvents)` seeds state once on mount; subsequent server-prop
+  // re-renders would otherwise wipe optimistic RSVP/edit updates before the
+  // user's change reaches the DB. Use `refetch` to pull fresh server state.
 
   const refetch = useCallback(async () => {
     try {
