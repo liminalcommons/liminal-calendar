@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
+import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 
 interface EventBlockProps {
@@ -33,25 +34,29 @@ const EVENT_GRADIENTS = [
   'linear-gradient(135deg, #6a8b80 0%, #447a6b 100%)', // teal
 ];
 
-function formatTime(iso: string, timezone?: string): string {
-  const d = new Date(iso);
-  if (timezone) {
-    try {
-      return new Intl.DateTimeFormat('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: timezone,
-      }).format(d).replace(':00', '').toLowerCase().replace(' ', '');
-    } catch {
-      // Fall through to local time on invalid timezone
-    }
+function formatTime(iso: string, timezone: string): string {
+  try {
+    const full = formatInTimeZone(new Date(iso), timezone, 'h:mma').toLowerCase();
+    return full.replace(':00', '');
+  } catch {
+    const d = new Date(iso);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const period = h >= 12 ? 'pm' : 'am';
+    const displayH = h % 12 || 12;
+    return m === 0 ? `${displayH}${period}` : `${displayH}:${String(m).padStart(2, '0')}${period}`;
   }
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const period = h >= 12 ? 'pm' : 'am';
-  const displayH = h % 12 || 12;
-  return m === 0 ? `${displayH}${period}` : `${displayH}:${String(m).padStart(2, '0')}${period}`;
+}
+
+function hourMinuteInTz(iso: string, timezone: string): { h: number; m: number } {
+  try {
+    const hm = formatInTimeZone(new Date(iso), timezone, 'H:m');
+    const [h, m] = hm.split(':').map(Number);
+    return { h, m };
+  } catch {
+    const d = new Date(iso);
+    return { h: d.getHours(), m: d.getMinutes() };
+  }
 }
 
 function getRecurrenceLabel(rule?: string): string | null {
@@ -87,8 +92,10 @@ const EventBlock = React.memo(function EventBlock({
   const startDate = new Date(event.starts_at);
   const endDate = event.ends_at ? new Date(event.ends_at) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
-  const startMinutes = startDate.getHours() * 60 + startDate.getMinutes();
-  const rawEndMinutes = endDate.getHours() * 60 + endDate.getMinutes();
+  const startHM = hourMinuteInTz(event.starts_at, event.timezone);
+  const endHM = hourMinuteInTz(event.ends_at ?? new Date(startDate.getTime() + 60 * 60 * 1000).toISOString(), event.timezone);
+  const startMinutes = startHM.h * 60 + startHM.m;
+  const rawEndMinutes = endHM.h * 60 + endHM.m;
   const endMinutes = Math.max(rawEndMinutes <= startMinutes ? 24 * 60 : rawEndMinutes, startMinutes + MIN_DISPLAY_MINUTES);
 
   const topPx = minutesToPx(startMinutes, hourOffsets, hourHeights);
@@ -146,8 +153,8 @@ const EventBlock = React.memo(function EventBlock({
 
         {heightPx >= 28 && (
           <p className="text-white/90 text-[10px] leading-tight truncate drop-shadow-sm">
-            {formatTime(event.starts_at)}
-            {event.ends_at ? ` – ${formatTime(event.ends_at)}` : ''}
+            {formatTime(event.starts_at, event.timezone)}
+            {event.ends_at ? ` – ${formatTime(event.ends_at, event.timezone)}` : ''}
           </p>
         )}
 

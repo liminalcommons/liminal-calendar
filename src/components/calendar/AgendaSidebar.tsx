@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { format, parseISO, isSameDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 
 const EVENT_DOT_COLORS = [
@@ -22,13 +23,19 @@ function hashId(id: string): number {
   return h % 6;
 }
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'pm' : 'am';
-  const h12 = h % 12 || 12;
-  return m > 0 ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
+function formatTime(iso: string, timezone: string): string {
+  try {
+    return formatInTimeZone(new Date(iso), timezone, 'h:mma')
+      .toLowerCase()
+      .replace(':00', '');
+  } catch {
+    const d = new Date(iso);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const h12 = h % 12 || 12;
+    return m > 0 ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
+  }
 }
 
 interface AgendaSidebarProps {
@@ -96,8 +103,8 @@ export function AgendaSidebar({ events, weekDays, onEventClick }: AgendaSidebarP
                           {event.title}
                         </p>
                         <p className="text-[9px] text-grove-text-dim">
-                          {formatTime(event.starts_at)}
-                          {event.ends_at && ` – ${formatTime(event.ends_at)}`}
+                          {formatTime(event.starts_at, event.timezone)}
+                          {event.ends_at && ` – ${formatTime(event.ends_at, event.timezone)}`}
                         </p>
                       </div>
                     </button>

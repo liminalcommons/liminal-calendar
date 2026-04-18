@@ -15,6 +15,7 @@ import {
   isSameMonth,
 } from 'date-fns';
 import Link from 'next/link';
+import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
@@ -44,13 +45,21 @@ interface MonthlyGridProps {
   events: DisplayEvent[];
 }
 
-function formatShortTime(iso: string): string {
-  const d = new Date(iso);
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'p' : 'a';
-  const h12 = h % 12 || 12;
-  return m > 0 ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
+function formatShortTime(iso: string, timezone: string): string {
+  try {
+    return formatInTimeZone(new Date(iso), timezone, 'h:mma')
+      .toLowerCase()
+      .replace(':00', '')
+      .replace('am', 'a')
+      .replace('pm', 'p');
+  } catch {
+    const d = new Date(iso);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const ampm = h >= 12 ? 'p' : 'a';
+    const h12 = h % 12 || 12;
+    return m > 0 ? `${h12}:${String(m).padStart(2, '0')}${ampm}` : `${h12}${ampm}`;
+  }
 }
 
 export function MonthlyGrid({ events }: MonthlyGridProps) {
@@ -181,9 +190,9 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                           className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
                                      ${color.bg} ${color.text} hover:opacity-80 transition-opacity
                                      border-l-2 ${color.border}`}
-                          title={`${event.title} — ${formatShortTime(event.starts_at)}`}
+                          title={`${event.title} — ${formatShortTime(event.starts_at, event.timezone)}`}
                         >
-                          <span className="opacity-70">{formatShortTime(event.starts_at)}</span>{' '}
+                          <span className="opacity-70">{formatShortTime(event.starts_at, event.timezone)}</span>{' '}
                           {event.title}
                         </Link>
                       );
@@ -211,9 +220,9 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                               className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
                                          ${color.bg} ${color.text} hover:opacity-80 transition-opacity
                                          border-l-2 ${color.border}`}
-                              title={`${event.title} — ${formatShortTime(event.starts_at)}`}
+                              title={`${event.title} — ${formatShortTime(event.starts_at, event.timezone)}`}
                             >
-                              <span className="opacity-70">{formatShortTime(event.starts_at)}</span>{' '}
+                              <span className="opacity-70">{formatShortTime(event.starts_at, event.timezone)}</span>{' '}
                               {event.title}
                             </Link>
                           );
