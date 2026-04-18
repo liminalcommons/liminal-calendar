@@ -124,51 +124,77 @@ export async function GET(request: Request) {
     }
   }
 
-  // Send push notifications for 15min window events
-  const push15Start = new Date(now.getTime() + 10 * 60_000);
-  const push15End = new Date(now.getTime() + 20 * 60_000);
+  // Push notifications: 1h, 15min, and at-start windows
+  // Dedupe via notificationLog with distinct 'push-*' type values so email logs don't collide
+  const PUSH_WINDOWS: { type: string; minMin: number; maxMin: number; title: (t: string) => string; body: string }[] = [
+    { type: 'push-1hr',   minMin: 55, maxMin: 65, title: (t) => `${t} — in 1 hour`,     body: 'Starts in about 1 hour. Tap to view.' },
+    { type: 'push-15min', minMin: 10, maxMin: 20, title: (t) => `${t} — starting soon`, body: 'Starts in 15 minutes. Tap to join.' },
+    { type: 'push-start', minMin: 0,  maxMin: 10, title: (t) => `${t} — starting now`,  body: 'Starting now. Tap to join.' },
+  ];
 
-  const pushDueEvents = await db
-    .select({
-      eventId: events.id,
-      title: events.title,
-      startsAt: events.startsAt,
-      location: events.location,
-      description: events.description,
-      userId: rsvps.userId,
-    })
-    .from(events)
-    .innerJoin(
-      rsvps,
-      and(eq(rsvps.eventId, events.id), eq(rsvps.remindMe, true), not(eq(rsvps.status, 'no'))),
-    )
-    .where(and(gte(events.startsAt, push15Start), lte(events.startsAt, push15End)));
-
-  // Group by event and send push
   let pushSent = 0;
-  const eventMap = new Map<number, { title: string; location: string | null; description: string | null; userIds: string[] }>();
-  for (const e of pushDueEvents) {
-    const existing = eventMap.get(e.eventId);
-    if (existing) {
-      existing.userIds.push(e.userId);
-    } else {
-      eventMap.set(e.eventId, { title: e.title, location: e.location, description: e.description, userIds: [e.userId] });
+
+  for (const w of PUSH_WINDOWS) {
+    const windowStart = new Date(now.getTime() + w.minMin * 60_000);
+    const windowEnd = new Date(now.getTime() + w.maxMin * 60_000);
+
+    const due = await db
+      .select({
+        eventId: events.id,
+        title: events.title,
+        startsAt: events.startsAt,
+        location: events.location,
+        description: events.description,
+        userId: rsvps.userId,
+      })
+      .from(events)
+      .innerJoin(
+        rsvps,
+        and(eq(rsvps.eventId, events.id), eq(rsvps.remindMe, true), not(eq(rsvps.status, 'no'))),
+      )
+      .where(and(gte(events.startsAt, windowStart), lte(events.startsAt, windowEnd)));
+
+    if (due.length === 0) continue;
+
+    const alreadySentPush = await db
+      .select({ eventId: notificationLog.eventId, userId: notificationLog.userId })
+      .from(notificationLog)
+      .where(eq(notificationLog.type, w.type));
+    const sentPushSet = new Set(alreadySentPush.map((s) => `${s.eventId}:${s.userId}`));
+
+    // Group by event, filtering out already-sent user/event pairs
+    const eventMap = new Map<number, { title: string; location: string | null; description: string | null; userIds: string[] }>();
+    for (const e of due) {
+      if (sentPushSet.has(`${e.eventId}:${e.userId}`)) continue;
+      const existing = eventMap.get(e.eventId);
+      if (existing) {
+        existing.userIds.push(e.userId);
+      } else {
+        eventMap.set(e.eventId, { title: e.title, location: e.location, description: e.description, userIds: [e.userId] });
+      }
     }
-  }
 
-  for (const [eventId, info] of eventMap) {
-    // Extract meeting link for click action
-    const text = `${info.location || ''} ${info.description || ''}`;
-    const linkMatch = text.match(/https?:\/\/[^\s<"]+/);
-    const url = linkMatch ? linkMatch[0] : `https://calendar.castalia.one/events/${eventId}`;
+    for (const [eventId, info] of eventMap) {
+      const text = `${info.location || ''} ${info.description || ''}`;
+      const linkMatch = text.match(/https?:\/\/[^\s<"]+/);
+      const url = linkMatch ? linkMatch[0] : `https://calendar.castalia.one/events/${eventId}`;
 
-    const result = await sendPushToUsers(info.userIds, {
-      title: `${info.title} — starting soon`,
-      body: 'Starts in 15 minutes. Tap to join.',
-      url,
-      tag: `event-${eventId}-15min`,
-    });
-    pushSent += result.sent;
+      const result = await sendPushToUsers(info.userIds, {
+        title: w.title(info.title),
+        body: w.body,
+        url,
+        tag: `event-${eventId}-${w.type}`,
+      });
+      pushSent += result.sent;
+
+      // Log each successful recipient so we don't re-send in the next cron tick within the same window
+      if (result.sent > 0) {
+        await db
+          .insert(notificationLog)
+          .values(info.userIds.map((uid) => ({ eventId, userId: uid, type: w.type })))
+          .onConflictDoNothing();
+      }
+    }
   }
 
   return NextResponse.json({ sent, skipped, errors, pushSent, timestamp: now.toISOString() });

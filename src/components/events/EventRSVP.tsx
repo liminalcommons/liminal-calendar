@@ -80,7 +80,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [remindMe, setRemindMe] = useState(false);
+  const [remindMe, setRemindMe] = useState(true);
 
   async function fetchAttendees() {
     try {
@@ -256,7 +256,7 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
               className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
             />
             <span className="text-xs text-grove-text-muted">
-              Remind me (15min before)
+              Remind me (1h, 15min, at start)
             </span>
           </label>
         )}
