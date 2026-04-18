@@ -92,6 +92,11 @@ export function SubscribePrompt() {
     setShow(false)
   }
 
+  const handleNeverAsk = () => {
+    localStorage.setItem(STORAGE_KEY, Date.now().toString())
+    setShow(false)
+  }
+
   const handleSkipNotifications = () => {
     setStep('subscribe')
   }
@@ -247,12 +252,18 @@ export function SubscribePrompt() {
         </div>
 
         {/* Skip */}
-        <div className="px-6 py-2.5 border-t border-grove-border/30">
+        <div className="px-6 py-2.5 border-t border-grove-border/30 flex items-center justify-between gap-4">
           <button
             onClick={handleSkip}
-            className="w-full text-center text-[11px] text-grove-text-dim hover:text-grove-text-muted transition-colors"
+            className="text-[11px] text-grove-text-dim hover:text-grove-text-muted transition-colors"
           >
             Skip for now
+          </button>
+          <button
+            onClick={handleNeverAsk}
+            className="text-[11px] text-grove-text-dim hover:text-grove-text-muted transition-colors"
+          >
+            Don&apos;t ask again
           </button>
         </div>
       </div>
