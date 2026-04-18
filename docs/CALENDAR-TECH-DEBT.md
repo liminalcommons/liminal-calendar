@@ -16,13 +16,10 @@ Living document. Items captured here are known-but-deferred; adding an item mean
 ### P1.1 — External cron trigger is undocumented and unowned
 `/api/cron/send-reminders` requires a 10-minute cadence (see `docs/notifications/scheduling.md`), but no schedule lives in this repo. Reminders fire today because something external is calling the endpoint — that something is not versioned here. If the external caller disappears, reminders silently stop. Three possible fixes (Vercel Pro cron entry, chora-node systemd unit committed to `deploy/`, 3rd-party scheduler whose config lives here). Pick one.
 
-### P1.2 — `auth-helpers` test asserts obsolete behavior (false-green baseline)
-`src/__tests__/lib/auth-helpers.test.ts:48` asserts `canEditEvent('admin', false) === true`. Commit `bb229fa` ("admin can only delete others' events, not edit — edit requires ownership") intentionally changed the helper's behavior; the test was never updated. Result: `npx jest` has a failing test in the baseline. Any future test regression is indistinguishable from this one in CI summary output. Either update the assertion or add an explicit `it.skip` with the reason.
-
-### P1.3 — No tests for 21 of 22 API routes
+### P1.2 — No tests for 21 of 22 API routes
 Before `rsvp-upsert.test.ts` (75abc56) the route layer had zero tests. One file now, 21 routes to go. Prioritize the ones that mutate data: `events/[id]/rsvp`, `events` POST, `push/subscribe`, `cron/send-reminders`, `cron/materialize`, `groups/*`, `profile`. The extraction pattern used for `upsertRsvp` (pure helper + tiny route wrapper + regression-guard test) is the template.
 
-### P1.4 — Token-refresh path noted broken in session memory
+### P1.3 — Token-refresh path noted broken in session memory
 User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessions silently expire mid-use and the frontend has to handle a 401, which is brittle. No owner, no ticket, no test. Needs a proper investigation cycle — reproduce, document, fix with a regression test.
 
 ---

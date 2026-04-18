@@ -44,8 +44,14 @@ describe('canCreateEvents', () => {
 });
 
 describe('canEditEvent', () => {
-  it('admin can edit even when not creator', () => {
-    expect(canEditEvent('admin', false)).toBe(true);
+  // Per commit bb229fa, edit requires ownership — admins can delete but not edit
+  // others' events.
+  it('admin who is not creator cannot edit', () => {
+    expect(canEditEvent('admin', false)).toBe(false);
+  });
+
+  it('admin who is creator can edit', () => {
+    expect(canEditEvent('admin', true)).toBe(true);
   });
 
   it('host who is creator can edit', () => {
