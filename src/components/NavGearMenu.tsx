@@ -73,7 +73,19 @@ export function NavGearMenu({ isAdmin, onSignOut }: NavGearMenuProps) {
         }
         setPushEnabled(false)
       } else {
-        // Subscribe
+        // Subscribe — must explicitly request notification permission first.
+        // pushManager.subscribe only implicitly prompts on Chrome and only when
+        // permission state is 'default'; Safari/Firefox/older Chrome require the
+        // explicit Notification.requestPermission() call to surface the OS prompt.
+        if (Notification.permission === 'denied') {
+          console.warn('[push] notifications blocked — user must re-enable in browser settings')
+          return
+        }
+        if (Notification.permission !== 'granted') {
+          const permission = await Notification.requestPermission()
+          if (permission !== 'granted') return
+        }
+
         const res = await apiFetch('/api/push/vapid-key')
         const { publicKey } = await res.json()
         if (!publicKey) return
