@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../../../auth';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
+import { upsertRsvp } from '@/lib/rsvp/upsert';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -51,28 +52,14 @@ export async function POST(
   try {
     const remindMeValue = typeof remindMe === 'boolean' ? remindMe : undefined;
 
-    const [existing] = await db
-      .select()
-      .from(rsvps)
-      .where(and(eq(rsvps.eventId, numId), eq(rsvps.userId, userId)));
-
-    if (existing) {
-      const updateSet: Record<string, unknown> = { status: response as string, userName, userImage };
-      if (remindMeValue !== undefined) updateSet.remindMe = remindMeValue;
-      await db
-        .update(rsvps)
-        .set(updateSet)
-        .where(eq(rsvps.id, existing.id));
-    } else {
-      await db.insert(rsvps).values({
-        eventId: numId,
-        userId,
-        userName,
-        userImage,
-        status: response as string,
-        remindMe: remindMeValue ?? false,
-      });
-    }
+    await upsertRsvp(db, {
+      eventId: numId,
+      userId,
+      userName,
+      userImage,
+      status: response as string,
+      remindMe: remindMeValue,
+    });
 
     return NextResponse.json({ success: true, response });
   } catch (err) {
