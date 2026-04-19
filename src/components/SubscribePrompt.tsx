@@ -134,7 +134,7 @@ export function SubscribePrompt() {
               </div>
             </div>
             <p className="text-sm text-grove-text leading-relaxed mb-5">
-              Get a notification <strong>15 minutes before</strong> events you RSVP to. Just enough time to grab a drink and show up.
+              Get notifications <strong>1 hour, 15 minutes, and right as an event starts</strong> for anything you RSVP to. Enough runway to show up without losing the day.
             </p>
 
             <div className="space-y-2">
