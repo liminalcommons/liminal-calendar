@@ -10,6 +10,7 @@ import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useRouter } from 'next/navigation';
+import { useRsvpMutation } from '@/lib/rsvp/use-rsvp-mutation';
 
 interface EventExpansionProps {
   event: DisplayEvent;
@@ -84,7 +85,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const [attendeeCount, setAttendeeCount] = useState(event.attendees.going);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [rsvpLoading, setRsvpLoading] = useState(false);
+  const { submit: submitRsvp, pending: rsvpLoading } = useRsvpMutation(event.id);
   const [closing, setClosing] = useState(false);
 
   const role = getUserRole(session);
@@ -166,7 +167,6 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
 
   const handleRsvp = useCallback(async (response: 'yes' | 'interested' | 'no') => {
     if (rsvpLoading) return;
-    setRsvpLoading(true);
     const prevStatus = rsvpStatus;
     const prevCount = attendeeCount;
 
@@ -177,26 +177,18 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       setAttendeeCount(prev => newStatus === 'yes' ? prev + 1 : Math.max(0, prev - 1));
     }
 
-    try {
-      await apiFetch(`/api/events/${event.id}/rsvp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: newStatus ?? 'no' }),
-      });
-      // Update grid state
+    const result = await submitRsvp({ response: newStatus ?? 'no' });
+    if (result.ok) {
       const newGoing = newStatus === 'yes' ? prevCount + 1 : Math.max(0, prevCount - 1);
       onUpdate?.(event.id, {
         myResponse: newStatus,
         attendees: { ...event.attendees, going: newGoing },
       });
-    } catch {
-      // Revert
+    } else {
       setRsvpStatus(prevStatus);
       setAttendeeCount(prevCount);
-    } finally {
-      setRsvpLoading(false);
     }
-  }, [event.id, event.attendees, rsvpStatus, rsvpLoading, attendeeCount, onUpdate]);
+  }, [event.id, event.attendees, rsvpStatus, rsvpLoading, attendeeCount, onUpdate, submitRsvp]);
 
   const handleDelete = useCallback(async () => {
     setIsDeleting(true);

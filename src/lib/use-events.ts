@@ -106,7 +106,11 @@ export function useEvents(initialEvents: DisplayEvent[]) {
 
   const updateEvent = useCallback((id: string, patch: Partial<DisplayEvent>) => {
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
-  }, []);
+    // Reconcile with server state after the optimistic patch so derived counts
+    // (e.g. attendees.going for other users) catch up without a hard reload.
+    // 1.2s lets the server finish writing before we re-read.
+    setTimeout(refetch, 1200);
+  }, [refetch]);
 
   return { events, loading, dissolvingIds, spawningIds, refetch, addEvent, removeEvent, updateEvent };
 }

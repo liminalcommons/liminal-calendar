@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { calendarSFX } from '@/lib/sound-manager';
 import { apiFetch } from '@/lib/api-fetch';
+import { useRsvpMutation } from '@/lib/rsvp/use-rsvp-mutation';
 
 interface AttendeeItem {
   id?: string;
@@ -79,8 +80,8 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const [attendees, setAttendees] = useState<AttendeeItem[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [remindMe, setRemindMe] = useState(true);
+  const { submit: submitRsvp, pending: updating } = useRsvpMutation(eventId);
 
   async function fetchAttendees() {
     try {
@@ -112,29 +113,18 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
 
   async function handleRSVP(response: 'yes' | 'interested' | 'no') {
     if (!token) return;
-    // Optimistic update
     const prev = currentResponse;
     setCurrentResponse(response === 'no' ? null : response);
-    setUpdating(true);
 
-    try {
-      const res = await apiFetch(`/api/events/${eventId}/rsvp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response, remindMe: response === 'no' ? false : remindMe }),
-      });
-      if (res.ok) {
-        calendarSFX.play('shimmer');
-        await fetchAttendees();
-      } else {
-        // Revert on failure
-        setCurrentResponse(prev);
-      }
-    } catch (e) {
-      console.error('Failed to RSVP:', e);
+    const result = await submitRsvp({
+      response,
+      remindMe: response === 'no' ? false : remindMe,
+    });
+    if (result.ok) {
+      calendarSFX.play('shimmer');
+      await fetchAttendees();
+    } else {
       setCurrentResponse(prev);
-    } finally {
-      setUpdating(false);
     }
   }
 
@@ -142,10 +132,9 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
     const next = !remindMe;
     setRemindMe(next);
     if (currentResponse && currentResponse !== 'no') {
-      await apiFetch(`/api/events/${eventId}/rsvp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ response: currentResponse, remindMe: next }),
+      await submitRsvp({
+        response: currentResponse as 'yes' | 'interested',
+        remindMe: next,
       });
     }
   }

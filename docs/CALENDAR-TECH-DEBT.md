@@ -26,22 +26,10 @@ User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessio
 
 ## P2 — Friction
 
-### P2.1 — Duplicated RSVP optimistic-update logic
-`src/components/events/EventRSVP.tsx` (267 LOC, full detail page) and `src/components/calendar/EventExpansion.tsx` (470 LOC, popover) both implement their own `handleRsvp` with optimistic-update + POST + revert-on-error. They are near-identical but not identical — drift already visible (EventExpansion tracks `attendeeCount` separately, EventRSVP re-fetches attendees). A bug fix in one does not propagate to the other. Extract to a shared hook `useRsvpMutation(eventId, onApplied)` co-located with `src/lib/rsvp/`.
-
-### P2.2 — `tsconfig.tsbuildinfo` tracked in git
-`git ls-files` shows `tsconfig.tsbuildinfo` as tracked. This file is a local TypeScript incremental build cache — every developer and every CI run rewrites it. Tracking it creates noisy diffs and merge conflicts. Add to `.gitignore`, `git rm --cached`, and delete it from history on the next opportunity (or leave history alone; just stop tracking going forward).
-
-### P2.3 — `src/app/api/db-test/route.ts` (pending deletion in working tree)
-`git status` shows `D src/app/api/db-test/route.ts`. Someone started removing a debug endpoint and never finished the commit. Either delete for real or restore with a comment explaining why it stays. Pending-deletes confuse future agents about intent.
-
-### P2.4 — Admin allowlist hardcoded in `auth.ts`
+### P2.1 — Admin allowlist hardcoded in `auth.ts`
 `ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']` lives in the auth module. Adding/removing an admin requires a code change + deploy. Move to env var or to a `members.role` column (which already exists on the schema — see `members.role`). Config-in-code on a repo without CODEOWNERS = any contributor can silently grant admin to themselves.
 
-### P2.5 — Un-invoked `refetch` after mutations
-`useEvents.refetch` exists but nobody calls it after write operations. `addEvent` schedules one via `setTimeout(refetch, 500)`; `updateEvent` and `removeEvent` do not. Consequence: if a write partially fails on the server (e.g. an RSVP inserts but a derived count is wrong), local state never reconciles until a hard reload. Either wire `refetch` into write-success paths, or add a polling / visibility-change refresh.
-
-### P2.6 — Client-side recurrence expansion
+### P2.2 — Client-side recurrence expansion
 `expandRecurringEvents` runs in the browser for a rolling 1-month-back / 6-month-forward window. Works today but scales poorly as users add recurring events, and it means the same expansion logic has to live in both JS (display) and SQL (ICS feed). A server-side materialization of instances (with a cache-friendly flat table) would unify the two and shrink the wire payload.
 
 ---
