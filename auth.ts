@@ -25,9 +25,17 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Liminal Commons Hylo group ID
 const LIMINAL_COMMONS_GROUP_ID = '41955';
 
-// Admin allowlist — Hylo IDs that get 'admin' role regardless of Hylo group role
-// Hylo only exposes hasModeratorRole, no distinct admin field
-const ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']; // victor, psygenlab, danielle johnson, erik h
+// Admin allowlist — Hylo IDs that get 'admin' role regardless of Hylo group role.
+// Hylo only exposes hasModeratorRole, no distinct admin field.
+// Source of truth: ADMIN_HYLO_IDS env var (comma-separated). Falls back to the
+// historical inline list so an unset env var in dev doesn't lock out existing
+// admins; production should always set the env var explicitly.
+const DEFAULT_ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']; // victor, psygenlab, danielle johnson, erik h
+const ADMIN_HYLO_IDS_FROM_ENV = (process.env.ADMIN_HYLO_IDS ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const ADMIN_HYLO_IDS = ADMIN_HYLO_IDS_FROM_ENV.length > 0 ? ADMIN_HYLO_IDS_FROM_ENV : DEFAULT_ADMIN_HYLO_IDS;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -120,6 +128,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
+      // Upsert member record on first sign-in only (jwt callback with account)
+      if (account && token.hyloId) {
+        const hyloId = token.hyloId as string;
+        const role = (token.role as string) || 'member';
+        const feedToken = `feed_${randomBytes(12).toString('hex')}`;
+        db.insert(members)
+          .values({
+            hyloId,
+            name: (token.name as string) || 'Unknown',
+            email: (token.email as string) || null,
+            image: (token.picture as string) || null,
+            role,
+            feedToken,
+          })
+          .onConflictDoUpdate({
+            target: members.hyloId,
+            set: {
+              name: (token.name as string) || 'Unknown',
+              email: (token.email as string) || null,
+              image: (token.picture as string) || null,
+              updatedAt: new Date(),
+            },
+          })
+          .then(() => {
+            // Backfill: if existing member has no feed token, generate one
+            return db.update(members)
+              .set({ feedToken: `feed_${randomBytes(12).toString('hex')}` })
+              .where(and(eq(members.hyloId, hyloId), isNull(members.feedToken)));
+          })
+          .catch(() => {}); // non-blocking, best-effort
+      }
+
       // Token refresh is handled by auth.castalia.one (the auth gateway).
       // This app reads the shared .castalia.one cookie — do NOT refresh or
       // invalidate tokens here. The gateway manages the token lifecycle.
@@ -151,36 +191,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
       user.role = role;
-
-      // Upsert member record on login (non-blocking)
-      if (hyloId) {
-        const feedToken = `feed_${randomBytes(12).toString('hex')}`;
-        db.insert(members)
-          .values({
-            hyloId,
-            name: (token.name as string) || 'Unknown',
-            email: (token.email as string) || null,
-            image: (token.picture as string) || null,
-            role,
-            feedToken,
-          })
-          .onConflictDoUpdate({
-            target: members.hyloId,
-            set: {
-              name: (token.name as string) || 'Unknown',
-              email: (token.email as string) || null,
-              image: (token.picture as string) || null,
-              updatedAt: new Date(),
-            },
-          })
-          .then(() => {
-            // Backfill: if existing member has no feed token, generate one
-            return db.update(members)
-              .set({ feedToken: `feed_${randomBytes(12).toString('hex')}` })
-              .where(and(eq(members.hyloId, hyloId), isNull(members.feedToken)));
-          })
-          .catch(() => {}); // non-blocking, best-effort
-      }
 
       // Expose access token for server-side helpers
       (session as any).accessToken = token.accessToken;

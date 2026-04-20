@@ -26,10 +26,7 @@ User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessio
 
 ## P2 — Friction
 
-### P2.1 — Admin allowlist hardcoded in `auth.ts`
-`ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']` lives in the auth module. Adding/removing an admin requires a code change + deploy. Move to env var or to a `members.role` column (which already exists on the schema — see `members.role`). Config-in-code on a repo without CODEOWNERS = any contributor can silently grant admin to themselves.
-
-### P2.2 — Client-side recurrence expansion
+### P2.1 — Client-side recurrence expansion
 `expandRecurringEvents` runs in the browser for a rolling 1-month-back / 6-month-forward window. Works today but scales poorly as users add recurring events, and it means the same expansion logic has to live in both JS (display) and SQL (ICS feed). A server-side materialization of instances (with a cache-friendly flat table) would unify the two and shrink the wire payload.
 
 ---
@@ -39,13 +36,10 @@ User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessio
 ### P3.1 — Large working-tree modifications not committed
 `git status` in the submodule shows 12 uncommitted modified files (`auth.ts`, `package.json`, `src/lib/auth-helpers.ts`, `src/lib/recurrence.ts`, several API routes). Either commit or revert — sitting in the working tree is state that future agents can accidentally incorporate into unrelated commits.
 
-### P3.2 — `docs/superpowers/plans/` and `docs/superpowers/specs/` untracked
-Two markdown specs for event-email-reminders are untracked in `git status`. If they're load-bearing, commit them; if they were scratch notes, delete them.
-
-### P3.3 — `EventExpansion.tsx` is 470 LOC
+### P3.2 — `EventExpansion.tsx` is 470 LOC
 Single React component doing expansion animation, title editing, RSVP, delete, recurrence display, and share. Hard to test in isolation. Split along the natural seams (one sub-component per concern) so each has a clean test target.
 
-### P3.4 — Session callback complexity in `auth.ts`
+### P3.3 — Session callback complexity in `auth.ts`
 `auth.ts` mixes Hylo OAuth config, admin role assignment, member row creation (`members` table upsert), feed-token generation, and session shape. A lot of policy in one file. Factor into `auth/providers`, `auth/role-resolver`, `auth/member-sync` so changes to one aspect don't pretend to change the others.
 
 ---

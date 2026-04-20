@@ -31,24 +31,14 @@ The 10-minute window width implies the cron **must fire at least every 10 minute
 { "crons": [{ "path": "/api/cron/materialize", "schedule": "0 6 * * *" }] }
 ```
 
-Operational evidence (user report) confirms `send-reminders` is firing today — the 15-minute push reliably lands — but the trigger source is **external to this repo**. Most plausible candidates:
+Per the original design spec (`docs/superpowers/specs/2026-04-09-event-email-reminders-design.md`), the trigger is a **chora-node crontab hitting the endpoint every 5 minutes** with the shared `CRON_SECRET`. That trigger config lives on `chora-node`, not in this repo.
 
-1. A systemd user timer on `chora-node` hitting `https://calendar.castalia.one/api/cron/send-reminders` with the shared `CRON_SECRET`.
-2. Another Vercel project (e.g. the old calendar deployment) whose cron is still active.
-3. A third-party scheduler (cron-job.org, Upstash Scheduler, GitHub Actions).
+**This is still a load-bearing externality** — if the chora-node cron drops the entry, reminders silently stop with no deploy-visible signal. A smoke test is to query `notification_log` for recent rows; no new rows over the last hour = the trigger is down.
 
-**This is a load-bearing unknown.** If the external trigger stops, reminders silently stop with no deploy-visible signal.
+## Why this repo does not own the schedule today
 
-## Why this repo does not own the schedule
-
-Vercel Hobby caps cron frequency to once per day. At that cap `send-reminders` cannot satisfy its 10-minute window contract. Options to take ownership:
-
-- **Upgrade to Vercel Pro** and add `{ "path": "/api/cron/send-reminders", "schedule": "*/5 * * * *" }` to `vercel.json`.
-- **Self-host the trigger** on `chora-node` via a systemd timer and commit the unit file to `packages/liminal-calendar/deploy/` so the schedule is versioned.
-- **Use an external scheduler** (Upstash, cron-job.org) and document its configuration here.
-
-Any of the three is fine. Operating without **one** of them documented is the current risk.
+Vercel Hobby caps cron frequency to once per day; `send-reminders` needs every 5 minutes. The chosen path was to run the trigger from `chora-node` crontab so the schedule stays cheap. The trade-off is that the trigger config is not versioned with the application code.
 
 ## Action item
 
-Replace this section with the chosen source of truth — plan, credentials location (which env variable), and how to confirm it's running (check `notification_log` for recent rows, or the function's Vercel logs). Until that is done, treat "reminders fire" as an observed behavior, not a guaranteed one.
+Copy the relevant chora-node crontab line into `packages/liminal-calendar/deploy/chora-node/crontab.example` so the schedule is versioned even though chora-node remains the executor. Anyone bringing up a new calendar host then has a reproducible starting point. Until that's done, treat "reminders fire" as an observed behavior, not a guaranteed one.
