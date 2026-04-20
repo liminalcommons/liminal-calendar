@@ -8,9 +8,15 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
-import { formatInTimeZone } from 'date-fns-tz';
 import { useRouter } from 'next/navigation';
 import { useRsvpMutation } from '@/lib/rsvp/use-rsvp-mutation';
+import {
+  POPOVER_APPROX_HEIGHT,
+  computePopoverPosition,
+  formatEventDuration,
+  formatEventDateTime,
+  getOriginalEventId,
+} from './event-expansion-utils';
 
 interface EventExpansionProps {
   event: DisplayEvent;
@@ -20,55 +26,15 @@ interface EventExpansionProps {
   onUpdate?: (id: string, patch: Partial<DisplayEvent>) => void;
 }
 
-const POPOVER_WIDTH = typeof window !== 'undefined' ? Math.min(360, window.innerWidth - 16) : 360
-const POPOVER_APPROX_HEIGHT = 420;
+const POPOVER_WIDTH = typeof window !== 'undefined' ? Math.min(360, window.innerWidth - 16) : 360;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  let left = anchorRect.right + 8;
-  let top = anchorRect.top;
-
-  // Flip left if too close to right edge
-  if (left + POPOVER_WIDTH > vw - 8) {
-    left = anchorRect.left - POPOVER_WIDTH - 8;
-  }
-  // Clamp left
-  left = Math.max(8, left);
-
-  // Flip up if too close to bottom edge
-  if (top + POPOVER_APPROX_HEIGHT > vh - 8) {
-    top = Math.max(8, vh - POPOVER_APPROX_HEIGHT - 8);
-  }
-  top = Math.max(8, top);
-
-  return { top, left };
-}
-
-function formatDuration(startsAt: string, endsAt: string | null): string {
-  const start = new Date(startsAt);
-  const end = endsAt ? new Date(endsAt) : new Date(start.getTime() + 60 * 60 * 1000);
-  const diffMs = end.getTime() - start.getTime();
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  if (hours === 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
-}
-
-function formatEventTime(event: DisplayEvent): string {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return formatInTimeZone(new Date(event.starts_at), tz, 'EEE MMM d, h:mm a zzz');
-  } catch {
-    return new Date(event.starts_at).toLocaleString();
-  }
-}
-
-// Extract original DB event ID from expanded recurrence IDs like "42-20260401"
-function getOriginalEventId(id: string): string {
-  return id.replace(/-\d{8}$/, '');
+  return computePopoverPosition(
+    anchorRect,
+    { width: window.innerWidth, height: window.innerHeight },
+    POPOVER_WIDTH,
+    POPOVER_APPROX_HEIGHT,
+  );
 }
 
 export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate }: EventExpansionProps) {
@@ -216,8 +182,8 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
     }
   }, [event.id, onDelete, onClose]);
 
-  const duration = formatDuration(event.starts_at, event.ends_at);
-  const timeStr = formatEventTime(event);
+  const duration = formatEventDuration(event.starts_at, event.ends_at);
+  const timeStr = formatEventDateTime(event);
 
   return (
     <div
