@@ -7,6 +7,7 @@ import { EventCard } from '@/components/events/EventCard'
 import { EventCountdown } from '@/components/events/EventCountdown'
 import { NavBar } from '@/components/NavBar'
 import { getUpcomingEvents, groupEventsByDateLabel } from '@/lib/calendar-utils'
+import { expandRecurringEvents } from '@/lib/recurrence-expander'
 import type { DisplayEvent } from '@/lib/display-event'
 
 export default function ListPage() {
@@ -17,9 +18,9 @@ export default function ListPage() {
 
   useEffect(() => {
     const now = new Date()
-    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-    const to = new Date(now.getFullYear(), now.getMonth() + 7, 1).toISOString()
-    fetch(`/api/events?from=${from}&to=${to}&limit=200`)
+    const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 7, 1)
+    fetch(`/api/events?from=${rangeStart.toISOString()}&to=${rangeEnd.toISOString()}&limit=200`)
       .then(r => {
         if (r.status === 401) {
           console.warn('[list] 401 — session expired. Sign out and back in to refresh.');
@@ -29,7 +30,11 @@ export default function ListPage() {
       })
       .then(data => {
         if (Array.isArray(data)) {
-          setEvents(getUpcomingEvents(data, 20))
+          // Master recurring rows carry their original startsAt (often in the
+          // past). Without expansion, getUpcomingEvents filters them out and
+          // the list looks empty even when the week grid is full.
+          const expanded = expandRecurringEvents(data, rangeStart, rangeEnd)
+          setEvents(getUpcomingEvents(expanded, 20))
         }
         setLoading(false)
       })
