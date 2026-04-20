@@ -22,7 +22,7 @@ interface ReminderRecipient {
   timezone: string;
 }
 
-function stopReminderToken(eventId: number, userId: string): string {
+export function stopReminderToken(eventId: number, userId: string): string {
   return createHmac('sha256', HMAC_SECRET)
     .update(`${eventId}:${userId}`)
     .digest('hex')

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAllRecurrenceRules, saveRecurrenceRule, getNextOccurrences } from '@/lib/recurrence';
 import { createEvent } from '@/lib/hylo-client';
+import { filterNewOccurrences } from '@/lib/recurrence-materialize';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,9 @@ export async function GET(request: Request) {
       try {
         const occurrences = getNextOccurrences(rule, fromDate, WINDOW_DAYS);
 
-        for (const occurrence of occurrences) {
+        const newOccurrences = filterNewOccurrences(occurrences, rule.lastMaterialized);
+
+        for (const occurrence of newOccurrences) {
           try {
             await createEvent(serviceToken, rule.templateData.groupId, {
               title: rule.templateData.title,
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
         const updatedRule = {
           ...rule,
           lastMaterialized: new Date().toISOString(),
-          createdCount: rule.createdCount + occurrences.length,
+          createdCount: rule.createdCount + newOccurrences.length,
         };
         await saveRecurrenceRule(updatedRule);
       } catch (ruleErr) {
