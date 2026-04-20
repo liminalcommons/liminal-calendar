@@ -301,12 +301,18 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   const { data: session } = useSession();
 
   // ── Form state ────────────────────────────────────────────────────────────
+  // Default to Custom mode with a Castalia URL pre-filled — a soft nudge
+  // toward castalia.one without forcing users off Zoom/Meet/etc. Users who
+  // want a native Castalia talk zone can flip the tab.
+  const DEFAULT_CASTALIA_LINK = 'https://castalia.one';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [meetingLink, setMeetingLink] = useState('');
+  const [meetingLink, setMeetingLink] = useState(
+    mode === 'create' ? DEFAULT_CASTALIA_LINK : '',
+  );
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [zoneDeepLink, setZoneDeepLink] = useState<string | null>(null);
-  const [linkMode, setLinkMode] = useState<'zone' | 'custom'>('zone');
+  const [linkMode, setLinkMode] = useState<'zone' | 'custom'>('custom');
 
   // Week / day selection
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -880,14 +886,21 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
             }}
           />
         ) : (
-          <input
-            id="meeting-link"
-            type="url"
-            value={meetingLink}
-            onChange={(e) => setMeetingLink(e.target.value)}
-            placeholder="https://zoom.us/... or any meeting URL"
-            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
-          />
+          <>
+            <input
+              id="meeting-link"
+              type="url"
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              placeholder="https://castalia.one, Zoom, Meet, or any meeting URL"
+              className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+            />
+            {meetingLink === DEFAULT_CASTALIA_LINK && (
+              <p className="mt-1.5 text-xs text-grove-text-muted">
+                Hosting on <a href="https://castalia.one" target="_blank" rel="noopener" className="text-grove-accent-deep underline">castalia.one</a>? Keep this. Otherwise paste your Zoom / Meet / other link.
+              </p>
+            )}
+          </>
         )}
       </div>
 

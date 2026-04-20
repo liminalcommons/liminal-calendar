@@ -82,7 +82,8 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [meetingLink, setMeetingLink] = useState('');
+  // Pre-fill with castalia.one as a soft nudge; user can clear or replace.
+  const [meetingLink, setMeetingLink] = useState('https://castalia.one');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [recurrence, setRecurrence] = useState('');
   const [invitees, setInvitees] = useState<PickedUser[]>([]);
@@ -270,7 +271,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             type="url"
             value={meetingLink}
             onChange={e => setMeetingLink(e.target.value)}
-            placeholder="Meeting link (optional)"
+            placeholder="https://castalia.one, Zoom, Meet, or any link"
             className={`flex-1 ${inputClass}`}
             disabled={isCreating}
           />
