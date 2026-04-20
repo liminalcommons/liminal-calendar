@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
+import { resolveRole, resolveSessionRole } from '@/lib/auth/role';
 
 interface HyloProfile {
   id: string;
@@ -114,18 +115,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const lcMembership = memberships.find(
           (m) => m.group.id === LIMINAL_COMMONS_GROUP_ID
         );
-        if (!lcMembership) {
-          // Not a member of Liminal Commons — blocked by middleware
-          token.role = undefined;
-        } else if (ADMIN_HYLO_IDS.includes(p.id)) {
-          // Hardcoded admin allowlist (Hylo has no distinct admin role)
-          token.role = 'admin';
-        } else if (lcMembership.hasModeratorRole) {
-          // Moderators in Hylo map to 'host' tier
-          token.role = 'host';
-        } else {
-          token.role = 'member';
-        }
+        token.role = resolveRole({
+          hyloId: p.id,
+          isLiminalCommonsMember: Boolean(lcMembership),
+          hasModeratorRole: Boolean(lcMembership?.hasModeratorRole),
+          adminAllowlist: ADMIN_HYLO_IDS,
+        });
       }
 
       // Upsert member record on first sign-in only (jwt callback with account)
@@ -174,23 +169,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const hyloId = token.hyloId as string | undefined;
 
       // Role priority: 1) DB members table override, 2) admin allowlist, 3) Hylo role, 4) 'member'
-      let role: string = token.role as string || 'member';
+      let dbRole: string | undefined;
       if (hyloId) {
         try {
-          const [dbMember] = await db.select({ role: members.role }).from(members).where(eq(members.hyloId, hyloId)).limit(1);
-          if (dbMember) {
-            role = dbMember.role;
-          } else if (ADMIN_HYLO_IDS.includes(hyloId)) {
-            role = 'admin';
-          }
+          const [dbMember] = await db
+            .select({ role: members.role })
+            .from(members)
+            .where(eq(members.hyloId, hyloId))
+            .limit(1);
+          dbRole = dbMember?.role;
         } catch {
-          // DB not ready or members table doesn't exist yet — fall back to allowlist
-          if (ADMIN_HYLO_IDS.includes(hyloId)) {
-            role = 'admin';
-          }
+          // DB not ready or members table doesn't exist yet — fall through
         }
       }
-      user.role = role;
+      user.role = resolveSessionRole({
+        hyloId,
+        dbRole,
+        tokenRole: token.role as string | undefined,
+        adminAllowlist: ADMIN_HYLO_IDS,
+      });
 
       // Expose access token for server-side helpers
       (session as any).accessToken = token.accessToken;

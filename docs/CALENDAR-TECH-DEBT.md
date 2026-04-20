@@ -7,20 +7,20 @@ Living document. Items captured here are known-but-deferred; adding an item mean
 - **P2** — friction: slows future work, creates inconsistency, but users don't feel it today.
 - **P3** — hygiene: stylistic / cleanliness; worth doing on a rainy day.
 
-**Last reviewed**: 2026-04-18
+**Last reviewed**: 2026-04-20
 
 ---
 
 ## P1 — Risk
 
-### P1.1 — External cron trigger is undocumented and unowned
-`/api/cron/send-reminders` requires a 10-minute cadence (see `docs/notifications/scheduling.md`), but no schedule lives in this repo. Reminders fire today because something external is calling the endpoint — that something is not versioned here. If the external caller disappears, reminders silently stop. Three possible fixes (Vercel Pro cron entry, chora-node systemd unit committed to `deploy/`, 3rd-party scheduler whose config lives here). Pick one.
+### P1.1 — Mutating API routes still untested
+Tests now cover `events/[id]/rsvp` (via `upsertRsvp`), `push/subscribe` (via `validateSubscription`+insert/delete), and `cron/send-reminders` (via `reminder-dispatch` helpers) — 35 tests across those three. Still untested: `events` POST (create event), `cron/materialize`, `groups/*`, `profile` update, `upload`, `bug-report`, `scheduling/suggest`, `push/vapid-key`, `admin/*`, `members/*`, `notifications/stop-reminder`, `zones`, `chat`, `generate-image`, `db-migrate`, `import-hylo`. Extraction template is `src/lib/rsvp/upsert.ts` + `src/__tests__/lib/rsvp-upsert.test.ts`.
 
-### P1.2 — No tests for 21 of 22 API routes
-Before `rsvp-upsert.test.ts` (75abc56) the route layer had zero tests. One file now, 21 routes to go. Prioritize the ones that mutate data: `events/[id]/rsvp`, `events` POST, `push/subscribe`, `cron/send-reminders`, `cron/materialize`, `groups/*`, `profile`. The extraction pattern used for `upsertRsvp` (pure helper + tiny route wrapper + regression-guard test) is the template.
-
-### P1.3 — Token-refresh path noted broken in session memory
+### P1.2 — Token-refresh path noted broken in session memory
 User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessions silently expire mid-use and the frontend has to handle a 401, which is brittle. No owner, no ticket, no test. Needs a proper investigation cycle — reproduce, document, fix with a regression test.
+
+### P1.3 — Chora-node crontab versioned as example only
+`deploy/chora-node/crontab.example` now documents the expected schedule, but the **actual** crontab still lives unversioned on `chora-node`. No smoke-test alarm fires if the trigger drops. Either (a) build a small `send-reminders-heartbeat` check that pages on silence, or (b) move the schedule into versioned infra (systemd unit checked in, Vercel Pro cron, 3rd-party scheduler with config-in-repo).
 
 ---
 
@@ -36,11 +36,11 @@ User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessio
 ### P3.1 — Large working-tree modifications not committed
 `git status` in the submodule shows 12 uncommitted modified files (`auth.ts`, `package.json`, `src/lib/auth-helpers.ts`, `src/lib/recurrence.ts`, several API routes). Either commit or revert — sitting in the working tree is state that future agents can accidentally incorporate into unrelated commits.
 
-### P3.2 — `EventExpansion.tsx` is 470 LOC
-Single React component doing expansion animation, title editing, RSVP, delete, recurrence display, and share. Hard to test in isolation. Split along the natural seams (one sub-component per concern) so each has a clean test target.
+### P3.2 — `EventExpansion.tsx` still 428 LOC of handlers + JSX
+Pure-function helpers have been extracted to `event-expansion-utils.ts` (placement math, duration formatting, date formatting, recurrence-id stripping) with 12 tests locking their behavior. What remains is genuinely component logic: state hooks, RSVP handler, title-edit handler, delete-confirm flow, position effect, JSX. Next slice would be a `TitleEditor` or `DeleteConfirmDialog` sub-component; lower priority than the untested routes above.
 
-### P3.3 — Session callback complexity in `auth.ts`
-`auth.ts` mixes Hylo OAuth config, admin role assignment, member row creation (`members` table upsert), feed-token generation, and session shape. A lot of policy in one file. Factor into `auth/providers`, `auth/role-resolver`, `auth/member-sync` so changes to one aspect don't pretend to change the others.
+### P3.3 — `auth.ts` still has provider + member-sync + session in one file
+Role resolution has been extracted to `src/lib/auth/role.ts` with 10 tests covering both the jwt-time precedence (allowlist > moderator > member > undefined-for-non-members) and the session-time precedence (DB override > allowlist > token > 'member'). Still mixed in the remaining ~230 LOC of `auth.ts`: Hylo OAuth provider config, member row upsert (with feed-token backfill), and session-token shape. Further factoring would be `auth/providers.ts` + `auth/member-sync.ts` — lower-priority because those pieces each touch NextAuth internals and cannot be extracted without threading a lot of typed context.
 
 ---
 
