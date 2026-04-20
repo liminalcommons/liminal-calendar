@@ -6,6 +6,7 @@ import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { createEvent as createHyloEvent } from '@/lib/hylo-client';
 import { asc, eq, inArray, gte, lte, and } from 'drizzle-orm';
+import { validateCreateEventInput } from '@/lib/events/create-event-input';
 
 export async function GET(request: NextRequest) {
   try {
@@ -80,45 +81,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { title, startTime, endTime, details, timezone, location, imageUrl, recurrenceRule, hyloGroupId, hyloGroupIds } =
-    body as Record<string, unknown>;
-
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    return NextResponse.json({ error: 'title is required' }, { status: 400 });
+  const validation = validateCreateEventInput(body);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error.error }, { status: validation.error.status });
   }
-  if (!startTime || typeof startTime !== 'string') {
-    return NextResponse.json({ error: 'startTime is required' }, { status: 400 });
-  }
-  if (!endTime || typeof endTime !== 'string') {
-    return NextResponse.json({ error: 'endTime is required' }, { status: 400 });
-  }
-
-  const startDate = new Date(startTime);
-  const endDate = new Date(endTime);
-  if (isNaN(startDate.getTime())) {
-    return NextResponse.json({ error: 'startTime is not a valid date' }, { status: 400 });
-  }
-  if (isNaN(endDate.getTime())) {
-    return NextResponse.json({ error: 'endTime is not a valid date' }, { status: 400 });
-  }
+  const v = validation.value;
 
   const user = session.user;
-
-  const groupId = typeof hyloGroupId === 'string' && hyloGroupId ? hyloGroupId : null;
+  const details = v.description;
+  const title = v.title;
+  const startDate = v.startDate;
+  const endDate = v.endDate;
 
   try {
     const [created] = await db
       .insert(events)
       .values({
-        title: (title as string).trim(),
-        description: typeof details === 'string' ? details : null,
-        startsAt: startDate,
-        endsAt: endDate,
-        timezone: typeof timezone === 'string' ? timezone : 'UTC',
-        location: typeof location === 'string' ? location : null,
-        imageUrl: typeof imageUrl === 'string' ? imageUrl : null,
-        recurrenceRule: typeof recurrenceRule === 'string' ? recurrenceRule : null,
-        hyloGroupId: groupId,
+        title: v.title,
+        description: v.description,
+        startsAt: v.startDate,
+        endsAt: v.endDate,
+        timezone: v.timezone,
+        location: v.location,
+        imageUrl: v.imageUrl,
+        recurrenceRule: v.recurrenceRule,
+        hyloGroupId: v.hyloGroupId,
         creatorId: user.hyloId ?? user.id ?? 'unknown',
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,
@@ -127,9 +114,7 @@ export async function POST(request: NextRequest) {
 
     // Sync to Hylo — supports multiple groups
     const accessToken = session?.accessToken as string | undefined;
-    const groupIds: string[] = Array.isArray(hyloGroupIds)
-      ? hyloGroupIds.filter((id: unknown) => typeof id === 'string' && id)
-      : groupId ? [groupId] : [];
+    const groupIds: string[] = v.hyloGroupIds;
 
     if (groupIds.length > 0 && !accessToken) {
       console.warn('[POST /api/events] Hylo groups selected but no accessToken — cannot sync');
@@ -144,12 +129,12 @@ export async function POST(request: NextRequest) {
       for (const gid of groupIds) {
         try {
           const hyloEvent = await createHyloEvent(accessToken, gid, {
-            title: (title as string).trim(),
+            title: v.title,
             details: hyloDetails,
-            startTime: startDate,
-            endTime: endDate,
-            timezone: typeof timezone === 'string' ? timezone : undefined,
-            location: typeof location === 'string' ? location : undefined,
+            startTime: v.startDate,
+            endTime: v.endDate,
+            timezone: v.timezone,
+            location: v.location ?? undefined,
             // Note: Hylo doesn't accept imageUrl in PostInput — image shows via OG tags on calendar link
           });
 

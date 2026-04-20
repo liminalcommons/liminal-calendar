@@ -14,7 +14,7 @@ Living document. Items captured here are known-but-deferred; adding an item mean
 ## P1 — Risk
 
 ### P1.1 — Mutating API routes still untested
-Tests now cover `events/[id]/rsvp` (via `upsertRsvp`), `push/subscribe` (via `validateSubscription`+insert/delete), and `cron/send-reminders` (via `reminder-dispatch` helpers) — 35 tests across those three. Still untested: `events` POST (create event), `cron/materialize`, `groups/*`, `profile` update, `upload`, `bug-report`, `scheduling/suggest`, `push/vapid-key`, `admin/*`, `members/*`, `notifications/stop-reminder`, `zones`, `chat`, `generate-image`, `db-migrate`, `import-hylo`. Extraction template is `src/lib/rsvp/upsert.ts` + `src/__tests__/lib/rsvp-upsert.test.ts`.
+Tests now cover `events/[id]/rsvp` (via `upsertRsvp`), `events` POST (via `validateCreateEventInput`), `push/subscribe` (via `validateSubscription`+insert/delete), and `cron/send-reminders` (via `reminder-dispatch` helpers) — 46 tests across those four. Still untested: `cron/materialize`, `groups/*`, `profile` update, `upload`, `bug-report`, `scheduling/suggest`, `push/vapid-key`, `admin/*`, `members/*`, `notifications/stop-reminder`, `zones`, `chat`, `generate-image`, `db-migrate`, `import-hylo`. Extraction template is `src/lib/rsvp/upsert.ts` + `src/__tests__/lib/rsvp-upsert.test.ts`.
 
 ### P1.2 — Token-refresh path noted broken in session memory
 User memory note: "Token auto-refresh broken (reverted 3x)". Implication: sessions silently expire mid-use and the frontend has to handle a 401, which is brittle. No owner, no ticket, no test. Needs a proper investigation cycle — reproduce, document, fix with a regression test.
