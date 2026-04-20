@@ -42,3 +42,14 @@ Vercel Hobby caps cron frequency to once per day; `send-reminders` needs every 5
 ## Action item
 
 Copy the relevant chora-node crontab line into `packages/liminal-calendar/deploy/chora-node/crontab.example` so the schedule is versioned even though chora-node remains the executor. Anyone bringing up a new calendar host then has a reproducible starting point. Until that's done, treat "reminders fire" as an observed behavior, not a guaranteed one.
+
+## Monitoring
+
+`GET /api/cron/heartbeat` reports the most recent `notification_log.sent_at`:
+
+```json
+{ "status": "ok" | "stale" | "empty" | "error",
+  "lastSentAt": "...", "ageSeconds": 123, "thresholdSeconds": 1800 }
+```
+
+Point an uptime monitor (e.g., UptimeRobot keyword check) at this URL every 15 min and alert when the response body contains `"status":"stale"`. That catches chora-node outages within ~30 minutes instead of discovering them from user reports days later.

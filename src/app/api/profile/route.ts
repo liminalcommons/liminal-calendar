@@ -3,6 +3,7 @@ import { auth } from '../../../../auth';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import { validateProfileUpdate } from '@/lib/profile/update-input';
 
 export async function GET() {
   const session = await auth();
@@ -50,21 +51,11 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { timezone, availability } = body as Record<string, unknown>;
-
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-
-  if (typeof timezone === 'string' && timezone.length > 0) {
-    updates.timezone = timezone;
+  const validation = validateProfileUpdate(body);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
-
-  if (Array.isArray(availability)) {
-    const valid = availability.every(s => typeof s === 'number' && s >= 0 && s <= 335);
-    if (!valid) {
-      return NextResponse.json({ error: 'availability slots must be numbers 0-335' }, { status: 400 });
-    }
-    updates.availability = JSON.stringify(availability);
-  }
+  const updates = validation.updates;
 
   try {
     const [updated] = await db
