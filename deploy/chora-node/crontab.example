@@ -1,0 +1,32 @@
+# Liminal Calendar — chora-node crontab template
+#
+# Install:
+#   crontab -e   (then paste relevant lines, after substituting env values)
+#
+# These lines drive server-side work that Vercel Hobby cron can't cover
+# (cap: once/day). If the project ever migrates to Vercel Pro, consolidate
+# them into vercel.json and delete this file.
+#
+# Required env (export in the user's shell profile or prepend to each line):
+#   CRON_SECRET               — shared secret configured in Vercel env
+#   CALENDAR_BASE_URL         — e.g. https://calendar.castalia.one
+#
+# --------------------------------------------------------------------------
+# Every 5 minutes: send due email + push reminders (24h / 1h / 15m / start).
+# Width of each time window in the route is 10 minutes, so anything >= every
+# 10 min risks missing an event that falls between ticks. 5 min is safe.
+
+*/5 * * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "${CALENDAR_BASE_URL}/api/cron/send-reminders" >/dev/null 2>&1
+
+# --------------------------------------------------------------------------
+# Daily 06:07 local: materialize recurring event instances for the next window.
+# NOTE: `/api/cron/materialize` is also scheduled in vercel.json at 06:00.
+# Only keep one — this line is here as a fallback for when the Vercel cron
+# is disabled or the project is moved off Vercel.
+
+# 7 6 * * * curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "${CALENDAR_BASE_URL}/api/cron/materialize" >/dev/null 2>&1
+
+# --------------------------------------------------------------------------
+# Smoke test (manual, not a cron line). Run ad-hoc to confirm the trigger
+# is live — look for new rows in notification_log within the last hour:
+#   psql $DATABASE_URL -c "select max(sent_at) from notification_log;"
