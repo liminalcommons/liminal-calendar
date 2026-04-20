@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { useEffect, useState } from 'react';
 
 export type TimeOfDay = 'day' | 'dawn' | 'dusk' | 'night' | 'late_night';
 
@@ -35,6 +36,22 @@ export function getUserTimezone(): string {
   } catch {
     return 'UTC';
   }
+}
+
+/**
+ * React hook that returns the browser's timezone after hydration. During SSR
+ * and the very first client render it returns 'UTC' so the server-rendered
+ * HTML and the hydrated output agree; after mount, it switches to the real
+ * user timezone. Callers should render time labels using this value so that
+ * events display in the viewer's local time (matching Google Calendar /
+ * Apple Calendar behavior).
+ */
+export function useUserTimezone(): string {
+  const [tz, setTz] = useState<string>('UTC');
+  useEffect(() => {
+    setTz(getUserTimezone());
+  }, []);
+  return tz;
 }
 
 /**
@@ -95,8 +112,9 @@ export const COMMUNITY_TIMEZONES: CommunityTimezone[] = [
  */
 const LOCATION_TZ_MAP: [RegExp, string][] = [
   // US
-  [/los angeles|la\b|santa monica|hollywood|san diego|sf|san francisco|oakland|berkeley|sacramento|portland|seattle|vancouver|pacific/i, 'America/Los_Angeles'],
-  [/denver|boulder|salt lake|phoenix|arizona|mountain/i, 'America/Denver'],
+  [/los angeles|la,\s*ca|santa monica|hollywood|san diego|sf\b|san francisco|oakland|berkeley|sacramento|portland|seattle|vancouver|pacific/i, 'America/Los_Angeles'],
+  [/phoenix|arizona/i, 'America/Phoenix'],
+  [/denver|boulder|salt lake|mountain/i, 'America/Denver'],
   [/chicago|minneapolis|dallas|austin|houston|central/i, 'America/Chicago'],
   [/new york|nyc|brooklyn|boston|philadelphia|washington|dc\b|miami|atlanta|detroit|toronto|montreal|eastern/i, 'America/New_York'],
   [/hawaii|honolulu/i, 'Pacific/Honolulu'],
@@ -121,7 +139,8 @@ const LOCATION_TZ_MAP: [RegExp, string][] = [
   [/tokyo|japan|osaka/i, 'Asia/Tokyo'],
   [/seoul|korea/i, 'Asia/Seoul'],
   // Oceania
-  [/sydney|melbourne|brisbane|australia|perth/i, 'Australia/Sydney'],
+  [/perth|western australia/i, 'Australia/Perth'],
+  [/sydney|melbourne|brisbane|australia/i, 'Australia/Sydney'],
   [/auckland|new zealand|wellington/i, 'Pacific/Auckland'],
   // Africa
   [/cairo|egypt/i, 'Africa/Cairo'],

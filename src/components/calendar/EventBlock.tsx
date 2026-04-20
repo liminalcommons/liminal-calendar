@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
+import { useUserTimezone } from '@/lib/timezone-utils';
 
 interface EventBlockProps {
   event: DisplayEvent;
@@ -92,8 +93,12 @@ const EventBlock = React.memo(function EventBlock({
   const startDate = new Date(event.starts_at);
   const endDate = event.ends_at ? new Date(event.ends_at) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
-  const startHM = hourMinuteInTz(event.starts_at, event.timezone);
-  const endHM = hourMinuteInTz(event.ends_at ?? new Date(startDate.getTime() + 60 * 60 * 1000).toISOString(), event.timezone);
+  // Render times in the viewer's local timezone (matches Google/Apple Calendar).
+  // `useUserTimezone` returns 'UTC' during SSR and swaps to the browser TZ
+  // after hydration — the block may shift rows once on first paint.
+  const userTz = useUserTimezone();
+  const startHM = hourMinuteInTz(event.starts_at, userTz);
+  const endHM = hourMinuteInTz(event.ends_at ?? new Date(startDate.getTime() + 60 * 60 * 1000).toISOString(), userTz);
   const startMinutes = startHM.h * 60 + startHM.m;
   const rawEndMinutes = endHM.h * 60 + endHM.m;
   const endMinutes = Math.max(rawEndMinutes <= startMinutes ? 24 * 60 : rawEndMinutes, startMinutes + MIN_DISPLAY_MINUTES);
@@ -153,8 +158,8 @@ const EventBlock = React.memo(function EventBlock({
 
         {heightPx >= 28 && (
           <p className="text-white/90 text-[10px] leading-tight truncate drop-shadow-sm">
-            {formatTime(event.starts_at, event.timezone)}
-            {event.ends_at ? ` – ${formatTime(event.ends_at, event.timezone)}` : ''}
+            {formatTime(event.starts_at, userTz)}
+            {event.ends_at ? ` – ${formatTime(event.ends_at, userTz)}` : ''}
           </p>
         )}
 

@@ -4,6 +4,7 @@ import React from 'react';
 import { format, parseISO, isSameDay } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
+import { useUserTimezone } from '@/lib/timezone-utils';
 
 const EVENT_DOT_COLORS = [
   'bg-[#7a8b6a]', // forest green
@@ -45,6 +46,7 @@ interface AgendaSidebarProps {
 }
 
 export function AgendaSidebar({ events, weekDays, onEventClick }: AgendaSidebarProps) {
+  const userTz = useUserTimezone();
   // Filter events to this week and group by day
   const dayGroups: { day: Date; events: DisplayEvent[] }[] = weekDays.map(day => ({
     day,
@@ -103,8 +105,8 @@ export function AgendaSidebar({ events, weekDays, onEventClick }: AgendaSidebarP
                           {event.title}
                         </p>
                         <p className="text-[9px] text-grove-text-dim">
-                          {formatTime(event.starts_at, event.timezone)}
-                          {event.ends_at && ` – ${formatTime(event.ends_at, event.timezone)}`}
+                          {formatTime(event.starts_at, userTz)}
+                          {event.ends_at && ` – ${formatTime(event.ends_at, userTz)}`}
                         </p>
                       </div>
                     </button>

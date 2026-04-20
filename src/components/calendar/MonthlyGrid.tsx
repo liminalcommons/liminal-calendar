@@ -19,6 +19,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
+import { useUserTimezone } from '@/lib/timezone-utils';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -64,6 +65,7 @@ function formatShortTime(iso: string, timezone: string): string {
 
 export function MonthlyGrid({ events }: MonthlyGridProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(() => new Date());
+  const userTz = useUserTimezone();
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -190,9 +192,9 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                           className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
                                      ${color.bg} ${color.text} hover:opacity-80 transition-opacity
                                      border-l-2 ${color.border}`}
-                          title={`${event.title} — ${formatShortTime(event.starts_at, event.timezone)}`}
+                          title={`${event.title} — ${formatShortTime(event.starts_at, userTz)}`}
                         >
-                          <span className="opacity-70">{formatShortTime(event.starts_at, event.timezone)}</span>{' '}
+                          <span className="opacity-70">{formatShortTime(event.starts_at, userTz)}</span>{' '}
                           {event.title}
                         </Link>
                       );
@@ -220,9 +222,9 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                               className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
                                          ${color.bg} ${color.text} hover:opacity-80 transition-opacity
                                          border-l-2 ${color.border}`}
-                              title={`${event.title} — ${formatShortTime(event.starts_at, event.timezone)}`}
+                              title={`${event.title} — ${formatShortTime(event.starts_at, userTz)}`}
                             >
-                              <span className="opacity-70">{formatShortTime(event.starts_at, event.timezone)}</span>{' '}
+                              <span className="opacity-70">{formatShortTime(event.starts_at, userTz)}</span>{' '}
                               {event.title}
                             </Link>
                           );
