@@ -1,9 +1,9 @@
 import NextAuth from 'next-auth';
-import { randomBytes } from 'crypto';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { resolveRole, resolveSessionRole } from '@/lib/auth/role';
+import { syncMember } from '@/lib/auth/member-sync';
 
 interface HyloProfile {
   id: string;
@@ -123,36 +123,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
       }
 
-      // Upsert member record on first sign-in only (jwt callback with account)
+      // Upsert member record on first sign-in only (jwt callback with account).
+      // Fire-and-forget: the sign-in flow must not block on DB availability.
       if (account && token.hyloId) {
-        const hyloId = token.hyloId as string;
-        const role = (token.role as string) || 'member';
-        const feedToken = `feed_${randomBytes(12).toString('hex')}`;
-        db.insert(members)
-          .values({
-            hyloId,
-            name: (token.name as string) || 'Unknown',
-            email: (token.email as string) || null,
-            image: (token.picture as string) || null,
-            role,
-            feedToken,
-          })
-          .onConflictDoUpdate({
-            target: members.hyloId,
-            set: {
-              name: (token.name as string) || 'Unknown',
-              email: (token.email as string) || null,
-              image: (token.picture as string) || null,
-              updatedAt: new Date(),
-            },
-          })
-          .then(() => {
-            // Backfill: if existing member has no feed token, generate one
-            return db.update(members)
-              .set({ feedToken: `feed_${randomBytes(12).toString('hex')}` })
-              .where(and(eq(members.hyloId, hyloId), isNull(members.feedToken)));
-          })
-          .catch(() => {}); // non-blocking, best-effort
+        syncMember(db, {
+          hyloId: token.hyloId as string,
+          name: token.name as string | null | undefined,
+          email: token.email as string | null | undefined,
+          image: token.picture as string | null | undefined,
+          role: token.role as string | null | undefined,
+        }).catch(() => {});
       }
 
       // Token refresh is handled by auth.castalia.one (the auth gateway).

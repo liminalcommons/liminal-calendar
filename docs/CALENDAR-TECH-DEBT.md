@@ -19,15 +19,15 @@ Tests now cover `events/[id]/rsvp` (via `upsertRsvp`), `events` POST (via `valid
 ### P1.2 — Token-refresh still architecturally delegated to the auth gateway
 Investigation outcome: refresh is deliberately handled by `auth.castalia.one` (see comment at `auth.ts`). Automatic refresh inside this app is not viable because the Hylo app's Universal Link hijack on mobile breaks any in-app OAuth start attempt (hence the revert history). The UX failure mode has been softened: `apiFetch` now emits a `calendar:session-expired` window event on 401, and `SessionExpiredBanner` (mounted in root layout) renders a visible "Your session expired — Sign in" toast. Remaining risk: the underlying refresh still doesn't happen transparently; a real fix has to live in the auth-gateway repo, not here.
 
-### P1.3 — Chora-node crontab versioned as example only
-`deploy/chora-node/crontab.example` now documents the expected schedule, but the **actual** crontab still lives unversioned on `chora-node`. No smoke-test alarm fires if the trigger drops. Either (a) build a small `send-reminders-heartbeat` check that pages on silence, or (b) move the schedule into versioned infra (systemd unit checked in, Vercel Pro cron, 3rd-party scheduler with config-in-repo).
+### P1.3 — Chora-node crontab still executes off-repo
+`deploy/chora-node/crontab.example` versions the schedule template, and `GET /api/cron/heartbeat` exposes staleness (see `docs/notifications/scheduling.md` for the uptime-monitor recipe). What's still missing: the actual running crontab on chora-node is not automatically reconciled with the example file, and no external uptime monitor is wired to the heartbeat endpoint yet. Operational action, not a code change — plug UptimeRobot (or equivalent) into the heartbeat URL with a keyword alert on `"status":"stale"`.
 
 ---
 
 ## P2 — Friction
 
-### P2.1 — Client-side recurrence expansion
-`expandRecurringEvents` runs in the browser for a rolling 1-month-back / 6-month-forward window. Works today but scales poorly as users add recurring events, and it means the same expansion logic has to live in both JS (display) and SQL (ICS feed). A server-side materialization of instances (with a cache-friendly flat table) would unify the two and shrink the wire payload.
+### P2.1 — Client-side recurrence expansion (migration plan drafted, not executed)
+`expandRecurringEvents` still runs in the browser on every page load. Full plan for moving to server-side materialization (schema, writer, reader, client cutover, backfill, per-occurrence edits) lives in `docs/architecture/recurrence-materialization-plan.md`. Deliberately deferred: the perf hit is not yet felt (~20 recurring series, <5ms expansion), and the migration is a 1-2 day effort with a staging-verification tail. Revisit when ~100 series, load-time jank reports, or per-occurrence edits are on the roadmap.
 
 ---
 
@@ -36,11 +36,8 @@ Investigation outcome: refresh is deliberately handled by `auth.castalia.one` (s
 ### P3.1 — Large working-tree modifications not committed
 `git status` in the submodule shows 12 uncommitted modified files (`auth.ts`, `package.json`, `src/lib/auth-helpers.ts`, `src/lib/recurrence.ts`, several API routes). Either commit or revert — sitting in the working tree is state that future agents can accidentally incorporate into unrelated commits.
 
-### P3.2 — `EventExpansion.tsx` still 428 LOC of handlers + JSX
-Pure-function helpers have been extracted to `event-expansion-utils.ts` (placement math, duration formatting, date formatting, recurrence-id stripping) with 12 tests locking their behavior. What remains is genuinely component logic: state hooks, RSVP handler, title-edit handler, delete-confirm flow, position effect, JSX. Next slice would be a `TitleEditor` or `DeleteConfirmDialog` sub-component; lower priority than the untested routes above.
-
-### P3.3 — `auth.ts` still has provider + member-sync + session in one file
-Role resolution has been extracted to `src/lib/auth/role.ts` with 10 tests covering both the jwt-time precedence (allowlist > moderator > member > undefined-for-non-members) and the session-time precedence (DB override > allowlist > token > 'member'). Still mixed in the remaining ~230 LOC of `auth.ts`: Hylo OAuth provider config, member row upsert (with feed-token backfill), and session-token shape. Further factoring would be `auth/providers.ts` + `auth/member-sync.ts` — lower-priority because those pieces each touch NextAuth internals and cannot be extracted without threading a lot of typed context.
+### P3.2 — `EventExpansion.tsx` down to 393 LOC of hooks + JSX
+Pure helpers (event-expansion-utils, 12 tests) and the delete-confirm footer (DeleteConfirm component, ~60 LOC moved out) are extracted. What remains is state wiring + RSVP/title-edit/position effects + the JSX tree. Further splitting would need a `TitleEditor` sub-component — low priority now that the test-covered surface area is meaningful.
 
 ---
 
