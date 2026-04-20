@@ -5,15 +5,17 @@ import { and, eq, gte, lte, not, inArray } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email';
 import { buildReminderEmail, type ReminderType } from '@/lib/notifications/reminders';
 import { sendPushToUsers } from '@/lib/notifications/push';
+import {
+  computeReminderWindow,
+  filterUnsentRecipients,
+  groupPushRecipientsByEvent,
+  pickPushClickUrl,
+  PUSH_WINDOWS,
+  EMAIL_WINDOWS,
+} from '@/lib/notifications/reminder-dispatch';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-
-const WINDOWS: [ReminderType, number, number][] = [
-  ['24hr', 1435, 1445], // 23h55m to 24h05m
-  ['1hr', 55, 65], // 55m to 1h05m
-  ['15min', 10, 20], // 10m to 20m
-];
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
@@ -28,9 +30,9 @@ export async function GET(request: Request) {
   let skipped = 0;
   let errors = 0;
 
-  for (const [type, minMin, maxMin] of WINDOWS) {
-    const windowStart = new Date(now.getTime() + minMin * 60_000);
-    const windowEnd = new Date(now.getTime() + maxMin * 60_000);
+  for (const [typeStr, minMin, maxMin] of EMAIL_WINDOWS) {
+    const type = typeStr as ReminderType;
+    const { windowStart, windowEnd } = computeReminderWindow(now, minMin, maxMin);
 
     // Find events in window with opted-in RSVPs
     const dueEvents = await db
@@ -124,19 +126,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // Push notifications: 1h, 15min, and at-start windows
-  // Dedupe via notificationLog with distinct 'push-*' type values so email logs don't collide
-  const PUSH_WINDOWS: { type: string; minMin: number; maxMin: number; title: (t: string) => string; body: string }[] = [
-    { type: 'push-1hr',   minMin: 55, maxMin: 65, title: (t) => `${t} — in 1 hour`,     body: 'Starts in about 1 hour. Tap to view.' },
-    { type: 'push-15min', minMin: 10, maxMin: 20, title: (t) => `${t} — starting soon`, body: 'Starts in 15 minutes. Tap to join.' },
-    { type: 'push-start', minMin: 0,  maxMin: 10, title: (t) => `${t} — starting now`,  body: 'Starting now. Tap to join.' },
-  ];
-
   let pushSent = 0;
 
   for (const w of PUSH_WINDOWS) {
-    const windowStart = new Date(now.getTime() + w.minMin * 60_000);
-    const windowEnd = new Date(now.getTime() + w.maxMin * 60_000);
+    const { windowStart, windowEnd } = computeReminderWindow(now, w.minMin, w.maxMin);
 
     const due = await db
       .select({
@@ -160,25 +153,11 @@ export async function GET(request: Request) {
       .select({ eventId: notificationLog.eventId, userId: notificationLog.userId })
       .from(notificationLog)
       .where(eq(notificationLog.type, w.type));
-    const sentPushSet = new Set(alreadySentPush.map((s) => `${s.eventId}:${s.userId}`));
-
-    // Group by event, filtering out already-sent user/event pairs
-    const eventMap = new Map<number, { title: string; location: string | null; description: string | null; userIds: string[] }>();
-    for (const e of due) {
-      if (sentPushSet.has(`${e.eventId}:${e.userId}`)) continue;
-      const existing = eventMap.get(e.eventId);
-      if (existing) {
-        existing.userIds.push(e.userId);
-      } else {
-        eventMap.set(e.eventId, { title: e.title, location: e.location, description: e.description, userIds: [e.userId] });
-      }
-    }
+    const unsent = filterUnsentRecipients(due, alreadySentPush);
+    const eventMap = groupPushRecipientsByEvent(unsent);
 
     for (const [eventId, info] of eventMap) {
-      const text = `${info.location || ''} ${info.description || ''}`;
-      const linkMatch = text.match(/https?:\/\/[^\s<"]+/);
-      const url = linkMatch ? linkMatch[0] : `https://calendar.castalia.one/events/${eventId}`;
-
+      const url = pickPushClickUrl(eventId, info.location, info.description);
       const result = await sendPushToUsers(info.userIds, {
         title: w.title(info.title),
         body: w.body,
@@ -187,7 +166,6 @@ export async function GET(request: Request) {
       });
       pushSent += result.sent;
 
-      // Log each successful recipient so we don't re-send in the next cron tick within the same window
       if (result.sent > 0) {
         await db
           .insert(notificationLog)
