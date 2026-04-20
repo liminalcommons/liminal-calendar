@@ -8,6 +8,7 @@ import { MobileRedirect } from "@/components/MobileRedirect";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { NotificationScheduler } from "@/components/NotificationScheduler";
+import { SessionExpiredBanner } from "@/components/SessionExpiredBanner";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -45,6 +46,7 @@ export default function RootLayout({
           <ServiceWorkerRegistration />
           <InstallPrompt />
           <NotificationScheduler />
+          <SessionExpiredBanner />
           <BugReportFab />
         </Providers>
       </body>
