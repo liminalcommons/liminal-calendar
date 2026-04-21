@@ -85,7 +85,7 @@ export const PUSH_WINDOWS: {
 }[] = [
   { type: 'push-1hr',   minMin: 55, maxMin: 65, title: (t) => `${t} — in 1 hour`,     body: 'Starts in about 1 hour. Tap to view.' },
   { type: 'push-15min', minMin: 10, maxMin: 20, title: (t) => `${t} — starting soon`, body: 'Starts in 15 minutes. Tap to join.' },
-  { type: 'push-start', minMin: 0,  maxMin: 10, title: (t) => `${t} — starting now`,  body: 'Starting now. Tap to join.' },
+  { type: 'push-start', minMin: -5, maxMin: 5,  title: (t) => `${t} — starting now`,  body: 'Starting now. Tap to join.' },
 ];
 
 export const EMAIL_WINDOWS: [string, number, number][] = [
