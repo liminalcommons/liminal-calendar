@@ -8,7 +8,12 @@ import { apiFetch } from '@/lib/api-fetch'
 
 const WEBCAL_URL = 'webcal://calendar.castalia.one/api/calendar/feed.ics'
 const FEED_URL = 'https://calendar.castalia.one/api/calendar/feed.ics'
-const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(FEED_URL)}`
+// Google Calendar's cid= param requires webcal:// to recognize the URL as an
+// external ICS subscription. cid=https://... causes desktop Google Calendar to
+// show "Unable to add this calendar. Please check the URL." On Android, Chrome
+// hands this link to the Google Calendar app which handles webcal:// fine; on
+// iOS it opens Safari → Google Calendar web, which also accepts webcal://.
+const GOOGLE_URL = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(WEBCAL_URL)}`
 const OUTLOOK_URL = `https://outlook.live.com/calendar/addcalendar?url=${encodeURIComponent(FEED_URL)}`
 
 interface NavGearMenuProps {
