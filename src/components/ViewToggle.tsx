@@ -29,7 +29,7 @@ export function ViewToggle() {
           onClick={() => {
             if (!isActive(path)) calendarSFX.play('scroll');
             // Persist explicit choice so MobileRedirect respects it on next load
-            try { localStorage.setItem(PREF_KEY, pref); } catch {}
+            try { localStorage.setItem(PREF_KEY, pref); } catch { /* best effort */ }
           }}
           className={[
             'px-3 py-1 text-xs font-medium transition-colors',
