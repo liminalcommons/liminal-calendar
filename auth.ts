@@ -23,6 +23,12 @@ interface HyloMembership {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Browser-facing OAuth host for Hylo — defaults to the hylo-oauth-proxy CF
+// Worker so iOS/Android don't hijack via Universal Links claimed on
+// www.hylo.com. Token + userinfo stay on www.hylo.com (server-to-server).
+// Override with HYLO_OAUTH_BROWSER_HOST.
+const HYLO_BROWSER_HOST = process.env.HYLO_OAUTH_BROWSER_HOST?.trim() || 'hylo-login.castalia.one';
+
 // Liminal Commons Hylo group ID
 const LIMINAL_COMMONS_GROUP_ID = '41955';
 
@@ -45,7 +51,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: 'Hylo',
       type: 'oauth',
       authorization: {
-        url: 'https://www.hylo.com/noo/oauth/auth',
+        url: `https://${HYLO_BROWSER_HOST}/noo/oauth/auth`,
         params: {
           scope: 'openid email profile offline_access',
           response_type: 'code',
