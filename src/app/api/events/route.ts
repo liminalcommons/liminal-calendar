@@ -100,7 +100,6 @@ export async function POST(request: NextRequest) {
         location: v.location,
         imageUrl: v.imageUrl,
         recurrenceRule: v.recurrenceRule,
-        hyloGroupId: v.hyloGroupId,
         creatorId: user.hyloId ?? user.id ?? 'unknown',
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,

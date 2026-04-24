@@ -75,7 +75,6 @@ function AttendeeChip({ attendee, badge }: { attendee: AttendeeItem; badge: stri
 export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const { data: session, status } = useSession();
   const isSignedIn = status === 'authenticated';
-  const token = session?.accessToken;
 
   const [attendees, setAttendees] = useState<AttendeeItem[]>([]);
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
@@ -103,16 +102,16 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   }
 
   useEffect(() => {
-    if (!token) {
+    if (!isSignedIn) {
       setLoading(false);
       return;
     }
     fetchAttendees().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eventId, token]);
+  }, [eventId, isSignedIn]);
 
   async function handleRSVP(response: 'yes' | 'interested' | 'no') {
-    if (!token) return;
+    if (!isSignedIn) return;
     const prev = currentResponse;
     setCurrentResponse(response === 'no' ? null : response);
 

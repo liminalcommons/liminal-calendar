@@ -13,8 +13,6 @@ export interface ValidatedCreateEventInput {
   location: string | null;
   imageUrl: string | null;
   recurrenceRule: string | null;
-  hyloGroupId: string | null;
-  hyloGroupIds: string[];
 }
 
 export interface CreateEventInputError {
@@ -59,13 +57,6 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
     return { ok: false, error: { error: 'endTime is not a valid date', status: 400 } };
   }
 
-  const hyloGroupId = str(b.hyloGroupId) || null;
-  const hyloGroupIds = Array.isArray(b.hyloGroupIds)
-    ? b.hyloGroupIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
-    : hyloGroupId
-    ? [hyloGroupId]
-    : [];
-
   return {
     ok: true,
     value: {
@@ -77,8 +68,6 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
       location: str(b.location),
       imageUrl: str(b.imageUrl),
       recurrenceRule: str(b.recurrenceRule),
-      hyloGroupId,
-      hyloGroupIds,
     },
   };
 }

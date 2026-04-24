@@ -10,16 +10,12 @@ declare module 'next-auth' {
       hyloId?: string;
       role?: 'member' | 'host' | 'admin';
     };
-    accessToken?: string;
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
     hyloId?: string;
-    accessToken?: string;
-    refreshToken?: string;
-    accessTokenExpires?: number;
     role?: 'member' | 'host' | 'admin';
   }
 }

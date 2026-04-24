@@ -10,8 +10,6 @@ describe('validateCreateEventInput', () => {
     location: 'Zoom: https://zoom.us/j/123',
     imageUrl: 'https://img/x.png',
     recurrenceRule: 'FREQ=WEEKLY;BYDAY=MO',
-    hyloGroupId: 'grp-42',
-    hyloGroupIds: ['grp-42', 'grp-7'],
   };
 
   it('accepts a well-formed body', () => {
@@ -21,7 +19,6 @@ describe('validateCreateEventInput', () => {
     expect(v.value.title).toBe('Stewards Circle');
     expect(v.value.description).toBe('Agenda TBD');
     expect(v.value.timezone).toBe('America/Los_Angeles');
-    expect(v.value.hyloGroupIds).toEqual(['grp-42', 'grp-7']);
     expect(v.value.startDate.toISOString()).toBe('2026-04-20T18:00:00.000Z');
   });
 
@@ -66,28 +63,6 @@ describe('validateCreateEventInput', () => {
     expect(v.value.timezone).toBe('UTC');
   });
 
-  it('derives hyloGroupIds from hyloGroupId when the array is missing', () => {
-    const v = validateCreateEventInput({ ...good, hyloGroupIds: undefined });
-    if (!v.ok) throw new Error();
-    expect(v.value.hyloGroupIds).toEqual(['grp-42']);
-  });
-
-  it('returns an empty hyloGroupIds when neither is provided', () => {
-    const v = validateCreateEventInput({
-      title: 'x',
-      startTime: good.startTime,
-      endTime: good.endTime,
-    });
-    if (!v.ok) throw new Error();
-    expect(v.value.hyloGroupIds).toEqual([]);
-  });
-
-  it('drops non-string entries from hyloGroupIds', () => {
-    const v = validateCreateEventInput({ ...good, hyloGroupIds: ['grp-1', 42, null, 'grp-2', ''] });
-    if (!v.ok) throw new Error();
-    expect(v.value.hyloGroupIds).toEqual(['grp-1', 'grp-2']);
-  });
-
   it('normalizes absent optional fields to null', () => {
     const v = validateCreateEventInput({
       title: 't',
@@ -99,6 +74,5 @@ describe('validateCreateEventInput', () => {
     expect(v.value.location).toBeNull();
     expect(v.value.imageUrl).toBeNull();
     expect(v.value.recurrenceRule).toBeNull();
-    expect(v.value.hyloGroupId).toBeNull();
   });
 });

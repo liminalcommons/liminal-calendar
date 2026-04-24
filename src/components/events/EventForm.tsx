@@ -166,107 +166,6 @@ function TalkZonePicker({ selectedZoneId, onChange, autoSelect }: {
   );
 }
 
-// ─── Hylo Group Picker ──────────────────────────────────────────────────────
-
-function HyloGroupPicker({ groups, selectedIds, onChange }: {
-  groups: Array<{ id: string; name: string }>
-  selectedIds: string[]
-  onChange: (ids: string[]) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const filtered = search
-    ? groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
-    : groups
-
-  const toggleGroup = (id: string) => {
-    if (selectedIds.includes(id)) {
-      onChange(selectedIds.filter(g => g !== id))
-    } else {
-      onChange([...selectedIds, id])
-    }
-  }
-
-  const label = selectedIds.length === 0
-    ? "Don't post to Hylo"
-    : selectedIds.length === 1
-    ? groups.find(g => g.id === selectedIds[0])?.name || '1 group'
-    : `${selectedIds.length} groups selected`
-
-  return (
-    <div>
-      <label className="block text-sm font-medium text-grove-text mb-1">
-        Post to Hylo
-      </label>
-      <div className="relative" ref={ref}>
-        <button
-          type="button"
-          onClick={() => { setOpen(!open); setSearch('') }}
-          className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text text-sm text-left focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent"
-        >
-          {label}
-        </button>
-
-        {open && (
-          <div className="absolute z-50 left-0 right-0 bottom-full mb-1 bg-grove-surface border border-grove-border rounded-lg shadow-lg overflow-hidden">
-            <div className="max-h-40 overflow-y-auto">
-              {selectedIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onChange([])}
-                  className="w-full text-left px-3 py-1.5 text-xs text-grove-text-muted hover:bg-grove-border/30 transition-colors"
-                >
-                  Clear all
-                </button>
-              )}
-              {filtered.map(g => (
-                <label
-                  key={g.id}
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-grove-border/30 transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(g.id)}
-                    onChange={() => toggleGroup(g.id)}
-                    className="rounded border-grove-border text-grove-accent focus:ring-grove-accent"
-                  />
-                  <span className={selectedIds.includes(g.id) ? 'text-grove-accent' : 'text-grove-text'}>
-                    {g.name}
-                  </span>
-                </label>
-              ))}
-              {filtered.length === 0 && (
-                <p className="px-3 py-2 text-xs text-grove-text-dim italic">No groups found</p>
-              )}
-            </div>
-            <div className="p-2 border-t border-grove-border/50">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search groups..."
-                autoFocus
-                className="w-full px-2 py-1.5 text-sm bg-grove-bg border border-grove-border rounded text-grove-text placeholder:text-grove-text-dim focus:outline-none focus:ring-1 focus:ring-grove-accent"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 interface EventFormProps {
@@ -337,11 +236,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   // Image
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  // Hylo posting
-  const [hyloGroups, setHyloGroups] = useState<Array<{ id: string; name: string }>>([])
-  const [selectedHyloGroups, setSelectedHyloGroups] = useState<string[]>([])
-  const [postToHylo, setPostToHylo] = useState(false)
-
   // UI state
   const [timezone, setTimezone] = useState('UTC');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -370,17 +264,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       const dayOfWeek = d.getDay()
       setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
     }
-    if ((externalValues as any).hyloGroupNames && hyloGroups.length > 0) {
-      const names = (externalValues as any).hyloGroupNames as string[]
-      const matchedIds = hyloGroups
-        .filter(g => names.some(n => g.name.toLowerCase().includes(n.toLowerCase())))
-        .map(g => g.id)
-      if (matchedIds.length > 0) {
-        setSelectedHyloGroups(matchedIds)
-        setPostToHylo(true)
-      }
-    }
-  }, [externalValues, durationMinutes, hyloGroups])
+  }, [externalValues, durationMinutes])
 
   // Notify parent of internal value changes
   useEffect(() => {
@@ -449,18 +333,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   useEffect(() => {
     setTimezone(getUserTimezone());
   }, []);
-
-  // Fetch Hylo groups for posting
-  useEffect(() => {
-    apiFetch('/api/groups')
-      .then(r => r.ok ? r.json() : [])
-      .then(groups => {
-        if (Array.isArray(groups) && groups.length > 0) {
-          setHyloGroups(groups)
-        }
-      })
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     if (mode === 'create') {
@@ -635,8 +507,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
         recurrenceEndCount: recurrence !== 'none' && recurrenceEndType === 'after_count' ? recurrenceEndCount : undefined,
         imageUrl: imageUrl || undefined,
-        hyloGroupId: postToHylo && selectedHyloGroups.length > 0 ? selectedHyloGroups[0] : undefined,
-        hyloGroupIds: postToHylo && selectedHyloGroups.length > 0 ? selectedHyloGroups : undefined,
       };
 
       if (mode === 'create') {
@@ -907,26 +777,12 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       {/* Image upload */}
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
-      {/* Actions + Hylo */}
+      {/* Actions */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-2">
-        {mode === 'create' && hyloGroups.length > 0 && (
-          <div className="w-full sm:flex-1">
-            <HyloGroupPicker
-              groups={hyloGroups}
-              selectedIds={selectedHyloGroups}
-              onChange={(ids) => {
-                setSelectedHyloGroups(ids)
-                setPostToHylo(ids.length > 0)
-              }}
-            />
-          </div>
-        )}
         <button
           type="submit"
           disabled={isSubmitting || !selectedDay}
-          className={`py-2 px-6 bg-grove-accent-deep hover:opacity-90 disabled:opacity-50 text-grove-surface font-medium rounded-lg transition-opacity text-sm ${
-            mode === 'edit' || hyloGroups.length === 0 ? 'flex-1' : ''
-          }`}
+          className="py-2 px-6 bg-grove-accent-deep hover:opacity-90 disabled:opacity-50 text-grove-surface font-medium rounded-lg transition-opacity text-sm flex-1"
         >
           {isSubmitting
             ? 'Saving…'
