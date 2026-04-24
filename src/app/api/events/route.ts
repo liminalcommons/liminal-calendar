@@ -4,8 +4,7 @@ import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
-import { createEvent as createHyloEvent } from '@/lib/hylo-client';
-import { asc, eq, inArray, gte, lte, and } from 'drizzle-orm';
+import { asc, inArray, gte, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 
 export async function GET(request: NextRequest) {
@@ -88,10 +87,6 @@ export async function POST(request: NextRequest) {
   const v = validation.value;
 
   const user = session.user;
-  const details = v.description;
-  const title = v.title;
-  const startDate = v.startDate;
-  const endDate = v.endDate;
 
   try {
     const [created] = await db
@@ -111,46 +106,6 @@ export async function POST(request: NextRequest) {
         creatorImage: user.image ?? null,
       })
       .returning();
-
-    // Sync to Hylo — supports multiple groups
-    const accessToken = session?.accessToken as string | undefined;
-    const groupIds: string[] = v.hyloGroupIds;
-
-    if (groupIds.length > 0 && !accessToken) {
-      console.warn('[POST /api/events] Hylo groups selected but no accessToken — cannot sync');
-    }
-    if (groupIds.length > 0 && accessToken) {
-      const calendarLink = `https://calendar.castalia.one/events/${created.id}`;
-      const hyloDetails = [
-        typeof details === 'string' ? details : '',
-        `<p>---</p><p>📅 <a href="${calendarLink}">View on Liminal Calendar</a></p>`,
-      ].join('').trim();
-
-      for (const gid of groupIds) {
-        try {
-          const hyloEvent = await createHyloEvent(accessToken, gid, {
-            title: v.title,
-            details: hyloDetails,
-            startTime: v.startDate,
-            endTime: v.endDate,
-            timezone: v.timezone,
-            location: v.location ?? undefined,
-            // Note: Hylo doesn't accept imageUrl in PostInput — image shows via OG tags on calendar link
-          });
-
-          // Store the first Hylo post ID
-          if (!created.hyloPostId) {
-            await db
-              .update(events)
-              .set({ hyloPostId: hyloEvent.id })
-              .where(eq(events.id, created.id));
-            created.hyloPostId = hyloEvent.id;
-          }
-        } catch (hyloErr: any) {
-          console.warn(`[POST /api/events] Hylo sync to group ${gid} failed:`, hyloErr?.message || hyloErr);
-        }
-      }
-    }
 
     return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
