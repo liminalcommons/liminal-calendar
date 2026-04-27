@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/NavBar';
 import { AvailabilityGrid } from '@/components/availability/AvailabilityGrid';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
+import { LinkClerkButton } from '@/components/profile/LinkClerkButton';
 import { apiFetch } from '@/lib/api-fetch';
 
 const COMMON_TIMEZONES = [
@@ -174,6 +175,17 @@ export default function ProfilePage() {
         >
           {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Profile'}
         </button>
+
+        {/* Account linking */}
+        <div className="mt-8">
+          <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider mb-2">
+            Account Linking
+          </h2>
+          <p className="text-xs text-grove-text-muted mb-3">
+            If you sign in via both Hylo and Clerk, link them so your events and RSVPs share one profile.
+          </p>
+          <LinkClerkButton />
+        </div>
       </main>
     </div>
   );
