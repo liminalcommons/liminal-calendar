@@ -28,11 +28,16 @@ export const dynamic = 'force-dynamic';
  * See docs/clerk-config.md for the full configuration record.
  */
 export async function POST(req: NextRequest) {
+  // svix-id is the per-message id Clerk includes in webhook headers.
+  // Log it on errors so retries can be correlated and replays detected
+  // in production observability.
+  const svixId = req.headers.get('svix-id') ?? 'unknown';
+
   let evt;
   try {
     evt = await verifyWebhook(req);
   } catch (err) {
-    console.error('[POST /api/webhooks/clerk] signature verification failed:', err);
+    console.error(`[POST /api/webhooks/clerk] signature verification failed (svix-id=${svixId}):`, err);
     return new Response('Webhook verification failed', { status: 400 });
   }
 
@@ -43,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
     return new Response('OK', { status: 200 });
   } catch (err) {
-    console.error('[POST /api/webhooks/clerk] handler error:', err);
+    console.error(`[POST /api/webhooks/clerk] handler error (svix-id=${svixId}):`, err);
     return new Response('Webhook handler error', { status: 500 });
   }
 }
