@@ -67,8 +67,10 @@ NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 - **Endpoint URL**: `https://calendar.castalia.one/api/webhooks/clerk`
   (dev: `http://localhost:3000/api/webhooks/clerk` via ngrok or Clerk's
   built-in dev tunneling)
-- **Subscribe to events**: `user.created`
-  (later: optionally `user.updated`, `user.deleted` for sync drift)
+- **Subscribe to events**: `user.created`, `user.updated`
+  (`user.updated` propagates email/name/image changes from Clerk to our
+  members table — see `eba841b`. `user.deleted` deferred until deletion
+  policy is decided.)
 - **Signing secret**: copy from the dashboard into `.env.local` as
   `CLERK_WEBHOOK_SIGNING_SECRET`. The handler at
   `src/app/api/webhooks/clerk/route.ts` calls Clerk's `verifyWebhook`
