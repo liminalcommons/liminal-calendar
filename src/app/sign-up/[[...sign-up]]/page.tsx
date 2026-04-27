@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function SignUpPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[rgb(var(--grove-bg))] p-4">
+    <main className="flex min-h-screen items-center justify-center bg-grove-bg p-4">
       <SignUp />
     </main>
   );
