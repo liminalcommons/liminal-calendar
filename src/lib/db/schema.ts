@@ -46,10 +46,13 @@ export const rsvps = pgTable(
 
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
-  hyloId: text('hylo_id').notNull().unique(),
-  // Clerk user id, nullable. A Member may carry hyloId, clerkId, or both
-  // (account linking — S6). Nullability of hyloId is deferred to a later
-  // S3 migration once Clerk-only sign-ups exist in production data.
+  // Hylo user id — now nullable. Clerk-only Members have null hyloId.
+  // The UNIQUE constraint still prevents duplicate non-null hyloIds.
+  // Invariant (enforced by app layer until S6 adds a CHECK constraint):
+  // at least one of (hyloId, clerkId) must be non-null on every row.
+  hyloId: text('hylo_id').unique(),
+  // Clerk user id — nullable. Hylo-only Members have null clerkId.
+  // S6 will allow same row to carry both (account linking).
   clerkId: text('clerk_id').unique(),
   name: text('name').notNull(),
   email: text('email'),

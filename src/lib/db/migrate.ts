@@ -68,6 +68,11 @@ export async function runMigrations() {
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_members_clerk_id_unique ON members(clerk_id) WHERE clerk_id IS NOT NULL`;
 
+  // Make hyloId nullable so Clerk-only sign-ups can insert without a Hylo
+  // identity. Idempotent in PG ≥9.x — DROP NOT NULL on already-nullable
+  // column is a no-op (no error).
+  await sql`ALTER TABLE members ALTER COLUMN hylo_id DROP NOT NULL`;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;

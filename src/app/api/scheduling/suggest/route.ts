@@ -36,11 +36,16 @@ export async function POST(request: NextRequest) {
       availability: members.availability,
     }).from(members).where(inArray(members.hyloId, inviteeIds as string[]));
 
-    const membersAvail = invitees.map(m => ({
-      hyloId: m.hyloId,
-      name: m.name,
-      availability: JSON.parse(m.availability ?? '[]') as number[],
-    }));
+    // hyloId is now nullable on members; the inArray() clause above
+    // filters at the DB level, but TS doesn't infer that. Filter
+    // defensively so the rest of the pipeline keeps its non-null contract.
+    const membersAvail = invitees
+      .filter((m): m is typeof m & { hyloId: string } => m.hyloId !== null)
+      .map(m => ({
+        hyloId: m.hyloId,
+        name: m.name,
+        availability: JSON.parse(m.availability ?? '[]') as number[],
+      }));
 
     const suggestions = findBestTimes(membersAvail, duration);
     return NextResponse.json(suggestions);
