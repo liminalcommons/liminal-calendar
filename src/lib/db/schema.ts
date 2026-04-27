@@ -94,6 +94,21 @@ export const pushSubscriptions = pgTable(
   (table) => [unique('push_sub_user_endpoint').on(table.userId, table.endpoint)],
 );
 
+// Email opt-in list. Populated from RSVP form (source='rsvp'),
+// signup flow (source='signup'), or admin actions (source='manual').
+// Drives the monthly newsletter and is independent of the members
+// table — non-member visitors who RSVP can subscribe without being
+// auth'd. Email stored lowercase for case-insensitive uniqueness.
+export const newsletterSubscribers = pgTable('newsletter_subscribers', {
+  id: serial('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  source: text('source').notNull(), // 'rsvp' | 'signup' | 'manual'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+export type NewNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert;
+
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 

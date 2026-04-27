@@ -73,6 +73,17 @@ export async function runMigrations() {
   // column is a no-op (no error).
   await sql`ALTER TABLE members ALTER COLUMN hylo_id DROP NOT NULL`;
 
+  // Newsletter opt-in list — populated from RSVP, signup, or admin actions.
+  // Independent of members table so non-member visitors can subscribe.
+  await sql`
+    CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      source TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
