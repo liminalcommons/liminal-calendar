@@ -6,8 +6,15 @@ interface Calls {
   inserts: Array<{ values: unknown; conflictTarget: unknown; conflictSet: unknown }>;
 }
 
-function makeFakeDb(opts: { candidate?: Record<string, unknown> | null } = {}) {
-  const candidate = opts.candidate ?? null;
+function makeFakeDb(opts: {
+  byClerkId?: Record<string, unknown> | null;
+  candidate?: Record<string, unknown> | null;
+} = {}) {
+  // Two-step select sequence: 1st = findMemberByClerkId, 2nd = email-merge SELECT.
+  const sequence: unknown[][] = [
+    opts.byClerkId ? [opts.byClerkId] : [],
+    opts.candidate ? [opts.candidate] : [],
+  ];
   const calls: Calls = { selects: [], updates: [], inserts: [] };
 
   const db = {
@@ -16,7 +23,8 @@ function makeFakeDb(opts: { candidate?: Record<string, unknown> | null } = {}) {
         where: (predicate: unknown) => ({
           limit: (n: unknown) => {
             calls.selects.push({ where: predicate, limit: n });
-            return Promise.resolve(candidate ? [candidate] : []);
+            const next = sequence.shift() ?? [];
+            return Promise.resolve(next);
           },
         }),
       }),
@@ -59,8 +67,8 @@ describe('syncClerkMemberWithMerge', () => {
       emailVerified: true,
     });
 
-    // MERGE path: 1 select, 1 update, 0 inserts.
-    expect(calls.selects).toHaveLength(1);
+    // MERGE path: 2 selects (findMemberByClerkId + email-merge), 1 update, 0 inserts.
+    expect(calls.selects).toHaveLength(2);
     expect(calls.updates).toHaveLength(1);
     expect(calls.inserts).toHaveLength(0);
 
@@ -86,8 +94,9 @@ describe('syncClerkMemberWithMerge', () => {
       emailVerified: false,
     });
 
-    // No merge select should happen — straight to plain syncClerkMember.
-    expect(calls.selects).toHaveLength(0);
+    // findMemberByClerkId fires (returns empty), then security gate skips
+    // email-merge SELECT, falls straight through to plain syncClerkMember.
+    expect(calls.selects).toHaveLength(1);
     // syncClerkMember does 1 insert + 1 update (feedToken backfill).
     expect(calls.inserts).toHaveLength(1);
     expect(calls.updates).toHaveLength(1);
@@ -109,7 +118,8 @@ describe('syncClerkMemberWithMerge', () => {
       emailVerified: true,
     });
 
-    expect(calls.selects).toHaveLength(0);
+    // Only findMemberByClerkId fires; no email → no merge SELECT.
+    expect(calls.selects).toHaveLength(1);
     expect(calls.inserts).toHaveLength(1);
     expect(calls.updates).toHaveLength(1);
   });
@@ -125,11 +135,38 @@ describe('syncClerkMemberWithMerge', () => {
       emailVerified: true,
     });
 
-    // Merge SELECT happened (verified email warrants the lookup) but found nothing.
-    expect(calls.selects).toHaveLength(1);
+    // Both selects fire (findMemberByClerkId then email-merge); both empty.
+    expect(calls.selects).toHaveLength(2);
     // Falls through to plain syncClerkMember insert path.
     expect(calls.inserts).toHaveLength(1);
     expect(calls.updates).toHaveLength(1);
+  });
+
+  it('DELEGATES to syncClerkMember when a Member already has this clerkId (returning user, no merge attempt)', async () => {
+    // Returning Clerk user — Member row already has this clerkId. Even if a
+    // matching Hylo-only email candidate would exist, the wrapper must NOT
+    // try to merge (would otherwise hit a unique-violation on clerkId).
+    const existing = { id: 5, hyloId: null, clerkId: 'clerk_returning', name: 'X', email: 'x@x.y' };
+    const candidate = { id: 7, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'x@x.y' };
+    const { db, calls } = makeFakeDb({ byClerkId: existing, candidate });
+
+    await syncClerkMemberWithMerge(db, {
+      clerkId: 'clerk_returning',
+      name: 'X (updated)',
+      email: 'x@x.y',
+      image: null,
+      emailVerified: true,
+    });
+
+    // First select fires (findMemberByClerkId). Second select MUST NOT fire
+    // (we delegated before reaching the merge SELECT).
+    expect(calls.selects).toHaveLength(1);
+    // Delegated to syncClerkMember → 1 insert + 1 update for feedToken backfill.
+    expect(calls.inserts).toHaveLength(1);
+    expect(calls.updates).toHaveLength(1);
+    // The insert is the upsert keyed by clerkId, NOT a merge UPDATE.
+    const v = calls.inserts[0].values as Record<string, unknown>;
+    expect(v.clerkId).toBe('clerk_returning');
   });
 
   it("MERGE preserves candidate's existing name when input.name is missing", async () => {
