@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
+    "@clerk/nextjs": "^7.2.7",
     "@neondatabase/serverless": "^1.0.2",
     "@octokit/rest": "^22.0.1",
     "@vercel/kv": "^2.0.0",

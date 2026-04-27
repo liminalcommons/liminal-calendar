@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import "@/styles/globals.css";
 import "@/styles/glitch-effects.css";
 import { Providers } from "@/components/providers/Providers";
@@ -39,16 +40,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body>
-        <Providers>
-          {children}
-          <MobileRedirect />
-          <SubscribePrompt />
-          <ServiceWorkerRegistration />
-          <InstallPrompt />
-          <NotificationScheduler />
-          <SessionExpiredBanner />
-          <BugReportFab />
-        </Providers>
+        <ClerkProvider>
+          <Providers>
+            {children}
+            <MobileRedirect />
+            <SubscribePrompt />
+            <ServiceWorkerRegistration />
+            <InstallPrompt />
+            <NotificationScheduler />
+            <SessionExpiredBanner />
+            <BugReportFab />
+          </Providers>
+        </ClerkProvider>
       </body>
     </html>
   );
