@@ -1,6 +1,15 @@
 # Clerk Integration — Handoff
 
-**Status (2026-04-27):** Functionally complete on the calendar `main` branch. 24 commits since `1de717c` (S1). Tests: 32 suites / 293 tests / 0 fail. Pending owner-side activation steps below.
+**Status (2026-04-27):** LIVE on https://liminalcalendar.com. 29 commits pushed since `1de717c` (S1). Production deploy + DB migration complete. Tests: 32 suites / 293 tests / 0 fail. One owner step remains (webhook signing secret).
+
+**Production state:**
+- Clerk app: `app_3Cwwd0JdlBCkWk2EHDD6OAyoxmS` instance `ins_3CxV74RYtdNQE3Ko7hASQFsFqO6` (Production, cloned from dev).
+- Frontend API: `clerk.liminalcalendar.com` (CNAME → frontend-api.clerk.services, DNS-only).
+- Vercel project: `liminal-calendar-v3` aliased to `liminalcalendar.com`.
+- Env vars set in Vercel production: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`, `NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/welcome`, `NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/welcome`, `NEXTAUTH_URL=https://liminalcalendar.com`.
+- DB migration ran successfully (clerk_id column, hyloId nullable, newsletter_subscribers, chk_members_identity).
+- `calendar.castalia.one` 301-redirects to `liminalcalendar.com`.
+- **Pending**: `CLERK_WEBHOOK_SIGNING_SECRET` not set in Vercel. Webhook endpoint will reject deliveries until configured. Sign-up still works (member sync is lazy via getCurrentMember).
 
 The integration adds Clerk as a SECOND authentication provider beside the existing Hylo OAuth gateway. Existing Hylo users see no change. New users can sign up via Clerk (email magic-link / Google / Apple / Facebook) and access the same calendar features.
 
@@ -21,13 +30,17 @@ The integration adds Clerk as a SECOND authentication provider beside the existi
 
 Run these in order:
 
-### 1. Configure Clerk dashboard (production)
+### 1. Configure Clerk webhook (REMAINING STEP)
 
-Go to `dashboard.clerk.com → Configure → Webhooks → Add endpoint`:
+Go to https://dashboard.clerk.com/apps/app_3Cwwd0JdlBCkWk2EHDD6OAyoxmS/instances/ins_3CxV74RYtdNQE3Ko7hASQFsFqO6/webhooks → Add Endpoint:
 
-- **Endpoint URL**: `https://calendar.castalia.one/api/webhooks/clerk`
+- **Endpoint URL**: `https://liminalcalendar.com/api/webhooks/clerk`
 - **Subscribe to events**: `user.created`, `user.updated`
-- Copy the signing secret (starts with `whsec_...`).
+- Copy the signing secret (starts with `whsec_...`)
+- Set in Vercel: `vercel env add CLERK_WEBHOOK_SIGNING_SECRET production` (paste secret when prompted)
+- Redeploy: `vercel --prod`
+
+Note: this UI is rendered in a Svix iframe inside the Clerk dashboard and could not be driven via Chrome agent — manual click required.
 
 Then `dashboard.clerk.com → User & authentication → User & authentication`:
 
