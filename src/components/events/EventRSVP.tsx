@@ -80,6 +80,10 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
   const [currentResponse, setCurrentResponse] = useState<string | null>(initialResponse ?? null);
   const [loading, setLoading] = useState(true);
   const [remindMe, setRemindMe] = useState(true);
+  // Newsletter opt-in. Default false — opt-in must be deliberate. The
+  // server is idempotent on the unique-email constraint, so re-checking
+  // is a safe no-op.
+  const [subscribeNewsletter, setSubscribeNewsletter] = useState(false);
   const { submit: submitRsvp, pending: updating } = useRsvpMutation(eventId);
 
   async function fetchAttendees() {
@@ -118,6 +122,8 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
     const result = await submitRsvp({
       response,
       remindMe: response === 'no' ? false : remindMe,
+      // Only meaningful on yes/interested — server ignores when false anyway.
+      subscribeToNewsletter: response === 'no' ? false : subscribeNewsletter,
     });
     if (result.ok) {
       calendarSFX.play('shimmer');
@@ -134,6 +140,21 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
       await submitRsvp({
         response: currentResponse as 'yes' | 'interested',
         remindMe: next,
+      });
+    }
+  }
+
+  async function handleToggleNewsletter() {
+    const next = !subscribeNewsletter;
+    setSubscribeNewsletter(next);
+    // Only POST when toggling ON — opt-in is one-way (no unsubscribe API
+    // here yet; that's S5 part 5+). Re-checking is a server-side no-op via
+    // the unique-email constraint.
+    if (next && currentResponse && currentResponse !== 'no') {
+      await submitRsvp({
+        response: currentResponse as 'yes' | 'interested',
+        remindMe,
+        subscribeToNewsletter: true,
       });
     }
   }
@@ -236,17 +257,30 @@ export function EventRSVP({ eventId, initialResponse }: EventRSVPProps) {
         </div>
 
         {currentResponse && currentResponse !== 'no' && (
-          <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={remindMe}
-              onChange={handleToggleRemind}
-              className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
-            />
-            <span className="text-xs text-grove-text-muted">
-              Remind me (1h, 15min, at start)
-            </span>
-          </label>
+          <>
+            <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={remindMe}
+                onChange={handleToggleRemind}
+                className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
+              />
+              <span className="text-xs text-grove-text-muted">
+                Remind me (1h, 15min, at start)
+              </span>
+            </label>
+            <label className="flex items-center gap-2 mt-1 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={subscribeNewsletter}
+                onChange={handleToggleNewsletter}
+                className="w-4 h-4 rounded border-grove-border text-grove-accent focus:ring-grove-accent"
+              />
+              <span className="text-xs text-grove-text-muted">
+                Subscribe to the monthly newsletter
+              </span>
+            </label>
+          </>
         )}
         </>
       )}

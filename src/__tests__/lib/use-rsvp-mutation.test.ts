@@ -39,6 +39,34 @@ describe('useRsvpMutation', () => {
     expect(JSON.parse(init.body)).toEqual({ response: 'no' });
   });
 
+  it('passes subscribeToNewsletter through when present', async () => {
+    (apiFetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
+    const { result } = renderHook(() => useRsvpMutation('11'));
+    await act(async () => {
+      await result.current.submit({
+        response: 'yes',
+        remindMe: false,
+        subscribeToNewsletter: true,
+      });
+    });
+    const [, init] = (apiFetch as jest.Mock).mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({
+      response: 'yes',
+      remindMe: false,
+      subscribeToNewsletter: true,
+    });
+  });
+
+  it('omits subscribeToNewsletter from the body when caller does not pass it', async () => {
+    (apiFetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
+    const { result } = renderHook(() => useRsvpMutation('12'));
+    await act(async () => {
+      await result.current.submit({ response: 'yes' });
+    });
+    const [, init] = (apiFetch as jest.Mock).mock.calls[0];
+    expect('subscribeToNewsletter' in JSON.parse(init.body)).toBe(false);
+  });
+
   it('returns ok=false with status on non-2xx responses', async () => {
     (apiFetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 });
     const { result } = renderHook(() => useRsvpMutation('9'));
