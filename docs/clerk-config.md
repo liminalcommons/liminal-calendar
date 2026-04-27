@@ -60,6 +60,27 @@ NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
 ```
 
+## Webhooks
+
+`Configure → Webhooks → Add endpoint`
+
+- **Endpoint URL**: `https://calendar.castalia.one/api/webhooks/clerk`
+  (dev: `http://localhost:3000/api/webhooks/clerk` via ngrok or Clerk's
+  built-in dev tunneling)
+- **Subscribe to events**: `user.created`
+  (later: optionally `user.updated`, `user.deleted` for sync drift)
+- **Signing secret**: copy from the dashboard into `.env.local` as
+  `CLERK_WEBHOOK_SIGNING_SECRET`. The handler at
+  `src/app/api/webhooks/clerk/route.ts` calls Clerk's `verifyWebhook`
+  which reads this var.
+
+> *Why we need this:* Clerk emits `user.created` on first sign-up. The
+> handler calls `syncClerkMemberWithMerge` to provision a Member row
+> (email-merge into a Hylo-only row when the email is verified, or
+> create a separate Clerk-only row otherwise). Without the webhook,
+> Clerk-authed users would have no Member row and `getCurrentMember`
+> would return null forever.
+
 ## Why this file exists
 
 Dashboard state lives in Clerk's backend, not in our repo. If the dev instance
