@@ -1,5 +1,8 @@
 # Clerk Dashboard Configuration
 
+> **See also**: [`clerk-integration-handoff.md`](./clerk-integration-handoff.md)
+> — owner activation checklist, deferred items, architecture pointers.
+
 Liminal Calendar uses Clerk as a second auth provider beside the existing Hylo
 gateway. Clerk lives in its own dashboard and **its configuration is not in
 this git repo** — this file captures the chosen state so a re-created Clerk
