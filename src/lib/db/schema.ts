@@ -47,6 +47,10 @@ export const rsvps = pgTable(
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
   hyloId: text('hylo_id').notNull().unique(),
+  // Clerk user id, nullable. A Member may carry hyloId, clerkId, or both
+  // (account linking — S6). Nullability of hyloId is deferred to a later
+  // S3 migration once Clerk-only sign-ups exist in production data.
+  clerkId: text('clerk_id').unique(),
   name: text('name').notNull(),
   email: text('email'),
   image: text('image'),
