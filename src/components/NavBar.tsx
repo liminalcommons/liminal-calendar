@@ -25,9 +25,10 @@ export function NavBar() {
   const handleSignOut = () => signOut({ callbackUrl: '/' });
 
   const handleSignIn = () => {
-    const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
-    const callbackUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `${gateway}/signin?callbackUrl=${callbackUrl}`;
+    // Routes to the chooser, which surfaces both Hylo and Clerk paths.
+    // The chooser's Hylo CTA still redirects to the same auth.castalia.one
+    // gateway URL with a callbackUrl — Hylo flow remains byte-identical.
+    window.location.href = '/welcome';
   };
 
   const user = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
