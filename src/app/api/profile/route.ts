@@ -1,25 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../auth';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { validateProfileUpdate } from '@/lib/profile/update-input';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
+  const member = await getCurrentMember(db);
+  if (!member) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const hyloId = session.user.hyloId as string | undefined;
-  if (!hyloId) {
-    return NextResponse.json({ error: 'No Hylo ID' }, { status: 400 });
   }
 
   try {
-    const [member] = await db.select().from(members).where(eq(members.hyloId, hyloId)).limit(1);
-    if (!member) {
-      return NextResponse.json({ error: 'Member not found' }, { status: 404 });
-    }
     return NextResponse.json({
       hyloId: member.hyloId,
       name: member.name,
@@ -35,13 +27,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
+  const member = await getCurrentMember(db);
+  if (!member) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const hyloId = session.user.hyloId as string | undefined;
-  if (!hyloId) {
-    return NextResponse.json({ error: 'No Hylo ID' }, { status: 400 });
   }
 
   let body: unknown;
@@ -58,10 +46,12 @@ export async function PATCH(request: NextRequest) {
   const updates = validation.updates;
 
   try {
+    // Update by primary key — works for both Hylo and Clerk Members
+    // (the previous WHERE hyloId = X pattern only worked for Hylo users).
     const [updated] = await db
       .update(members)
       .set(updates)
-      .where(eq(members.hyloId, hyloId))
+      .where(eq(members.id, member.id))
       .returning();
 
     return NextResponse.json({
