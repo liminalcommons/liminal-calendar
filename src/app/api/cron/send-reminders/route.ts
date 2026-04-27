@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { events, rsvps, members, notificationLog } from '@/lib/db/schema';
-import { and, eq, gte, lte, not, inArray } from 'drizzle-orm';
+import { and, eq, gte, lte, not, inArray, or } from 'drizzle-orm';
 import { sendEmail } from '@/lib/email';
 import { buildReminderEmail, type ReminderType } from '@/lib/notifications/reminders';
 import { sendPushToUsers } from '@/lib/notifications/push';
@@ -63,16 +63,35 @@ export async function GET(request: Request) {
 
     const sentSet = new Set(alreadySent.map((s) => `${s.eventId}:${s.userId}`));
 
-    // Gather member emails + timezones
+    // Gather member emails + timezones. RSVP rows carry either hyloId
+    // (existing Hylo users) or clerkId (Clerk-only users) in user_id —
+    // look members up by either identity column. The map is keyed by
+    // whichever id matched so memberMap.get(due.userId) below works
+    // regardless of which provider the user signed in with.
     const userIds = [...new Set(dueEvents.map((e) => e.userId))];
     const memberRows =
       userIds.length > 0
         ? await db
-            .select({ hyloId: members.hyloId, email: members.email, timezone: members.timezone })
+            .select({
+              hyloId: members.hyloId,
+              clerkId: members.clerkId,
+              email: members.email,
+              timezone: members.timezone,
+            })
             .from(members)
-            .where(inArray(members.hyloId, userIds))
+            .where(
+              or(
+                inArray(members.hyloId, userIds),
+                inArray(members.clerkId, userIds),
+              ),
+            )
         : [];
-    const memberMap = new Map(memberRows.map((m) => [m.hyloId, m]));
+    const userIdSet = new Set(userIds);
+    const memberMap = new Map<string, (typeof memberRows)[number]>();
+    for (const m of memberRows) {
+      if (m.hyloId && userIdSet.has(m.hyloId)) memberMap.set(m.hyloId, m);
+      if (m.clerkId && userIdSet.has(m.clerkId)) memberMap.set(m.clerkId, m);
+    }
 
     for (const due of dueEvents) {
       const key = `${due.eventId}:${due.userId}`;
