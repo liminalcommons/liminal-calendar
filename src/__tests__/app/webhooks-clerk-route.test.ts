@@ -68,15 +68,44 @@ describe('POST /api/webhooks/clerk', () => {
     expect(input.emailVerified).toBe(true);
   });
 
-  it('returns 200 without syncing for non-user.created event types', async () => {
+  it('returns 200 without syncing for unhandled event types', async () => {
+    // session.created is a non-user event; mapper returns null; no sync.
     mockVerifyWebhook.mockResolvedValue({
-      type: 'user.updated',
-      data: { id: 'user_x' },
+      type: 'session.created',
+      data: { id: 'sess_x' },
     });
 
     const res = await POST(makeReq({ 'svix-id': 'msg_test_skip' }));
     expect(res.status).toBe(200);
     expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  it('dispatches user.updated events through the same mapper + sync path', async () => {
+    // Clerk emits user.updated when an existing user changes email/name/image.
+    // Same mapper output as user.created → wrapper's findMemberByClerkId
+    // delegates to syncClerkMember's onConflictDoUpdate path (UPDATE
+    // name/email/image, preserve role/feedToken).
+    mockVerifyWebhook.mockResolvedValue({
+      type: 'user.updated',
+      data: {
+        id: 'user_42',
+        email_addresses: [
+          { id: 'idn_1', email_address: 'updated@x.y', verification: { status: 'verified' } },
+        ],
+        primary_email_address_id: 'idn_1',
+        first_name: 'Alice',
+        last_name: 'Updated',
+        image_url: null,
+      },
+    });
+
+    const res = await POST(makeReq({ 'svix-id': 'msg_user_updated' }));
+    expect(res.status).toBe(200);
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    const [, input] = mockSync.mock.calls[0];
+    expect(input.clerkId).toBe('user_42');
+    expect(input.email).toBe('updated@x.y');
+    expect(input.name).toBe('Alice Updated');
   });
 
   it('returns 500 when the sync helper throws', async () => {

@@ -1,8 +1,19 @@
 /**
- * Translate a Clerk webhook `user.created` event into the input shape
- * expected by `syncClerkMemberWithMerge`.
+ * Translate a Clerk webhook `user.created` OR `user.updated` event into
+ * the input shape expected by `syncClerkMemberWithMerge`.
+ *
+ * Both event types share the same UserJSON data shape, so the mapper is
+ * common. The wrapper's `findMemberByClerkId` check at the top means
+ * user.updated events naturally route through the conflict-update path
+ * in syncClerkMember (UPDATE name/email/image, preserve role/feedToken).
+ *
+ * This propagates Clerk-side changes (email change, name change,
+ * profile-image change) to our Member table, mitigating drift.
  *
  * Returns null for any other event type (caller should ignore).
+ * `user.deleted` is intentionally NOT handled here — it has a
+ * different data shape (UserDeletedJSON) and warrants its own
+ * deletion-policy decision.
  *
  * Email verification: looks up the primary email by
  * `primary_email_address_id`; falls back to the first email in the list
@@ -25,9 +36,9 @@ interface ClerkEmailAddress {
 export function clerkUserCreatedToSyncInput(
   event: WebhookEvent,
 ): ClerkMemberWithMergeInput | null {
-  if (event.type !== 'user.created') return null;
+  if (event.type !== 'user.created' && event.type !== 'user.updated') return null;
 
-  // The user.created data shape is well-defined by Clerk; cast for
+  // user.created and user.updated share the UserJSON shape; cast for
   // ergonomic field access (the WebhookEvent union is heavily branded).
   const u = event.data as unknown as {
     id: string;
