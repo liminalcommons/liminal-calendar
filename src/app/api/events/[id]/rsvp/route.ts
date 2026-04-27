@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../../auth';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { upsertRsvp } from '@/lib/rsvp/upsert';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { addNewsletterSubscriber } from '@/lib/newsletter/add-subscriber';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -12,8 +13,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
+  const member = await getCurrentMember(db);
+  if (!member) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -30,7 +31,7 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { response, remindMe } = body as Record<string, unknown>;
+  const { response, remindMe, subscribeToNewsletter } = body as Record<string, unknown>;
   if (!response || !VALID_RESPONSES.includes(response as ValidResponse)) {
     return NextResponse.json(
       { error: `response must be one of: ${VALID_RESPONSES.join(', ')}` },
@@ -44,10 +45,11 @@ export async function POST(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const user = session.user;
-  const userId = user.hyloId ?? user.id ?? 'unknown';
-  const userName = user.name ?? 'Unknown';
-  const userImage = user.image ?? null;
+  // userId: hyloId for Hylo Members, clerkId for Clerk-only Members.
+  // Slight semantic ambiguity (the column name is "user_id" but carries
+  // either provider's id); avoids a schema migration. Will be cleaned up
+  // when rsvps gains a member_id FK in a future cycle.
+  const userId = member.hyloId ?? member.clerkId ?? 'unknown';
 
   try {
     const remindMeValue = typeof remindMe === 'boolean' ? remindMe : undefined;
@@ -55,11 +57,23 @@ export async function POST(
     await upsertRsvp(db, {
       eventId: numId,
       userId,
-      userName,
-      userImage,
+      userName: member.name,
+      userImage: member.image,
       status: response as string,
       remindMe: remindMeValue,
     });
+
+    // Newsletter opt-in: fire-and-forget so a newsletter failure can't
+    // block the RSVP write. Idempotent on the unique email constraint
+    // (re-RSVPs with opt-in repeatedly are no-ops).
+    if (subscribeToNewsletter === true && member.email) {
+      addNewsletterSubscriber(db, {
+        email: member.email,
+        source: 'rsvp',
+      }).catch((err) => {
+        console.error('[POST /api/events/[id]/rsvp] newsletter subscribe failed:', err);
+      });
+    }
 
     return NextResponse.json({ success: true, response });
   } catch (err) {
