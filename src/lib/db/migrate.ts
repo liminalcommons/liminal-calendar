@@ -84,6 +84,31 @@ export async function runMigrations() {
     )
   `;
 
+  // Defense-in-depth: enforce the (hyloId || clerkId) Member invariant
+  // at the DB level. Helpers (syncMember, syncClerkMember,
+  // syncClerkMemberWithMerge) already enforce at app level — this
+  // guards against future code (or direct SQL) that bypasses them.
+  // Idempotent via DO block + pg_constraint check, since PostgreSQL
+  // lacks `ADD CONSTRAINT IF NOT EXISTS` for CHECK constraints.
+  // Existing rows satisfy the constraint: pre-S3.1 rows have non-null
+  // hyloId; S3.2+ rows come through helpers that always set one or
+  // both columns. Constraint addition will only fail if orphan rows
+  // exist with both columns null — none should in normal flow.
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_members_identity'
+          AND conrelid = 'members'::regclass
+      ) THEN
+        ALTER TABLE members
+          ADD CONSTRAINT chk_members_identity
+          CHECK (hylo_id IS NOT NULL OR clerk_id IS NOT NULL);
+      END IF;
+    END $$
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
