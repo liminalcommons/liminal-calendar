@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { clerkMiddleware } from '@clerk/nextjs/server';
 
-const CANONICAL_HOST = 'calendar.castalia.one';
+const CANONICAL_HOST = 'liminalcalendar.com';
 
-// Clerk runs alongside NextAuth-Hylo. In S1 it observes only — no `auth.protect()`,
-// no route gates. Composition keeps the existing host-redirect intact.
+// Clerk runs alongside NextAuth-Hylo. The callback redirects calendar.castalia.one
+// (legacy host) to liminalcalendar.com (canonical, since the site now serves both
+// providers natively without the .castalia.one shared-cookie gateway pattern).
 export default clerkMiddleware((_auth, request) => {
   const host = request.headers.get('host') || '';
 
-  if (host === 'liminalcalendar.com' || host === 'www.liminalcalendar.com') {
+  if (host === 'calendar.castalia.one' || host === 'www.calendar.castalia.one') {
     const url = request.nextUrl.clone();
     url.host = CANONICAL_HOST;
     url.protocol = 'https';

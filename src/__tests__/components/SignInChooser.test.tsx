@@ -2,7 +2,16 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import { SignInChooser } from '@/components/auth/SignInChooser';
 
+jest.mock('next-auth/react', () => ({
+  signIn: jest.fn(),
+}));
+
+import { signIn } from 'next-auth/react';
+const mockSignIn = signIn as jest.Mock;
+
 describe('SignInChooser', () => {
+  beforeEach(() => mockSignIn.mockReset());
+
   it('renders both auth path options', () => {
     render(<SignInChooser />);
     expect(
@@ -21,17 +30,13 @@ describe('SignInChooser', () => {
     expect(clerkLink).toHaveAttribute('href', '/sign-in');
   });
 
-  it('Hylo button is clickable and triggers gateway redirect', () => {
+  it('Hylo button calls NextAuth signIn with provider id and callbackUrl', () => {
     const originalLocation = window.location;
-    const hrefSetter = jest.fn();
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: {
         get origin() {
           return 'http://localhost:3000';
-        },
-        set href(v: string) {
-          hrefSetter(v);
         },
       },
     });
@@ -42,9 +47,10 @@ describe('SignInChooser', () => {
     });
     hyloBtn.click();
 
-    expect(hrefSetter).toHaveBeenCalledTimes(1);
-    expect(hrefSetter.mock.calls[0][0]).toMatch(/auth\.castalia\.one\/signin\?callbackUrl=/);
-    expect(hrefSetter.mock.calls[0][0]).toMatch(/http%3A%2F%2Flocalhost%3A3000/);
+    expect(mockSignIn).toHaveBeenCalledTimes(1);
+    expect(mockSignIn).toHaveBeenCalledWith('hylo', {
+      callbackUrl: 'http://localhost:3000',
+    });
 
     Object.defineProperty(window, 'location', {
       configurable: true,

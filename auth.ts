@@ -180,34 +180,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  cookies: isProduction
-    ? {
-        sessionToken: {
-          name: '__Secure-authjs.session-token',
-          options: {
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/',
-            secure: true,
-            domain: '.castalia.one',
-          },
-        },
-        callbackUrl: {
-          name: '__Secure-authjs.callback-url',
-          options: {
-            httpOnly: true,
-            sameSite: 'lax',
-            path: '/',
-            secure: true,
-            domain: '.castalia.one',
-          },
-        },
-      }
-    : undefined,
+  // Cookie scoping: defer to NextAuth defaults so the session cookie is set
+  // on whichever host serves the request (liminalcalendar.com or
+  // calendar.castalia.one). Previously we explicitly scoped to `.castalia.one`
+  // for the gateway-shared-cookie pattern; that's incompatible with serving
+  // on liminalcalendar.com (different eTLD+1).
   pages: {
     signIn: '/',
   },
-  // Sign-in is handled by redirecting to auth.castalia.one directly (gateway pattern).
-  // auth.castalia.one runs the full Hylo OAuth flow and sets the session cookie on .castalia.one.
-  // Calendar reads the shared cookie — no local OAuth or redirectProxyUrl needed.
+  // Sign-in is handled in-app via NextAuth's standard signIn('hylo') flow:
+  // the user is redirected to the Hylo authorize URL (proxied through
+  // hylo-login.castalia.one to dodge the iOS Universal-Link hijack), Hylo
+  // redirects back to /api/auth/callback/hylo on whichever host initiated,
+  // NextAuth processes the callback and sets a host-only session cookie.
 });

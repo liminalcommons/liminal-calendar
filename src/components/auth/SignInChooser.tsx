@@ -1,12 +1,16 @@
 'use client';
 
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 
 export function SignInChooser() {
   const handleHyloSignIn = () => {
-    const gateway = process.env.NEXT_PUBLIC_AUTH_GATEWAY_URL || 'https://auth.castalia.one';
-    const callbackUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `${gateway}/signin?callbackUrl=${callbackUrl}`;
+    // NextAuth's standard sign-in flow: POSTs to /api/auth/signin/hylo,
+    // which redirects through Hylo's authorize URL (via the
+    // hylo-login.castalia.one proxy worker per auth.ts) and back to
+    // /api/auth/callback/hylo on the originating host. Cookie set
+    // host-only on liminalcalendar.com (or calendar.castalia.one).
+    signIn('hylo', { callbackUrl: window.location.origin });
   };
 
   return (
