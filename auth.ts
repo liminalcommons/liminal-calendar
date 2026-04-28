@@ -180,11 +180,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  // Cookie scoping: defer to NextAuth defaults so the session cookie is set
-  // on whichever host serves the request (liminalcalendar.com or
-  // calendar.castalia.one). Previously we explicitly scoped to `.castalia.one`
-  // for the gateway-shared-cookie pattern; that's incompatible with serving
-  // on liminalcalendar.com (different eTLD+1).
+  // Cookie scoping: scope sessionToken + callbackUrl to `.liminalcalendar.com`
+  // so a session set during the Hylo OAuth callback (which lands on
+  // auth.liminalcalendar.com — the only Hylo-allowlisted redirect URI we
+  // control) is visible on the liminalcalendar.com root where the app lives.
+  // csrfToken stays host-only (`__Host-` prefix mandates it) — that's fine
+  // because CSRF is single-flight within auth.liminalcalendar.com only.
+  cookies: isProduction
+    ? {
+        sessionToken: {
+          name: '__Secure-authjs.session-token',
+          options: {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            secure: true,
+            domain: '.liminalcalendar.com',
+          },
+        },
+        callbackUrl: {
+          name: '__Secure-authjs.callback-url',
+          options: {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            secure: true,
+            domain: '.liminalcalendar.com',
+          },
+        },
+      }
+    : undefined,
   pages: {
     signIn: '/',
   },
