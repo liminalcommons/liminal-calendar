@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/NavBar';
 import { AvailabilityGrid } from '@/components/availability/AvailabilityGrid';
@@ -40,6 +41,7 @@ function formatTimezoneLabel(tz: string): string {
 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
+  const { isSignedIn: clerkSignedIn, user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const router = useRouter();
   const [timezone, setTimezone] = useState('UTC');
   const [availability, setAvailability] = useState<number[]>([]);
@@ -48,8 +50,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (status === 'loading') return;
-    if (status === 'unauthenticated') { router.replace('/'); return; }
+    if (status === 'loading' || !clerkLoaded) return;
+    if (status === 'unauthenticated' && !clerkSignedIn) { router.replace('/'); return; }
 
     // Auto-detect timezone
     const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -91,7 +93,12 @@ export default function ProfilePage() {
     }
   };
 
-  const user = session?.user;
+  const hyloUser = session?.user;
+  const user = hyloUser ?? (clerkSignedIn ? {
+    name: clerkUser?.fullName ?? clerkUser?.username ?? null,
+    email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
+    image: clerkUser?.imageUrl ?? null,
+  } : null);
 
   return (
     <div className="min-h-screen bg-grove-bg">

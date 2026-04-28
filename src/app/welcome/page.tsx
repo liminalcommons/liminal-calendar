@@ -1,15 +1,21 @@
-import { redirect } from 'next/navigation';
-import { auth as clerkAuth } from '@clerk/nextjs/server';
-import { auth as nextAuth } from '../../../auth';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useUser } from '@clerk/nextjs';
 import { SignInChooser } from '@/components/auth/SignInChooser';
 
-export const metadata = {
-  title: 'Welcome — Liminal Commons Calendar',
-};
+export default function WelcomePage() {
+  const { status } = useSession();
+  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
+  const router = useRouter();
 
-export default async function WelcomePage() {
-  const [clerk, hylo] = await Promise.all([clerkAuth(), nextAuth()]);
-  if (clerk.userId || hylo?.user) redirect('/');
+  useEffect(() => {
+    if (status === 'loading' || !clerkLoaded) return;
+    if (status === 'authenticated' || clerkSignedIn) router.replace('/');
+  }, [status, clerkSignedIn, clerkLoaded, router]);
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-grove-bg p-4">
       <SignInChooser />
