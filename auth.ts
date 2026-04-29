@@ -23,11 +23,11 @@ interface HyloMembership {
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Browser-facing OAuth host for Hylo — defaults to the hylo-oauth-proxy CF
-// Worker so iOS/Android don't hijack via Universal Links claimed on
-// www.hylo.com. Token + userinfo stay on www.hylo.com (server-to-server).
-// Override with HYLO_OAUTH_BROWSER_HOST.
-const HYLO_BROWSER_HOST = process.env.HYLO_OAUTH_BROWSER_HOST?.trim() || 'hylo-login.castalia.one';
+// Browser-facing OAuth host for Hylo — direct to www.hylo.com.
+// (The hylo-login.castalia.one proxy was an attempted mobile-hijack dodge but
+// is not in use; the SPA bundle hardcodes api.hylo.com cookie bootstrapping
+// which the proxy doesn't cover. Override with HYLO_OAUTH_BROWSER_HOST.)
+const HYLO_BROWSER_HOST = process.env.HYLO_OAUTH_BROWSER_HOST?.trim() || 'www.hylo.com';
 
 // Liminal Commons Hylo group ID
 const LIMINAL_COMMONS_GROUP_ID = '41955';
@@ -214,8 +214,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/',
   },
   // Sign-in is handled in-app via NextAuth's standard signIn('hylo') flow:
-  // the user is redirected to the Hylo authorize URL (proxied through
-  // hylo-login.castalia.one to dodge the iOS Universal-Link hijack), Hylo
-  // redirects back to /api/auth/callback/hylo on whichever host initiated,
-  // NextAuth processes the callback and sets a host-only session cookie.
+  // the user is redirected to the Hylo authorize URL on www.hylo.com, logs in,
+  // and Hylo redirects back to /api/auth/callback/hylo on whichever host
+  // initiated. NextAuth processes the callback and sets the session cookie.
 });
