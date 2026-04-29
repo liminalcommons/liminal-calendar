@@ -77,7 +77,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               Authorization: `Bearer ${context.tokens.access_token}`,
             },
             body: JSON.stringify({
-              query: '{ me { id name email avatarUrl memberships { items { hasModeratorRole group { id name slug } } } } }',
+              // Hylo's GraphQL schema returns `memberships` as a list of
+              // Membership directly (NOT a connection with an `items` array).
+              // The legacy `memberships { items { ... } }` query throws:
+              //   "Cannot query field \"items\" on type \"Membership\"."
+              query: '{ me { id name email avatarUrl memberships { hasModeratorRole group { id name slug } } } }',
             }),
           });
 
@@ -95,7 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             parsed = null;
           }
           const payload = parsed as
-            | { data?: { me?: HyloProfile & { memberships?: { items?: HyloMembership[] } } }; errors?: unknown }
+            | { data?: { me?: HyloProfile & { memberships?: HyloMembership[] } }; errors?: unknown }
             | null;
 
           if (!payload || !payload.data || !payload.data.me) {
@@ -191,13 +195,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       if (profile) {
         const p = profile as HyloProfile & {
-          memberships?: { items?: HyloMembership[] };
+          memberships?: HyloMembership[];
         };
         token.hyloId = p.id;
         token.picture = p.avatarUrl ?? token.picture;
 
         // Determine role based on Liminal Commons group membership (3-tier)
-        const memberships = p.memberships?.items ?? [];
+        const memberships = p.memberships ?? [];
         const lcMembership = memberships.find(
           (m) => m.group.id === LIMINAL_COMMONS_GROUP_ID
         );
