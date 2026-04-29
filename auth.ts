@@ -98,6 +98,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   ],
   session: { strategy: 'jwt' },
+  // Surface the underlying cause of CallbackRouteError (and friends) so the
+  // back-leg of the OAuth flow doesn't silently 500 with `error=Configuration`.
+  // Auth.js v5 wraps the real error in a generic CallbackRouteError unless a
+  // custom logger is supplied. Gated `debug` via AUTH_DEBUG keeps prod logs
+  // quiet while still allowing on-demand verbosity.
+  logger: {
+    error(error: Error & { cause?: unknown }) {
+      const cause = error.cause as { message?: string; stack?: string; cause?: unknown } | undefined;
+      console.error('[auth][error]', error.name, error.message, {
+        cause_message: cause?.message,
+        cause_stack: cause?.stack,
+        nested: cause?.cause,
+      });
+    },
+    warn(code: string) {
+      console.warn('[auth][warn]', code);
+    },
+    debug(code: string, metadata?: unknown) {
+      if (process.env.AUTH_DEBUG === 'true') console.log('[auth][debug]', code, metadata);
+    },
+  },
   callbacks: {
     async jwt({ token, account, profile }) {
       // First sign-in: persist tokens from the OAuth exchange
