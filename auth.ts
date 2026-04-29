@@ -80,14 +80,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               query: '{ me { id name email avatarUrl memberships { items { hasModeratorRole group { id name slug } } } } }',
             }),
           });
-          const { data } = await res.json() as {
-            data: {
-              me: HyloProfile & {
-                memberships?: { items?: HyloMembership[] };
-              };
-            };
-          };
-          return data.me;
+
+          // Surface the raw response when the shape isn't what we expect, so
+          // OAuth callback errors aren't opaque "Cannot read properties of
+          // undefined (reading 'me')" stacks. We log status, content-type, and
+          // a body excerpt so the next cycle can see exactly why Hylo rejected
+          // the userinfo call (token-format mismatch, GraphQL `errors` array,
+          // HTML login page from session-based auth, etc.).
+          const body = await res.text();
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(body);
+          } catch {
+            parsed = null;
+          }
+          const payload = parsed as
+            | { data?: { me?: HyloProfile & { memberships?: { items?: HyloMembership[] } } }; errors?: unknown }
+            | null;
+
+          if (!payload || !payload.data || !payload.data.me) {
+            console.error('[auth][userinfo] Hylo /noo/graphql did not return expected { data: { me } } shape', {
+              status: res.status,
+              statusText: res.statusText,
+              contentType: res.headers.get('content-type'),
+              gqlErrors: payload?.errors,
+              bodyExcerpt: body.slice(0, 1000),
+              tokenPresent: Boolean(context.tokens.access_token),
+              tokenLength: context.tokens.access_token?.length,
+            });
+            throw new Error(
+              `Hylo userinfo failed: status=${res.status} ${res.statusText}; ` +
+                `body shape lacks data.me (gqlErrors=${JSON.stringify(payload?.errors ?? null)})`,
+            );
+          }
+
+          return payload.data.me;
         },
       },
       profile(profile: HyloProfile) {
