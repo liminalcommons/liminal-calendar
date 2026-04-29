@@ -21,7 +21,7 @@ describe('SignInChooser', () => {
     expect(clerkLink).toHaveAttribute('href', '/sign-in');
   });
 
-  it('Hylo button redirects to auth.liminalcalendar.com signin endpoint', () => {
+  it('Hylo button redirects to auth.liminalcalendar.com /start-hylo-signin handoff page', () => {
     const originalLocation = window.location;
     const hrefSetter = jest.fn();
     Object.defineProperty(window, 'location', {
@@ -44,7 +44,7 @@ describe('SignInChooser', () => {
 
     expect(hrefSetter).toHaveBeenCalledTimes(1);
     expect(hrefSetter).toHaveBeenCalledWith(
-      'https://auth.liminalcalendar.com/api/auth/signin/hylo?callbackUrl=https%3A%2F%2Fliminalcalendar.com%2F',
+      'https://auth.liminalcalendar.com/start-hylo-signin?callbackUrl=https%3A%2F%2Fliminalcalendar.com%2F',
     );
 
     Object.defineProperty(window, 'location', {

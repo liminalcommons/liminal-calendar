@@ -6,16 +6,14 @@ const AUTH_HOST = 'auth.liminalcalendar.com';
 
 export function SignInChooser() {
   const handleHyloSignIn = () => {
-    // Hylo's `castalia` OAuth client only allows redirect URIs at
-    // auth.liminalcalendar.com (subdomain), not the bare root. So we
-    // initiate sign-in on the auth subdomain — NextAuth there generates
-    // redirect_uri=https://auth.liminalcalendar.com/api/auth/callback/hylo
-    // (which IS in Hylo's allowlist), processes the callback, sets a
-    // session cookie scoped to `.liminalcalendar.com`, then redirects
-    // back to the root via callbackUrl. The shared-cookie scope makes
-    // the session visible on liminalcalendar.com.
+    // Hand off to the auth subdomain via /start-hylo-signin — that page calls
+    // signIn('hylo') which POSTs to /api/auth/signin/hylo with CSRF (Auth.js v5
+    // returns Configuration on a bare GET when pages.signIn is set). NextAuth
+    // there generates redirect_uri=https://auth.liminalcalendar.com/api/auth/callback/hylo
+    // (which IS in Hylo's allowlist), sets a `.liminalcalendar.com`-scoped
+    // session cookie on callback, then redirects back to callbackUrl.
     const callbackUrl = encodeURIComponent(`${window.location.origin}/`);
-    window.location.href = `https://${AUTH_HOST}/api/auth/signin/hylo?callbackUrl=${callbackUrl}`;
+    window.location.href = `https://${AUTH_HOST}/start-hylo-signin?callbackUrl=${callbackUrl}`;
   };
 
   return (
