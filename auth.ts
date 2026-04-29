@@ -50,6 +50,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       id: 'hylo',
       name: 'Hylo',
       type: 'oauth',
+      // Required so Auth.js v5 / oauth4webapi accepts the `iss` query parameter
+      // that Hylo includes on the callback (RFC 9207). Without this, the callback
+      // throws `unexpected "iss" (issuer) response parameter value` because the
+      // expected issuer defaults to the `https://authjs.dev` sentinel and Hylo
+      // returns `https://www.hylo.com`.
+      issuer: 'https://www.hylo.com',
       authorization: {
         url: `https://${HYLO_BROWSER_HOST}/noo/oauth/auth`,
         params: {
