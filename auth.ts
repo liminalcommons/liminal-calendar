@@ -104,12 +104,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // custom logger is supplied. Gated `debug` via AUTH_DEBUG keeps prod logs
   // quiet while still allowing on-demand verbosity.
   logger: {
-    error(error: Error & { cause?: unknown }) {
-      const cause = error.cause as { message?: string; stack?: string; cause?: unknown } | undefined;
-      console.error('[auth][error]', error.name, error.message, {
-        cause_message: cause?.message,
-        cause_stack: cause?.stack,
-        nested: cause?.cause,
+    error(error: Error & { cause?: unknown; type?: string; kind?: string }) {
+      // Auth.js v5 nests the original error variously: error.cause.err, error.cause,
+      // or just error.message. Dump everything we can to find the actual cause.
+      const safeStringify = (obj: unknown, depth = 3): string => {
+        const seen = new WeakSet();
+        return JSON.stringify(
+          obj,
+          (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) return '[Circular]';
+              seen.add(value);
+            }
+            if (value instanceof Error) {
+              return {
+                name: value.name,
+                message: value.message,
+                stack: value.stack,
+                cause: (value as Error & { cause?: unknown }).cause,
+              };
+            }
+            return value;
+          },
+          2,
+        );
+      };
+      console.error('[auth][error]', {
+        name: error.name,
+        message: error.message,
+        type: error.type,
+        kind: error.kind,
+        stack: error.stack,
+        full: safeStringify(error),
       });
     },
     warn(code: string) {
