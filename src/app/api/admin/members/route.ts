@@ -94,10 +94,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { hyloId, name, image, role } = body as Record<string, unknown>;
+  const { hyloId, clerkId, name, image, role } = body as Record<string, unknown>;
 
-  if (!hyloId || typeof hyloId !== 'string') {
-    return NextResponse.json({ error: 'hyloId is required' }, { status: 400 });
+  // Mirror the PATCH contract: caller identifies the new row by exactly
+  // one of hyloId or clerkId. Both nullable in schema but the
+  // chk_members_identity CHECK requires at least one non-null per row.
+  const hasHyloId = typeof hyloId === 'string' && hyloId.length > 0;
+  const hasClerkId = typeof clerkId === 'string' && clerkId.length > 0;
+  if (!hasHyloId && !hasClerkId) {
+    return NextResponse.json(
+      { error: 'hyloId or clerkId is required' },
+      { status: 400 },
+    );
   }
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
@@ -105,25 +113,28 @@ export async function POST(request: NextRequest) {
   const assignRole = (typeof role === 'string' && ['member', 'host', 'admin'].includes(role))
     ? role
     : 'host';
+  const imageValue = typeof image === 'string' ? image : null;
 
   try {
+    const baseValues = {
+      name,
+      image: imageValue,
+      role: assignRole,
+      ...(hasHyloId ? { hyloId: hyloId as string } : {}),
+      ...(hasClerkId ? { clerkId: clerkId as string } : {}),
+    };
+    const conflictSet = {
+      name,
+      image: imageValue,
+      role: assignRole,
+      updatedAt: new Date(),
+    };
+    const conflictTarget = hasHyloId ? members.hyloId : members.clerkId;
+
     const [created] = await db
       .insert(members)
-      .values({
-        hyloId,
-        name,
-        image: typeof image === 'string' ? image : null,
-        role: assignRole,
-      })
-      .onConflictDoUpdate({
-        target: members.hyloId,
-        set: {
-          name,
-          image: typeof image === 'string' ? image : null,
-          role: assignRole,
-          updatedAt: new Date(),
-        },
-      })
+      .values(baseValues)
+      .onConflictDoUpdate({ target: conflictTarget, set: conflictSet })
       .returning();
 
     return NextResponse.json(created, { status: 201 });

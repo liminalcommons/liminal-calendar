@@ -10,7 +10,7 @@ jest.mock('@/lib/db', () => ({
 }));
 
 import { auth } from '../../../auth';
-import { GET, PATCH } from '@/app/api/admin/members/route';
+import { GET, PATCH, POST } from '@/app/api/admin/members/route';
 
 const mockAuth = auth as unknown as jest.Mock;
 
@@ -19,10 +19,18 @@ interface UpdateCapture {
   whereCalled?: boolean;
 }
 
+interface InsertCapture {
+  values?: Record<string, unknown>;
+  conflictTarget?: unknown;
+  conflictSet?: Record<string, unknown>;
+}
+
 function setupDbMocks(opts: {
   selectRows?: unknown[];
   updateReturn?: unknown[];
   updateCapture?: UpdateCapture;
+  insertReturn?: unknown[];
+  insertCapture?: InsertCapture;
 }) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
@@ -39,6 +47,23 @@ function setupDbMocks(opts: {
           if (opts.updateCapture) opts.updateCapture.whereCalled = true;
           return {
             returning: () => Promise.resolve(opts.updateReturn ?? []),
+          };
+        },
+      };
+    },
+  });
+
+  dbModule.db.insert = () => ({
+    values: (v: Record<string, unknown>) => {
+      if (opts.insertCapture) opts.insertCapture.values = v;
+      return {
+        onConflictDoUpdate: (cfg: { target: unknown; set: Record<string, unknown> }) => {
+          if (opts.insertCapture) {
+            opts.insertCapture.conflictTarget = cfg.target;
+            opts.insertCapture.conflictSet = cfg.set;
+          }
+          return {
+            returning: () => Promise.resolve(opts.insertReturn ?? []),
           };
         },
       };
@@ -143,6 +168,67 @@ describe('PATCH /api/admin/members', () => {
     mockAuth.mockResolvedValue({ user: { hyloId: 'h-1', role: 'member' } });
     setupDbMocks({});
     const res = await PATCH(patchReq({ clerkId: 'clerk_y', role: 'host' }));
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/admin/members', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('creates a Hylo member when only hyloId is provided (existing behavior)', async () => {
+    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    const insertCapture: InsertCapture = {};
+    const created = { id: 50, hyloId: 'h-new', clerkId: null, name: 'NewHylo', role: 'host' };
+    setupDbMocks({ insertReturn: [created], insertCapture });
+
+    const res = await POST(patchReq({ hyloId: 'h-new', name: 'NewHylo', role: 'host' }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.hyloId).toBe('h-new');
+    expect(insertCapture.values?.hyloId).toBe('h-new');
+    expect(insertCapture.values?.clerkId).toBeUndefined();
+  });
+
+  it('creates a Clerk-only member when only clerkId is provided (new behavior)', async () => {
+    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    const insertCapture: InsertCapture = {};
+    const created = { id: 51, hyloId: null, clerkId: 'clerk_new', name: 'NewClerk', role: 'host' };
+    setupDbMocks({ insertReturn: [created], insertCapture });
+
+    const res = await POST(patchReq({ clerkId: 'clerk_new', name: 'NewClerk', role: 'host' }));
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.clerkId).toBe('clerk_new');
+    expect(body.hyloId).toBeNull();
+    expect(insertCapture.values?.clerkId).toBe('clerk_new');
+    expect(insertCapture.values?.hyloId).toBeUndefined();
+  });
+
+  it('returns 400 when neither hyloId nor clerkId is provided', async () => {
+    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    setupDbMocks({});
+    const res = await POST(patchReq({ name: 'Orphan', role: 'host' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when name is missing', async () => {
+    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    setupDbMocks({});
+    const res = await POST(patchReq({ clerkId: 'clerk_x', role: 'host' }));
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 401 when no session', async () => {
+    mockAuth.mockResolvedValue(null);
+    setupDbMocks({});
+    const res = await POST(patchReq({ clerkId: 'clerk_x', name: 'X', role: 'host' }));
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 when caller is not admin', async () => {
+    mockAuth.mockResolvedValue({ user: { hyloId: 'h-1', role: 'member' } });
+    setupDbMocks({});
+    const res = await POST(patchReq({ clerkId: 'clerk_x', name: 'X', role: 'host' }));
     expect(res.status).toBe(403);
   });
 });
