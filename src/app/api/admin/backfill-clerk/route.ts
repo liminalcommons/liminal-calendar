@@ -34,6 +34,12 @@ import {
 } from '@/lib/auth/clerk-user-to-sync-input';
 
 export const dynamic = 'force-dynamic';
+// Backfill walks ≤500 Clerk users sequentially with one DB query each.
+// Vercel default function timeout is 10s on Hobby — too tight for this
+// loop in cold-pool conditions. 60s is the Hobby max and Pro default;
+// fits within both. If the workspace ever exceeds ~500 Clerk users,
+// paginate via offset rather than raise this further.
+export const maxDuration = 60;
 
 export async function POST() {
   const session = await auth();
