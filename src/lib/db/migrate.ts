@@ -64,9 +64,34 @@ export async function runMigrations() {
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT '[]'`;
 
   // Clerk identity column — nullable so existing Hylo-only rows are unaffected.
-  // Unique partial index allows multiple NULLs while preventing duplicate Clerk IDs.
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
-  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_members_clerk_id_unique ON members(clerk_id) WHERE clerk_id IS NOT NULL`;
+
+  // Unique constraint on clerk_id. Postgres allows multiple NULLs in a
+  // regular UNIQUE column by default, so this gives us the same
+  // multi-NULL tolerance as the prior partial unique index — but
+  // critically, a regular UNIQUE constraint is recognized by
+  // `INSERT ... ON CONFLICT (clerk_id) DO UPDATE`, whereas a partial
+  // unique index is NOT (Postgres error 42P10: "no unique or exclusion
+  // constraint matching the ON CONFLICT specification").
+  //
+  // The earlier `idx_members_clerk_id_unique WHERE clerk_id IS NOT
+  // NULL` is now redundant — drop it before/after adding the
+  // constraint. This silently broke every fresh Clerk-only signup
+  // (the webhook's syncClerkMember.insert path) until 2026-05-02.
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'members_clerk_id_key'
+          AND conrelid = 'members'::regclass
+      ) THEN
+        ALTER TABLE members
+          ADD CONSTRAINT members_clerk_id_key UNIQUE (clerk_id);
+      END IF;
+    END $$
+  `;
+  await sql`DROP INDEX IF EXISTS idx_members_clerk_id_unique`;
 
   // Make hyloId nullable so Clerk-only sign-ups can insert without a Hylo
   // identity. Idempotent in PG ≥9.x — DROP NOT NULL on already-nullable

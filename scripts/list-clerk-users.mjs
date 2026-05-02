@@ -13,18 +13,25 @@ import { createClerkClient } from '@clerk/backend';
 
 function loadEnv() {
   if (process.env.CLERK_SECRET_KEY) return; // explicit env wins
-  try {
-    const raw = readFileSync('.env.local', 'utf8');
-    for (const line of raw.split(/\r?\n/)) {
-      const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-      if (!m) continue;
-      const [, k, v] = m;
-      if (!(k in process.env)) {
-        process.env[k] = v.replace(/^['"]|['"]$/g, '').trim();
+  // Prefer .env.production.local (created by `vercel env pull`) over
+  // .env.local (dev). Reading both lets the same script triage either
+  // instance without flag flips.
+  const candidates = ['.env.production.local', '.env.local'];
+  for (const file of candidates) {
+    try {
+      const raw = readFileSync(file, 'utf8');
+      for (const line of raw.split(/\r?\n/)) {
+        const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+        if (!m) continue;
+        const [, k, v] = m;
+        if (!(k in process.env)) {
+          process.env[k] = v.replace(/^['"]|['"]$/g, '').trim();
+        }
       }
+      if (process.env.CLERK_SECRET_KEY) return; // first match wins
+    } catch {
+      // file absent — try next
     }
-  } catch {
-    // no .env.local — fall through; SDK will throw if key absent
   }
 }
 
