@@ -10,7 +10,10 @@ import { AvailabilityTimeline } from '@/components/availability/AvailabilityTime
 
 interface Member {
   id: number;
-  hyloId: string;
+  // Clerk-only members carry null hyloId; Hylo-only members carry null clerkId.
+  // The DB CHECK constraint guarantees at least one is non-null per row.
+  hyloId: string | null;
+  clerkId: string | null;
   name: string;
   email: string | null;
   image: string | null;
@@ -34,8 +37,11 @@ export default function AdminPage() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  // Track in-flight role updates and expansion by `member.id` (numeric pk).
+  // Was previously keyed by `hyloId` — Clerk-only members have null hyloId
+  // and would collide on `null` (only one would be expandable at a time).
+  const [updating, setUpdating] = useState<number | null>(null);
+  const [expandedMember, setExpandedMember] = useState<number | null>(null);
 
   const userRole = session?.user?.role;
 
@@ -60,18 +66,23 @@ export default function AdminPage() {
       .catch(() => setLoading(false));
   }, [status, userRole, router]);
 
-  const handleRoleChange = async (hyloId: string, newRole: string) => {
-    setUpdating(hyloId);
+  const handleRoleChange = async (member: Member, newRole: string) => {
+    setUpdating(member.id);
     try {
+      // Identify the row via whichever provider id the member carries.
+      // Schema invariant: at least one of (hyloId, clerkId) is non-null.
+      const identity = member.hyloId
+        ? { hyloId: member.hyloId }
+        : { clerkId: member.clerkId };
       const res = await apiFetch('/api/admin/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hyloId, role: newRole }),
+        body: JSON.stringify({ ...identity, role: newRole }),
       });
       if (res.ok) {
         const updated = await res.json();
         setMembers(prev =>
-          prev.map(m => m.hyloId === hyloId ? { ...m, role: updated.role } : m)
+          prev.map(m => m.id === member.id ? { ...m, role: updated.role } : m)
             .sort((a, b) => {
               const order = { admin: 0, host: 1, member: 2 };
               return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
@@ -149,10 +160,10 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {members.map(member => {
-                  const isExpanded = expandedMember === member.hyloId;
+                  const isExpanded = expandedMember === member.id;
                   const availSlots: number[] = (() => { try { return JSON.parse(member.availability ?? '[]'); } catch { return []; } })();
                   return (
-                    <React.Fragment key={member.hyloId}>
+                    <React.Fragment key={member.id}>
                       <tr className="border-b border-grove-border/40 last:border-0">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -174,8 +185,8 @@ export default function AdminPage() {
                         <td className="px-4 py-3">
                           <select
                             value={member.role}
-                            onChange={e => handleRoleChange(member.hyloId, e.target.value)}
-                            disabled={updating === member.hyloId}
+                            onChange={e => handleRoleChange(member, e.target.value)}
+                            disabled={updating === member.id}
                             className={`text-xs font-medium px-2 py-1 rounded-md border cursor-pointer
                               ${ROLE_COLORS[member.role] || ROLE_COLORS.member}
                               disabled:opacity-50 disabled:cursor-wait
@@ -192,7 +203,7 @@ export default function AdminPage() {
                               {new Date(member.createdAt).toLocaleDateString()}
                             </span>
                             <button
-                              onClick={() => setExpandedMember(isExpanded ? null : member.hyloId)}
+                              onClick={() => setExpandedMember(isExpanded ? null : member.id)}
                               className="p-1 rounded text-grove-text-muted hover:text-grove-text hover:bg-grove-border/20 transition-colors"
                               title="View availability"
                             >

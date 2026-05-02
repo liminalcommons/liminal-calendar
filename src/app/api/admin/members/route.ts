@@ -39,20 +39,32 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { hyloId, role } = body as Record<string, unknown>;
+  const { hyloId, clerkId, role } = body as Record<string, unknown>;
 
-  if (!hyloId || typeof hyloId !== 'string') {
-    return NextResponse.json({ error: 'hyloId is required' }, { status: 400 });
+  // Caller must identify the target by exactly one of hyloId or clerkId.
+  // Clerk-only members have null hyloId, so the original hyloId-only
+  // contract excluded them from role updates.
+  const hasHyloId = typeof hyloId === 'string' && hyloId.length > 0;
+  const hasClerkId = typeof clerkId === 'string' && clerkId.length > 0;
+  if (!hasHyloId && !hasClerkId) {
+    return NextResponse.json(
+      { error: 'hyloId or clerkId is required' },
+      { status: 400 },
+    );
   }
   if (!role || !['member', 'host', 'admin'].includes(role as string)) {
     return NextResponse.json({ error: 'role must be member, host, or admin' }, { status: 400 });
   }
 
   try {
+    const predicate = hasHyloId
+      ? eq(members.hyloId, hyloId as string)
+      : eq(members.clerkId, clerkId as string);
+
     const [updated] = await db
       .update(members)
       .set({ role: role as string, updatedAt: new Date() })
-      .where(eq(members.hyloId, hyloId))
+      .where(predicate)
       .returning();
 
     if (!updated) {
