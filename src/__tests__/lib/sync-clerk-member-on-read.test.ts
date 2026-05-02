@@ -158,4 +158,30 @@ describe('syncClerkMemberOnRead', () => {
     ).resolves.toBeUndefined();
     expect(mockSync).not.toHaveBeenCalled();
   });
+
+  it('does NOT throw when syncClerkMemberWithMerge fails — read paths must not crash', async () => {
+    setupClerkUser({
+      id: 'clerk_db_err',
+      firstName: 'X',
+      lastName: null,
+      imageUrl: '',
+      primaryEmailAddressId: 'e_1',
+      emailAddresses: [
+        {
+          id: 'e_1',
+          emailAddress: 'x@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+    mockSync.mockRejectedValue(new Error('DB write failed'));
+
+    // Even when the inner sync rejects (e.g., DB outage, schema violation),
+    // the helper must resolve undefined so that callers like
+    // getCurrentMember return null instead of crashing the request.
+    await expect(
+      syncClerkMemberOnRead(fakeDb, 'clerk_db_err'),
+    ).resolves.toBeUndefined();
+    expect(mockSync).toHaveBeenCalledTimes(1);
+  });
 });

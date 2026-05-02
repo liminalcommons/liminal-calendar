@@ -10,11 +10,13 @@
  * `clerkUserToSyncInput` helper, used here and by
  * `/api/admin/backfill-clerk`. Both consume the SDK's User shape.
  *
- * Failure mode: if the Clerk getUser call rejects (e.g., user deleted,
- * network blip), this helper SWALLOWS the error and returns undefined.
- * Callers are read paths (e.g., GET /api/profile, GET /api/admin/members);
- * crashing them on a transient Clerk-side failure would be worse than
- * temporarily not auto-provisioning. Logged for observability.
+ * Failure mode: if the Clerk getUser call OR the inner
+ * syncClerkMemberWithMerge rejects (e.g., user deleted, network blip,
+ * DB outage, schema violation), this helper SWALLOWS the error and
+ * returns undefined. Callers are read paths (e.g., GET /api/profile,
+ * GET /api/admin/members); crashing them on a transient backend
+ * failure would be worse than temporarily not auto-provisioning.
+ * Logged for observability.
  *
  * Caller is responsible for deciding when to invoke (typically: valid
  * Clerk session + no member row found by clerkId).
@@ -38,5 +40,9 @@ export async function syncClerkMemberOnRead(db: any, clerkId: string): Promise<v
     return;
   }
 
-  await syncClerkMemberWithMerge(db, clerkUserToSyncInput(user));
+  try {
+    await syncClerkMemberWithMerge(db, clerkUserToSyncInput(user));
+  } catch (err) {
+    console.error('[syncClerkMemberOnRead] sync failed:', clerkId, err);
+  }
 }
