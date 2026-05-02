@@ -17,9 +17,8 @@
  * Bypasses syncClerkMemberOnRead deliberately: we already have the
  * canonical User object from getUserList, so calling
  * syncClerkMemberWithMerge directly avoids a redundant per-user
- * getUser roundtrip (Clerk has rate limits). The mapping is the same
- * shape as syncClerkMemberOnRead — duplication is acceptable for now;
- * factoring out a shared User→input mapper is a cycle-6+ candidate.
+ * getUser roundtrip (Clerk has rate limits). Mapping uses the shared
+ * `clerkUserToSyncInput` helper — same one syncClerkMemberOnRead uses.
  */
 
 import { NextResponse } from 'next/server';
@@ -28,41 +27,13 @@ import { getUserRole } from '@/lib/auth-helpers';
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { findMemberByClerkId } from '@/lib/auth/find-member-by-clerk-id';
+import { syncClerkMemberWithMerge } from '@/lib/auth/sync-clerk-member-with-merge';
 import {
-  syncClerkMemberWithMerge,
-  type ClerkMemberWithMergeInput,
-} from '@/lib/auth/sync-clerk-member-with-merge';
+  clerkUserToSyncInput,
+  type ClerkUser,
+} from '@/lib/auth/clerk-user-to-sync-input';
 
 export const dynamic = 'force-dynamic';
-
-interface ClerkUser {
-  id: string;
-  firstName: string | null;
-  lastName: string | null;
-  imageUrl: string;
-  primaryEmailAddressId: string | null;
-  emailAddresses: Array<{
-    id: string;
-    emailAddress: string;
-    verification: { status?: string } | null;
-  }>;
-}
-
-function clerkUserToSyncInput(user: ClerkUser): ClerkMemberWithMergeInput {
-  const primary =
-    user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId) ??
-    user.emailAddresses[0];
-  return {
-    clerkId: user.id,
-    name:
-      [user.firstName, user.lastName]
-        .filter((n): n is string => Boolean(n))
-        .join(' ') || null,
-    email: primary?.emailAddress ?? null,
-    image: user.imageUrl || null,
-    emailVerified: primary?.verification?.status === 'verified',
-  };
-}
 
 export async function POST() {
   const session = await auth();
