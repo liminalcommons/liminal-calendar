@@ -32,6 +32,30 @@ const ROLE_COLORS: Record<string, string> = {
   member: 'bg-grove-border/30 text-grove-text-muted border-grove-border',
 };
 
+function ProviderBadge({ member }: { member: Member }) {
+  const hasHylo = Boolean(member.hyloId);
+  const hasClerk = Boolean(member.clerkId);
+  if (hasHylo && hasClerk) {
+    return (
+      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-accent/20 text-grove-accent-deep border border-grove-accent/30">
+        Hylo + Clerk
+      </span>
+    );
+  }
+  if (hasHylo) {
+    return (
+      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-border/30 text-grove-text-muted border border-grove-border/50">
+        Hylo
+      </span>
+    );
+  }
+  return (
+    <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-blue-900/20 text-blue-300 border border-blue-700/40">
+      Clerk
+    </span>
+  );
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -175,7 +199,10 @@ export default function AdminPage() {
                               </div>
                             )}
                             <div>
-                              <p className="text-sm font-medium text-grove-text">{member.name}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-grove-text">{member.name}</p>
+                                <ProviderBadge member={member} />
+                              </div>
                               {member.email && (
                                 <p className="text-[11px] text-grove-text-muted">{member.email}</p>
                               )}
