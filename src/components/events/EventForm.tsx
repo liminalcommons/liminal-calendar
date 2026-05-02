@@ -519,6 +519,10 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         if (!res.ok) throw new Error(data.error || 'Failed to create event');
         // API returns DisplayEvent directly
         const newId = data.id || data.event?.id;
+        // Invalidate Router Cache so the calendar/list/month routes show the new
+        // event when the user navigates back. Without this, Next.js serves the
+        // cached RSC payload and the new event is missing until manual refresh.
+        router.refresh();
         router.push(`/events/${newId}`);
         onSuccess?.()
       } else {

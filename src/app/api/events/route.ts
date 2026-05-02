@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { auth } from '../../../../auth';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
@@ -105,6 +106,12 @@ export async function POST(request: NextRequest) {
         creatorImage: user.image ?? null,
       })
       .returning();
+
+    // Invalidate Full Route Cache for views that list events so the freshly
+    // created event appears on subsequent navigation without manual refresh.
+    revalidatePath('/');
+    revalidatePath('/list');
+    revalidatePath('/month');
 
     return NextResponse.json(dbEventToDisplayEvent(created), { status: 201 });
   } catch (err) {
