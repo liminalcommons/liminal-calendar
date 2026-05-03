@@ -1671,7 +1671,12 @@ git commit -m "docs(notifications): operator playbook for heartbeat monitoring"
 - Delete: `src/components/NotificationScheduler.tsx`
 - Modify: `src/app/layout.tsx`
 
-- [ ] **Step 1: Verify no other imports reference it**
+- [x] **Step 1: Verify no other imports reference it** — confirmed: 3 hits, all expected.
+  - `src/components/NotificationScheduler.tsx:11` — the `export function` declaration (the file itself)
+  - `src/app/layout.tsx:11` — `import { NotificationScheduler } from "@/components/NotificationScheduler";`
+  - `src/app/layout.tsx:50` — `<NotificationScheduler />` JSX usage
+
+No other references. Safe to delete in Step 3.
 
 Run: `grep -rn "NotificationScheduler" src/ --include="*.tsx" --include="*.ts"`
 Expected: hits only in `src/components/NotificationScheduler.tsx` and `src/app/layout.tsx`.
