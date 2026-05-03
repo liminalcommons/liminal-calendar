@@ -358,7 +358,7 @@ since dragging an event upward in the grid produces a negative deltaMinutes.
 - Modify: `src/components/calendar/EventBlock.tsx`
 - Create: `src/__tests__/components/EventBlock-drag.test.tsx`
 
-- [ ] **Step 1: Failing test — drag handle gated on `isOwner`**
+- [x] **Step 1: Failing test — drag handle gated on `isOwner`**
 
 ```tsx
 // src/__tests__/components/EventBlock-drag.test.tsx
@@ -407,7 +407,7 @@ describe('EventBlock owner-only drag affordance', () => {
 
 Expected: FAIL — `isOwner` prop unsupported.
 
-- [ ] **Step 2: Add `isOwner` prop, set `data-draggable` accordingly**
+- [x] **Step 2: Add `isOwner` prop, set `data-draggable` accordingly**
 
 ```tsx
 // In EventBlock.tsx:
@@ -424,14 +424,23 @@ interface EventBlockProps {
 >
 ```
 
-- [ ] **Step 3: Test PASS, typecheck, commit**
+- [x] **Step 3: Test PASS, typecheck, commit**
 
 ```bash
-npx jest src/__tests__/components/EventBlock-drag.test.tsx
-npx tsc --noEmit
+npx jest src/__tests__/components/EventBlock-drag.test.tsx   # 5/5 pass
+npx tsc --noEmit                                              # exit 0
 git add src/components/calendar/EventBlock.tsx src/__tests__/components/EventBlock-drag.test.tsx
 git commit -m "positiva: cal-tz-drag — EventBlock owner-only drag prop (Task B2)"
 ```
+
+**Beyond plan (per negativa cycle 3 improvement suggestion):** Test the
+*consequence* of `isOwner=false`, not just the marker. Added two tests:
+- `does NOT call onDragStart for non-owner pointerdown` — verifies the
+  pointer handler isn't installed regardless of the data attribute.
+- `DOES call onDragStart for owner pointerdown` — happy path symmetry.
+
+Also added `defaults to data-draggable="false" when isOwner is omitted`
+since the type allows omission.
 
 ---
 
