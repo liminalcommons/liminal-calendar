@@ -8,17 +8,26 @@ import type { NextRequest } from 'next/server';
 const mockEventA = { id: 1, title: 'EventA', startsAt: new Date('2026-06-01T10:00:00Z'), endsAt: null, location: null, description: null, timezone: 'UTC', creatorName: 'Alice', recurrenceRule: null };
 const mockEventB = { id: 2, title: 'EventB', startsAt: new Date('2026-06-02T10:00:00Z'), endsAt: null, location: null, description: null, timezone: 'UTC', creatorName: 'Bob', recurrenceRule: null };
 
+// Polymorphic where() chain — supports all three real call shapes:
+//   1. .where().limit()           → member lookup       → [{hyloId: 'u1'}]
+//   2. .where()  (await directly) → rsvps-eventIds      → [{eventId: 1}]  (only EventA RSVPed)
+//   3. .where().orderBy()         → events filtered by ids → [mockEventA]
+// The thenable `then` makes `await where(...)` resolve directly to the rsvps-eventIds array;
+// `.limit()` and `.orderBy()` are also available on the same object for chaining.
+const polymorphicWhere = {
+  limit: () => Promise.resolve([{ hyloId: 'u1' }]),
+  orderBy: () => Promise.resolve([mockEventA]),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  then: (resolve: any, reject: any) => Promise.resolve([{ eventId: 1 }]).then(resolve, reject),
+};
+
 jest.mock('@/lib/db', () => ({
   db: {
     select: () => ({
       from: (_table: unknown) => ({
-        // member-by-token lookup: select().from(members).where().limit()
-        where: () => ({ limit: () => Promise.resolve([{ hyloId: 'u1' }]) }),
-        // filtered RSVPs-only path uses innerJoin
-        innerJoin: () => ({
-          where: () => Promise.resolve([mockEventA]),
-        }),
-        // unfiltered path: select().from(events).orderBy()
+        // member-by-token lookup, rsvps-eventIds, OR events-filtered all enter here
+        where: () => polymorphicWhere,
+        // unfiltered events path: select().from(events).orderBy()
         orderBy: () => Promise.resolve([mockEventA, mockEventB]),
       }),
     }),

@@ -1450,7 +1450,7 @@ describe('ICS feed filter param', () => {
 });
 ```
 
-- [ ] **Step 3: Add the filter param handling**
+- [x] **Step 3: Add the filter param handling** (DEVIATION resolved at GREEN time: extended the test mock with a polymorphic `polymorphicWhere` object that's BOTH thenable (resolves to `[{eventId: 1}]` for `await db.select().from(rsvps).where(...)`) AND chainable (`.limit()` for member lookup, `.orderBy()` for events-by-ids filtered query). The plan's prescribed mock didn't anticipate the impl's three-different `where()` chain shapes. Plan's prescribed impl code used as-is — the deviation is test-side mock extension. All 3 tests now GREEN.)
 
 Modify `src/app/api/calendar/feed.ics/route.ts`. After the existing member lookup (line ~31), branch on the filter param:
 
