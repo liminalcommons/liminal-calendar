@@ -15,6 +15,7 @@ import { downloadICS } from '@/lib/ics-generator';
 import { apiFetch } from '@/lib/api-fetch';
 import { EventRSVP } from './EventRSVP';
 import { CommentSection } from '@/components/comments/CommentSection';
+import { AttendanceReportSection } from '@/components/attendance-reports/AttendanceReportSection';
 
 interface EventDetailViewProps {
   eventId: string;
@@ -271,6 +272,13 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         >
           Add to Calendar (.ics)
         </button>
+
+        {/* Attendance report — shown only for events that have ended */}
+        <AttendanceReportSection
+          eventId={Number(event.id)}
+          startsAt={event.starts_at}
+          endsAt={event.ends_at}
+        />
 
         {/* Comments */}
         <div className="pt-2 border-t border-grove-border">
