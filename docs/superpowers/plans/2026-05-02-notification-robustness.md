@@ -623,7 +623,7 @@ ON CONFLICT (user_id) DO NOTHING;
 - Create: `src/components/NotificationPreferences.tsx`
 - Test: `src/__tests__/components/NotificationPreferences.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** (DEVIATION: replaced `@testing-library/user-event` (not a project dep — only `@testing-library/jest-dom` + `@testing-library/react` are installed) with `fireEvent` from `@testing-library/react`. Functionally equivalent for click events; avoids adding a new dependency.)
 
 ```tsx
 // src/__tests__/components/NotificationPreferences.test.tsx
