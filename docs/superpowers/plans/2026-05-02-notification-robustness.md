@@ -1624,7 +1624,7 @@ git commit -m "feat(cron): /api/cron/heartbeat-check daily stale-detector"
 **Files:**
 - Modify: `docs/notifications/scheduling.md`
 
-- [ ] **Step 1: Append the operator playbook section**
+- [x] **Step 1: Append the operator playbook section** (DEVIATION — addition, not subtraction: included a `### Backfill — one-time, deploy-of-this-slice prerequisite` subsection ABOVE the plan-prescribed Primary/Backup/Smoke-test sections. Per still-open negativa-5+17 recommendation, the backfill psql command (`psql $DATABASE_URL -f src/lib/db/migrations/notification-preferences-backfill.sql`) is the FIRST deploy step for this slice — operators must run it before the cron read-path swap goes live, otherwise existing-user-without-prefs-row regression triggers. The plan's prescribed playbook content is included verbatim after the backfill section.)
 
 Add this section near the bottom of `docs/notifications/scheduling.md` (after the existing Monitoring section):
 

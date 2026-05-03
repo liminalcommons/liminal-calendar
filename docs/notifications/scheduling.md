@@ -53,3 +53,43 @@ Copy the relevant chora-node crontab line into `packages/liminal-calendar/deploy
 ```
 
 Point an uptime monitor (e.g., UptimeRobot keyword check) at this URL every 15 min and alert when the response body contains `"status":"stale"`. That catches chora-node outages within ~30 minutes instead of discovering them from user reports days later.
+
+## Operator playbook (post-deploy)
+
+### Backfill — one-time, deploy-of-this-slice prerequisite
+
+The 2026-05-02 notification-robustness slice (commit e64bf37 spec / fef7f8c plan) swapped the cron read path from `rsvps.remindMe` to a per-user `notification_preferences` table. Existing users without a preferences row are excluded from the cron's INNER JOIN — they will silently stop receiving notifications until they actively visit `/settings/notifications`.
+
+To bridge: run the one-shot backfill that creates default preferences rows for every existing user in `rsvps`:
+
+```bash
+psql $DATABASE_URL -f src/lib/db/migrations/notification-preferences-backfill.sql
+```
+
+The migration is idempotent (`ON CONFLICT (user_id) DO NOTHING`); safe to re-run. Defaults match spec §5.1: push columns TRUE, email columns FALSE.
+
+**Run this BEFORE the cron read-path swap is live** — otherwise users miss notifications between the swap going live and the backfill completing.
+
+### Primary monitor — UptimeRobot
+
+1. Create a Keyword Check at `https://liminalcalendar.com/api/cron/heartbeat`.
+2. Alert when response body contains `"status":"stale"`.
+3. Frequency: every 15 minutes.
+4. Notify: admin email + Slack if available.
+
+This catches a stuck chora-node crontab within ~30 minutes of failure.
+
+### Backup monitor — Vercel daily cron
+
+`/api/cron/heartbeat-check` runs daily (12:00 UTC) and emails `NOTIFICATION_ADMIN_EMAIL` if no `notification_log` row has been written in the last 30 minutes. This is the safety net when UptimeRobot itself is misconfigured or down.
+
+Required env: `NOTIFICATION_ADMIN_EMAIL` (set in Vercel project settings).
+
+### Smoke test
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  https://liminalcalendar.com/api/cron/heartbeat
+```
+
+Expected: `{"status":"ok", "lastSentAt":"...", "ageSeconds":<small>}`. If `"stale"`, the chora-node trigger is down.
