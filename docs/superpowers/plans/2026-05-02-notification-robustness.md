@@ -1158,7 +1158,7 @@ if (iosMode) {
 Run: `npx jest src/__tests__/components/InstallPrompt-ios.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run typecheck + commit**
+- [x] **Step 5: Run typecheck + commit** — completed in cycle 22 alongside Steps 3-4. tsc exit=0 verified (also resolved negativa-10 TS2578); component + test in 9a8728d. Task 8 structurally complete (5/5 boxes).
 
 ```bash
 npx tsc --noEmit
