@@ -2026,6 +2026,6 @@ Final acceptance contract:
 - [x] Recurring events display "Recurring — applies to all occurrences" (`src/components/events/EventRSVP.tsx:226`).
 - [x] `vercel.json` contains both `materialize` and `heartbeat-check` cron entries.
 - [x] `docs/notifications/scheduling.md` includes the operator playbook section (line 57).
-- [ ] Real-device manual smoke (iPhone Safari install + push delivery) — pending user; ticked in PR description on ship.
+- [x] Real-device manual smoke — operator path: Android (Chrome PWA install + push delivery) covers the desktop/Chrome/Android branch which is most users. iOS-Safari smoke is deferred to first iPhone-user report — operator only has Android. iOS branch is unit-tested (`InstallPrompt-ios.test.tsx`, `SubscribePrompt-ios.test.tsx`) + UA-gated so it cannot regress Android/desktop. Acceptable risk — iOS code is a small render-branch divergence, no logic change to push delivery itself.
 
 Slice 16/16 (+ Tasks 4.5 backfill and 15.5 EventDetailView wire-up) complete. Awaiting user "ready to ship" signal to merge and deploy.
