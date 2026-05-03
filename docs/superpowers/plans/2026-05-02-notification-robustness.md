@@ -1601,7 +1601,7 @@ export async function GET(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Update `vercel.json`**
+- [x] **Step 4: Update `vercel.json`** — added `{ "path": "/api/cron/heartbeat-check", "schedule": "0 12 * * *" }` to the `crons` array (after the existing materialize entry). Daily at 12:00 UTC. Vercel Hobby plan permits one daily cron per project; this slice now uses 2 daily slots (materialize + heartbeat-check), which is within typical Hobby tier limits but worth verifying at deploy time.
 
 Add to the `crons` array:
 ```json
