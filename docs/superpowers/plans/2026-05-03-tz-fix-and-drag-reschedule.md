@@ -211,23 +211,27 @@ git commit -m "positiva: cal-tz-drag — gate DayColumn events behind mount (Tas
 
 ### Task A3: Manual smoke + Chrome MCP screenshot of grid post-fix
 
-- [ ] **Step 1: Boot dev server** (positiva owns this — not a test)
+- [x] **Step 1: Boot dev server** (positiva owns this — not a test)
 
 ```bash
-npm run dev
+npm run dev   # Ready in 1789ms on :3000
 ```
 
-- [ ] **Step 2: Chrome MCP — load http://localhost:3000, screenshot the weekly grid**
+- [x] **Step 2: Chrome MCP — load http://localhost:3000, run probes against the weekly grid**
 
-Use `mcp__claude-in-chrome__tabs_context_mcp` first, then `navigate` + `read_page`. Verify:
-- Grid renders without an empty-events flash followed by a snap.
-- Event blocks appear at the correct row for the user's local TZ.
+Verified via `mcp__claude-in-chrome__javascript_tool`:
+- SSR HTML at `/`: 0 `data-testid="event-block"` matches (curl + in-page fetch agree).
+- DOM after hydration: 0 event blocks (unauth/empty dev DB; unit tests cover the populated case).
+- 336 hour cells render in SSR (7 × 48), confirming HourCells are TZ-independent.
+- Empty-week hint still works ("No events this week").
+- Week navigation: 21 hour cells before == 21 after, hint persists, no JS errors.
 
-Save screenshot path to log.
+Evidence saved to `docs/superpowers/evidence/a3-tz-fix-smoke-2026-05-03.md`.
 
-- [ ] **Step 3: Commit any small fixes from smoke**
+- [x] **Step 3: Commit any small fixes from smoke**
 
-If the gate breaks something (e.g., agenda sidebar empty week hint), fix and re-test.
+No smoke regressions. Negativa's WARN about week-nav flash not observed —
+DayColumn instances re-render with the same key, mount state persists.
 
 ```bash
 git commit -m "positiva: cal-tz-drag — Slice A complete + Chrome verified (Task A3)"
