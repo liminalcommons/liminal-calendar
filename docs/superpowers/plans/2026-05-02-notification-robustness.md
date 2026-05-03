@@ -1288,7 +1288,7 @@ git commit -m "feat(ui): integrate NotificationPreferences into SubscribePrompt"
 - Modify: `src/components/SubscribePrompt.tsx`
 - Test: `src/__tests__/components/SubscribePrompt-ios.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** (DEVIATION: added a `beforeEach` block to stub `(window as any).PushManager` and `window.Notification` with permission='default'. Plan's prescribed test omitted these stubs, but SubscribePrompt's useEffect uses them to decide between the 'notifications' and 'subscribe' initial steps. Without the stubs, the component skips to 'subscribe' and the heading "Never miss" never renders, causing the test to time out at the first waitFor for the wrong reason. Same stub pattern as SubscribePrompt-prefs.test.tsx.)
 
 ```tsx
 // src/__tests__/components/SubscribePrompt-ios.test.tsx
@@ -1328,7 +1328,7 @@ describe('SubscribePrompt iOS guard', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: heading "Never miss" found correctly; `getByText(/Install app first/i)` fails to find that text (no element exists yet). RED for the right reason — Step 4 will add the iOS guard with the "Install app first" copy.
 
 Run: `npx jest src/__tests__/components/SubscribePrompt-ios.test.tsx`
 Expected: FAIL — Enable button still present.
