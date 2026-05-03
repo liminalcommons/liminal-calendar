@@ -1687,7 +1687,7 @@ In `src/app/layout.tsx`:
 - Delete line 11: `import { NotificationScheduler } from "@/components/NotificationScheduler";`
 - Delete line 50: `<NotificationScheduler />`
 
-- [ ] **Step 3: Delete the component file**
+- [x] **Step 3: Delete the component file** — used `git rm src/components/NotificationScheduler.tsx` (cleaner than plain `rm` — stages the deletion in one step). File removed; layout no longer references it (Step 2). Step 4 will verify zero remaining references.
 
 Run: `rm src/components/NotificationScheduler.tsx`
 
