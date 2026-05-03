@@ -527,7 +527,7 @@ describe('cron send-reminders read path', () => {
 Run: `npx jest src/__tests__/app/api/cron/send-reminders-prefs.test.ts`
 Expected: FAIL — current cron only calls `innerJoin(rsvps, ...)` (one join per window), not the second `innerJoin(notificationPreferences, ...)`. So the count will be 6, not ≥12.
 
-- [ ] **Step 3: Modify the route to add the second join**
+- [x] **Step 3: Modify the route to add the second join**
 
 In `src/app/api/cron/send-reminders/route.ts`:
 
@@ -576,12 +576,12 @@ const due = await db
   ));
 ```
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 2/2 pass for send-reminders-prefs.test.ts.
 
 Run: `npx jest src/__tests__/app/api/cron/send-reminders-prefs.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Verify existing send-reminders tests still pass**
+- [x] **Step 5: Verify existing send-reminders tests still pass** — initially 6/9 failed because the existing mock in `send-reminders-route.test.ts` only supported `from().innerJoin().where()` (one innerJoin) but the new query shape needs `from().innerJoin().innerJoin().where()`. Extended the mock with a nested `innerJoin: () => ({ where, innerJoin: () => ({ where }) })` to support both shapes (backwards compatible). All 9/9 send-reminders tests now pass. Full suite: 42/42 suites, 347/347 tests pass.
 
 Run: `npx jest src/__tests__/app/api/ -t "send-reminders"`
 Expected: PASS (or update mocks if older tests assumed `remindMe = true` filter).

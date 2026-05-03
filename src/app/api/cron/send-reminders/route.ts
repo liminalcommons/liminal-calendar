@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { events, rsvps, members, notificationLog } from '@/lib/db/schema';
+import { events, rsvps, members, notificationLog, notificationPreferences } from '@/lib/db/schema';
 import { and, eq, gte, lte, not, inArray, or } from 'drizzle-orm';
+import { WINDOW_TO_COLUMN, type NotificationChannelHorizon } from '@/lib/notifications/preferences';
 import { sendEmail } from '@/lib/email';
 import { buildReminderEmail, type ReminderType } from '@/lib/notifications/reminders';
 import { sendPushToUsers } from '@/lib/notifications/push';
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
     const type = typeStr as ReminderType;
     const { windowStart, windowEnd } = computeReminderWindow(now, minMin, maxMin);
 
-    // Find events in window with opted-in RSVPs
+    // Find events in window with users opted-in via notification_preferences
+    const prefColumn = notificationPreferences[WINDOW_TO_COLUMN[type as NotificationChannelHorizon]];
     const dueEvents = await db
       .select({
         eventId: events.id,
@@ -47,11 +49,13 @@ export async function GET(request: Request) {
         userId: rsvps.userId,
       })
       .from(events)
-      .innerJoin(
-        rsvps,
-        and(eq(rsvps.eventId, events.id), eq(rsvps.remindMe, true), not(eq(rsvps.status, 'no'))),
-      )
-      .where(and(gte(events.startsAt, windowStart), lte(events.startsAt, windowEnd)));
+      .innerJoin(rsvps, and(eq(rsvps.eventId, events.id), not(eq(rsvps.status, 'no'))))
+      .innerJoin(notificationPreferences, eq(notificationPreferences.userId, rsvps.userId))
+      .where(and(
+        gte(events.startsAt, windowStart),
+        lte(events.startsAt, windowEnd),
+        eq(prefColumn, true),
+      ));
 
     if (dueEvents.length === 0) continue;
 
@@ -150,6 +154,7 @@ export async function GET(request: Request) {
   for (const w of PUSH_WINDOWS) {
     const { windowStart, windowEnd } = computeReminderWindow(now, w.minMin, w.maxMin);
 
+    const pushPrefColumn = notificationPreferences[WINDOW_TO_COLUMN[w.type as NotificationChannelHorizon]];
     const due = await db
       .select({
         eventId: events.id,
@@ -160,11 +165,13 @@ export async function GET(request: Request) {
         userId: rsvps.userId,
       })
       .from(events)
-      .innerJoin(
-        rsvps,
-        and(eq(rsvps.eventId, events.id), eq(rsvps.remindMe, true), not(eq(rsvps.status, 'no'))),
-      )
-      .where(and(gte(events.startsAt, windowStart), lte(events.startsAt, windowEnd)));
+      .innerJoin(rsvps, and(eq(rsvps.eventId, events.id), not(eq(rsvps.status, 'no'))))
+      .innerJoin(notificationPreferences, eq(notificationPreferences.userId, rsvps.userId))
+      .where(and(
+        gte(events.startsAt, windowStart),
+        lte(events.startsAt, windowEnd),
+        eq(pushPrefColumn, true),
+      ));
 
     if (due.length === 0) continue;
 

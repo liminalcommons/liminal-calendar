@@ -44,10 +44,15 @@ function setupSelectQueue(results: unknown[][]) {
     // The chain may or may not include innerJoin — return an object that
     // supports both `.from().where()` and `.from().innerJoin().where()`.
     const terminal = { __nextResult: next };
+    // Support .from().where(), .from().innerJoin().where(),
+    // and .from().innerJoin().innerJoin().where() (post-Task-4 shape).
     const fromResult = {
       where: () => Promise.resolve(terminal.__nextResult),
       innerJoin: () => ({
         where: () => Promise.resolve(terminal.__nextResult),
+        innerJoin: () => ({
+          where: () => Promise.resolve(terminal.__nextResult),
+        }),
       }),
     };
     return { from: () => fromResult };
