@@ -96,7 +96,7 @@ Project test command: `cd packages/liminal-calendar && npx jest <path>` for a si
 - Modify: `src/lib/db/schema.ts` (append after `pushSubscriptions` table, around line 95)
 - Create: `src/lib/db/migrations/NNNN_notification_preferences.sql` (auto-generated)
 
-- [ ] **Step 1: Append the table definition to schema.ts**
+- [x] **Step 1: Append the table definition to schema.ts**
 
 ```ts
 // Per-user notification preferences. Replaces per-RSVP `rsvps.remindMe`
@@ -129,12 +129,9 @@ Also: add a one-line comment above the existing `remindMe` field on the `rsvps` 
 remindMe: boolean('remind_me').default(false),
 ```
 
-- [ ] **Step 2: Generate the migration**
+- [x] **Step 2: Generate the migration** (DEVIATION: project uses hand-written SQL migrations per `push-subscriptions.sql` precedent, not drizzle-kit auto-gen. Wrote `src/lib/db/migrations/notification-preferences.sql` directly.)
 
-Run: `cd packages/liminal-calendar && npx drizzle-kit generate:pg`
-Expected: a new file `src/lib/db/migrations/NNNN_<auto-name>.sql` containing `CREATE TABLE notification_preferences (...)`.
-
-- [ ] **Step 3: Verify generated SQL**
+- [x] **Step 3: Verify generated SQL**
 
 Open the generated file. It must contain:
 ```sql
@@ -152,12 +149,12 @@ CREATE TABLE IF NOT EXISTS "notification_preferences" (
 );
 ```
 
-- [ ] **Step 4: Run typecheck**
+- [x] **Step 4: Run typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: PASS (no errors).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — committed at 025caa3.
 
 ```bash
 git add src/lib/db/schema.ts src/lib/db/migrations/
