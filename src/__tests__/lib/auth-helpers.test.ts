@@ -14,18 +14,25 @@ import {
 } from '../../lib/auth-helpers';
 
 describe('getUserRole', () => {
-  it('returns member for null session', () => {
-    expect(getUserRole(null)).toBe('member');
+  // Per commit 62ceabf ("default new members to host role"), getUserRole
+  // returns 'host' for any non-admin input — including null/undefined and
+  // explicit 'member'. The auth-layer guard (`session?.user` 401) catches
+  // truly unauthenticated requests before this is called, so the host-default
+  // applies only to authenticated sessions whose role hasn't been set yet.
+  // Tests below pin that policy.
+  it('returns host for null session (host-default policy)', () => {
+    expect(getUserRole(null)).toBe('host');
   });
 
-  it('returns member when role is undefined', () => {
-    expect(getUserRole({ user: {} })).toBe('member');
+  it('returns host when role is undefined', () => {
+    expect(getUserRole({ user: {} })).toBe('host');
   });
 
-  it('returns role from session', () => {
+  it('returns admin when role is admin; otherwise host', () => {
     expect(getUserRole({ user: { role: 'host' } })).toBe('host');
     expect(getUserRole({ user: { role: 'admin' } })).toBe('admin');
-    expect(getUserRole({ user: { role: 'member' } })).toBe('member');
+    // Even an explicit 'member' is upgraded to host per the policy.
+    expect(getUserRole({ user: { role: 'member' } })).toBe('host');
   });
 });
 
