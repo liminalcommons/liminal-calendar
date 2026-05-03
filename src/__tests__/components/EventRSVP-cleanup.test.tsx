@@ -37,8 +37,7 @@ describe('EventRSVP cleanups', () => {
   });
 
   it('shows recurring inline text when recurrenceRule is set', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    render(<EventRSVP eventId="1" recurrenceRule="weekly" {...({} as any)} />);
+    render(<EventRSVP eventId="1" recurrenceRule="weekly" />);
     expect(screen.getByText(/recurring — applies to all occurrences/i)).toBeInTheDocument();
   });
 

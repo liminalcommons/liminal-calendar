@@ -1768,7 +1768,15 @@ describe('EventRSVP cleanups', () => {
 Run: `npx jest src/__tests__/components/EventRSVP-cleanup.test.tsx`
 Expected: FAIL — newsletter signup and remindMe checkbox both still present.
 
-- [ ] **Step 3: Modify `src/components/events/EventRSVP.tsx`**
+- [x] **Step 3: Modify `src/components/events/EventRSVP.tsx`** — done. Per spec §7.5 and negativa-22 improvement:
+  1. Added `recurrenceRule?: string | null` to EventRSVPProps + destructured in function signature.
+  2. Removed `remindMe` state + `subscribeNewsletter` state + `setRemindMe(myRsvp.remindMe)` lookup in fetchAttendees.
+  3. Updated handleRSVP submitRsvp call: `remindMe: response !== 'no'` (always TRUE on positive RSVPs per spec §5.2 — keeps schema column populated; cron read-path now uses notification_preferences instead).
+  4. Removed `subscribeToNewsletter` from submitRsvp call.
+  5. Deleted `handleToggleRemind` and `handleToggleNewsletter` functions (now-dead code).
+  6. Removed the entire post-RSVP `<>{currentResponse && currentResponse !== 'no' && <>...</>}</>` JSX block (both the remindMe checkbox and newsletter signup labels).
+  7. Added `{recurrenceRule && <p>Recurring — applies to all occurrences</p>}` near the RSVP buttons.
+  ALSO: dropped the `{...({} as any)}` spread from the test now that recurrenceRule is a real prop.
 
 Following the line numbers from the spec:
 - Delete line 17: `remindMe?: boolean;` from the input type
