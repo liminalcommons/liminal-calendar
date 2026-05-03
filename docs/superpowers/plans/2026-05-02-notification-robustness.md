@@ -1608,7 +1608,7 @@ Add to the `crons` array:
 { "path": "/api/cron/heartbeat-check", "schedule": "0 12 * * *" }
 ```
 
-- [ ] **Step 5: Run test, see GREEN, typecheck, commit**
+- [x] **Step 5: Run test, see GREEN, typecheck, commit** — completed across cycles 34 (route impl GREEN) and 35 (vercel.json config). Jest heartbeat-check 3/3; full suite 50/50 suites, 363/363 tests; tsc exit=0; commits e432d67 (route) + 72cb10a (vercel.json). Task 12 structurally complete (5/5 boxes).
 
 ```bash
 npx jest src/__tests__/app/api/cron/heartbeat-check.test.ts
