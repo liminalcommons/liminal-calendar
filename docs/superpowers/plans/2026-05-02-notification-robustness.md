@@ -1835,7 +1835,23 @@ git commit -m "chore(ui): EventRSVP — drop remindMe toggle + newsletter, add r
 
 This task is run by the loop after all prior tasks are committed. It uses the Chrome MCP browser automation tools to walk the full flow against the deployed PBE environment (or a local `npm run dev`). It produces no code changes — it produces a pass/fail signal.
 
-- [ ] **Step 1: Pre-flight checks**
+- [x] **Step 1: Pre-flight checks** — VERIFIED via Chrome MCP `javascript_tool` against `localhost:3013` (user-started dev server). Real browser evidence:
+
+```json
+{
+  "url": "http://localhost:3013/settings/notifications",
+  "swRegistered": true,
+  "swActive": true,
+  "swScriptUrl": "http://localhost:3013/sw.js",
+  "manifestLoaded": true,
+  "manifestDisplay": "standalone",
+  "manifestStartUrl": "/list",
+  "manifestName": "Liminal Commons Calendar",
+  "manifestIconCount": 3
+}
+```
+
+ALL pre-flight assertions hold: SW registered + active + scriptURL = /sw.js; manifest loaded with display:standalone, 3 icons, start_url /list.
 
 Navigate to the deployed liminalcalendar.com (or PBE).
 - DevTools → Application → Service Workers → confirm `/sw.js` registered + active
