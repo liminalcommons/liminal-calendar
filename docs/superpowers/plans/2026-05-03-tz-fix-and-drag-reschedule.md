@@ -247,7 +247,7 @@ git commit -m "positiva: cal-tz-drag — Slice A complete + Chrome verified (Tas
 - Create: `src/lib/drag-reschedule.ts`
 - Create: `src/__tests__/lib/drag-reschedule.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```ts
 // src/__tests__/lib/drag-reschedule.test.ts
@@ -301,7 +301,7 @@ describe('applyDeltaMinutes', () => {
 Run: `npx jest src/__tests__/lib/drag-reschedule.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 2: Implement helpers**
+- [x] **Step 2: Implement helpers**
 
 ```ts
 // src/lib/drag-reschedule.ts
@@ -337,14 +337,18 @@ export function applyDeltaMinutes<T extends { starts_at: string; ends_at: string
 }
 ```
 
-- [ ] **Step 3: Run tests → PASS, typecheck, commit**
+- [x] **Step 3: Run tests → PASS, typecheck, commit**
 
 ```bash
-npx jest src/__tests__/lib/drag-reschedule.test.ts
-npx tsc --noEmit
+npx jest src/__tests__/lib/drag-reschedule.test.ts   # 10/10 pass
+npx tsc --noEmit                                      # exit 0
 git add src/lib/drag-reschedule.ts src/__tests__/lib/drag-reschedule.test.ts
 git commit -m "positiva: cal-tz-drag — pure drag math helpers + tests (Task B1)"
 ```
+
+Tests added beyond plan: `clamps negative px to 0`, `preserves null ends_at`,
+`supports negative delta (drag earlier)`. The negative-delta case is critical
+since dragging an event upward in the grid produces a negative deltaMinutes.
 
 ---
 
