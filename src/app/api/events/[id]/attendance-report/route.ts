@@ -8,31 +8,11 @@ import {
   getAttendanceReportForUser,
   REPORT_NOTE_MAX_LENGTH,
 } from '@/lib/attendance-reports/repo';
+import { eventEndedAt, type EventTimeFields } from '@/lib/event-time';
 
-interface EventTimeRow {
-  // Drizzle row maps DB snake_case to camelCase, but the route's test
-  // shape uses snake_case (matches the JSON wire format from /api/events/[id]).
-  // Accept either at this seam to keep both layers honest.
-  startsAt?: Date | string | null;
-  endsAt?: Date | string | null;
-  starts_at?: Date | string | null;
-  ends_at?: Date | string | null;
-}
-
-const ONE_HOUR_MS = 60 * 60 * 1000;
-
-async function findEvent(numId: number): Promise<EventTimeRow | null> {
+async function findEvent(numId: number): Promise<EventTimeFields | null> {
   const rows = await db.select().from(events).where(eq(events.id, numId));
-  return (rows[0] as EventTimeRow | undefined) ?? null;
-}
-
-function eventEndedAt(event: EventTimeRow): number {
-  const ends = event.endsAt ?? event.ends_at ?? null;
-  const starts = event.startsAt ?? event.starts_at ?? null;
-  if (ends) return new Date(ends as Date | string).getTime();
-  // Fallback: treat events without ends_at as ending 1h after start.
-  if (starts) return new Date(starts as Date | string).getTime() + ONE_HOUR_MS;
-  return 0;
+  return (rows[0] as EventTimeFields | undefined) ?? null;
 }
 
 export async function POST(

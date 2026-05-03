@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { apiFetch } from '@/lib/api-fetch';
+import { eventHasEnded } from '@/lib/event-time';
 
 interface Props {
   eventId: number;
@@ -19,14 +20,6 @@ interface ReportRow {
   note: string | null;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
-
-function eventHasEnded(startsAt: string | null, endsAt: string | null): boolean {
-  if (endsAt) return Date.now() >= new Date(endsAt).getTime();
-  if (startsAt) return Date.now() >= new Date(startsAt).getTime() + ONE_HOUR_MS;
-  return false;
-}
-
 type Answer = 'yes' | 'no' | null;
 
 function answerOf(b: boolean | undefined | null): Answer {
@@ -38,7 +31,7 @@ function answerOf(b: boolean | undefined | null): Answer {
 export function AttendanceReportSection({ eventId, startsAt, endsAt }: Props) {
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
-  const ended = eventHasEnded(startsAt, endsAt);
+  const ended = eventHasEnded({ startsAt, endsAt });
 
   const shouldRender = isAuthenticated && ended;
 
