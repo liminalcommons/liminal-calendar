@@ -84,6 +84,30 @@ export async function PATCH(
   }
 
   const updates = body as Record<string, unknown>;
+
+  // Drag-to-reschedule sends `scope` to express the user's choice from the
+  // RecurrenceMoveModal. Only `'all'` (or omitted = legacy edit-form) is
+  // supported in v1. The other two are explicit 501s so a future client bug
+  // that drops past the modal's disabled radios fails loud, not silent.
+  // See: docs/superpowers/specs/2026-05-03-tz-fix-and-drag-reschedule-design.md
+  if (updates.scope !== undefined) {
+    if (updates.scope === 'this_only' || updates.scope === 'this_and_following') {
+      return NextResponse.json(
+        { error: `scope="${updates.scope}" is not implemented in v1; use "all" or omit.` },
+        { status: 501 },
+      );
+    }
+    if (updates.scope !== 'all') {
+      return NextResponse.json(
+        { error: `Invalid scope; expected "all", "this_only", "this_and_following", or omitted.` },
+        { status: 400 },
+      );
+    }
+    // scope === 'all' → fall through. The natural behavior of updating
+    // events.startsAt/endsAt IS the all-instance shift, since
+    // expandRecurringEvents uses the row as the rule template.
+  }
+
   const setValues: Record<string, unknown> = { updatedAt: new Date() };
 
   if (typeof updates.title === 'string') setValues.title = updates.title;

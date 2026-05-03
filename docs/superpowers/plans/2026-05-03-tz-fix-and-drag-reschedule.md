@@ -560,19 +560,49 @@ npx tsc --noEmit            # exit 0
 
 ---
 
-### Task B5: Server-side perm test for PATCH on recurring "all"
+### Task B5: Server-side scope handling for PATCH
 
 **Files:**
-- Modify: `src/app/api/events/[id]/route.ts` (if needed — check whether template propagation already happens)
-- Create: `src/__tests__/app/events-patch-recurring-all.test.ts`
+- Modify: `src/app/api/events/[id]/route.ts` (added scope validation; no template-shift needed)
+- Create: `src/__tests__/app/events-patch-scope.test.ts`
 
-- [ ] **Step 1: Failing test — PATCH with `{ scope: 'all', startTime, endTime }` on recurring event shifts the recurrence template**
+**Discovery during B5:** The codebase does NOT have a separate KV-backed
+recurrence rule template that needs syncing. `src/lib/recurrence.ts` has the
+type defined but it's unused (no callers — it's dead code from a prior
+attempt). The actual recurrence model is `events.recurrenceRule` (string
+column) + `expandRecurringEvents` (client-side virtual instance generator
+that uses the row as the template). So updating the row's `startsAt` IS
+the all-instance shift — no `saveRecurrenceRule` call needed.
 
-- [ ] **Step 2: Implement template-shift in PATCH handler**
+The plan's note "additionally call `saveRecurrenceRule`" doesn't apply.
+What B5 ADDS instead is explicit scope validation: defense in depth so a
+future client bug that bypasses the modal's disabled radios fails loud
+with a clear 501/400, not a silent accept.
 
-When request body has `scope: 'all'` AND event is recurring, additionally call `saveRecurrenceRule` with the shifted template.
+- [x] **Step 1: Failing tests — scope validation**
 
-- [ ] **Step 3: Test + typecheck + commit**
+5 tests in `events-patch-scope.test.ts`:
+- accepts scope="all" + updates startsAt/endsAt + preserves recurrenceRule
+- rejects scope="this_only" with 501 Not Implemented
+- rejects scope="this_and_following" with 501
+- rejects unknown scope (`'garbage'`) with 400
+- accepts no scope (legacy edit-form path)
+
+- [x] **Step 2: Implement scope validation in PATCH handler**
+
+Added an early branch in PATCH route that:
+- Lets `scope === undefined` and `scope === 'all'` fall through to existing
+  startsAt/endsAt update (which IS the all-instance shift).
+- Returns 501 for `'this_only'` / `'this_and_following'` with a clear message
+  pointing to v1 limitation.
+- Returns 400 for any other value.
+
+- [x] **Step 3: Test + typecheck + commit**
+
+```bash
+npx jest src/__tests__/app/events-patch-scope.test.ts   # 5/5 pass
+npx tsc --noEmit                                         # exit 0
+```
 
 ---
 
