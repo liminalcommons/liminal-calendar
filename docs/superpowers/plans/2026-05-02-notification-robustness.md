@@ -840,7 +840,7 @@ describe('Settings → Notifications page', () => {
 Run: `npx jest src/__tests__/app/settings/notifications-page.test.tsx`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation** (DEVIATION: added `_request: Request` unused-param + `// @typescript-eslint/no-unused-vars` eslint-disable to the rsvped-events route — same pattern as Task 3 GET signature harmonization. The plan's prescribed code took `request` then used it; I made it `_request` to match Task 3 precedent, but actually use it via `_request.url`. Functionally identical to the plan, just leading-underscore convention.)
 
 ```tsx
 // src/app/settings/notifications/page.tsx
@@ -946,7 +946,7 @@ export async function GET(request: Request) {
 
 This approach avoids extending `/api/events` with a `mine` filter (smaller blast radius) and reuses the same RSVP-id subquery pattern as Task 11.
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 1/1 pass for notifications-page.test.tsx. Full suite: 44/44 suites, 351/351 tests pass. Typecheck exit=0. Chrome MCP: connected (8 prod tabs visible) but no local dev server running, so page-level browser verification deferred to Task 16 E2E (per spec §11.2 acceptance gate). The component test contract — heading + prefs testid + rsvps testid render — is verified.
 
 Run: `npx jest src/__tests__/app/settings/notifications-page.test.tsx`
 Expected: PASS.
