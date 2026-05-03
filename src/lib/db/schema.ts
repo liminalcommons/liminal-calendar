@@ -129,6 +129,49 @@ export const newsletterSubscribers = pgTable('newsletter_subscribers', {
 export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
 export type NewNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert;
 
+// Member-authored comments on events. Flat list (no threading).
+// `deleted_at` enables soft-delete: hides from feed but keeps the row so an
+// admin audit trail and any future replies remain anchored.
+export const eventComments = pgTable('event_comments', {
+  id: serial('id').primaryKey(),
+  eventId: integer('event_id')
+    .notNull()
+    .references(() => events.id, { onDelete: 'cascade' }),
+  authorId: text('author_id').notNull(), // hyloId or clerkId — same convention as rsvps.userId
+  authorName: text('author_name').notNull(),
+  authorImage: text('author_image'),
+  body: text('body').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// Post-event attendance reports. One row per (event, reporter). Upserted on
+// resubmission. Allowed only after the event has ended (enforced by API).
+export const attendanceReports = pgTable(
+  'attendance_reports',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    reporterId: text('reporter_id').notNull(),
+    reporterName: text('reporter_name').notNull(),
+    eventHappened: boolean('event_happened').notNull(),
+    hostPresent: boolean('host_present').notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique('attendance_report_event_reporter_unique').on(table.eventId, table.reporterId),
+  ],
+);
+
+export type EventComment = typeof eventComments.$inferSelect;
+export type NewEventComment = typeof eventComments.$inferInsert;
+export type AttendanceReport = typeof attendanceReports.$inferSelect;
+export type NewAttendanceReport = typeof attendanceReports.$inferInsert;
+
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
