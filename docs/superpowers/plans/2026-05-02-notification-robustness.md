@@ -1857,7 +1857,14 @@ Navigate to the deployed liminalcalendar.com (or PBE).
 - DevTools → Application → Service Workers → confirm `/sw.js` registered + active
 - Application → Manifest → confirm `manifest.json` loads with display:standalone
 
-- [ ] **Step 2: Onboarding flow (desktop Chrome)**
+- [x] **Step 2: Onboarding flow (desktop Chrome)** — **DEFERRED to manual user verification**. Status: `/api/auth/session` returns `200 + null` on localhost:3013 — the dev server has no authenticated user. Sign-in via Chrome MCP automation is impractical because the Hylo OAuth flow involves cross-domain redirects, consent screens, and per-cycle-21 still-applicable concern about state-affecting actions. The unit tests in `SubscribePrompt-prefs.test.tsx` (Task 9, commit a21f344) verify the same behaviors deterministically (mock-authed user → 6 checkboxes render with correct defaults → toggle fires PUT). Per negativa-24's improvement: Step 2 marked deferred-pending-user; proceeding to Steps 3-7 which work signed-out.
+
+**Manual verification recipe (for the user post-deploy)**:
+1. Sign into liminalcalendar.com with a Hylo account
+2. Wait 2s after auth → SubscribePrompt should appear
+3. Confirm 6 checkboxes (3 push + 3 email)
+4. Check that push defaults are checked, email defaults are unchecked
+5. Click any email checkbox → network tab should show `PUT /api/preferences/notifications` with the toggled key=true
 
 Sign in. Wait 2s. Verify:
 - SubscribePrompt opens
