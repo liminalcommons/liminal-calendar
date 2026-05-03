@@ -386,7 +386,7 @@ describe('PUT /api/preferences/notifications', () => {
 Run: `npx jest src/__tests__/app/api/preferences-notifications.test.ts`
 Expected: FAIL — `Cannot find module '@/app/api/preferences/notifications/route'`.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation** (TWO DEVIATIONS: (1) added `@jest-environment node` directive to the route test file because Next's `next/server` needs Request global, which jsdom doesn't provide cleanly — matches the existing project convention in `rsvp-route.test.ts`; (2) GET signature changed from `GET()` to `GET(_request: Request)` to satisfy TS strict — the plan's test code calls `GET(new Request(...))` but the plan's impl declared no parameters, causing TS2554. Adding an unused `_request` parameter is the minimal harmonization.)
 
 ```ts
 // src/app/api/preferences/notifications/route.ts
@@ -432,7 +432,7 @@ export async function PUT(request: Request) {
 }
 ```
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 5/5 tests pass. Full jest suite re-run per negativa-2 improvement: 41/41 suites pass, 345/345 tests pass — no cross-cutting regression. tsc exit=0.
 
 Run: `npx jest src/__tests__/app/api/preferences-notifications.test.ts`
 Expected: PASS (5 tests).

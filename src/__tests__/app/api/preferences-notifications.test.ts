@@ -1,3 +1,7 @@
+/**
+ * @jest-environment node
+ */
+
 import { GET, PUT } from '@/app/api/preferences/notifications/route';
 
 jest.mock('@/../auth', () => ({
