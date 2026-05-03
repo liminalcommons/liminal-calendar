@@ -1082,7 +1082,7 @@ describe('InstallPrompt iOS branch', () => {
 Run: `npx jest src/__tests__/components/InstallPrompt-ios.test.tsx`
 Expected: FAIL — current InstallPrompt has no iOS branch.
 
-- [ ] **Step 3: Modify InstallPrompt.tsx**
+- [x] **Step 3: Modify InstallPrompt.tsx** (TWO PLAN DEFECTS resolved at GREEN time: (1) the `// @ts-expect-error test reset` comment from Step 1's prescribed test was unused — `as any` cast already silences TS — replaced with `// eslint-disable-next-line @typescript-eslint/no-explicit-any` (resolves negativa-10 TS2578); (2) the prescribed `findByText(/Add to Home Screen/i)` matched BOTH the iOS card heading AND the third instruction list item ("Scroll down and tap 'Add to Home Screen'") — anchored to `/^Add to Home Screen$/i` to match the heading exclusively. Plan's prescribed impl code (state declaration + useEffect rewrite + iOS render branch) was used as-is; deviations are test-side.)
 
 Replace the existing `useEffect` with:
 
@@ -1153,7 +1153,7 @@ if (iosMode) {
 
 (Existing non-iOS render stays as the fallback.)
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 3/3 pass for InstallPrompt-ios.test.tsx. Full suite: 46/46 suites, 355/355 tests pass. Typecheck: `npx tsc --noEmit` exit=0 (TS2578 resolved alongside this cycle).
 
 Run: `npx jest src/__tests__/components/InstallPrompt-ios.test.tsx`
 Expected: PASS.
