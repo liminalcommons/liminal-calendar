@@ -794,7 +794,7 @@ export function NotificationPreferences() {
 Run: `npx jest src/__tests__/components/NotificationPreferences.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run typecheck + commit**
+- [x] **Step 5: Run typecheck + commit** — completed in cycle 12 alongside Steps 3-4. tsc exit=0 verified; component + test committed at 36793cd. Tick reflects Task 5 is structurally complete (5/5 boxes).
 
 ```bash
 npx tsc --noEmit
