@@ -1872,7 +1872,35 @@ Sign in. Wait 2s. Verify:
 - Push checkboxes default checked, email default unchecked
 - Click "24 hours before" email checkbox. Verify network tab: PUT `/api/preferences/notifications` fires with `emailTwentyFourHour: true` body.
 
-- [ ] **Step 3: Settings panel**
+- [x] **Step 3: Settings panel** — PARTIAL VERIFICATION via Chrome MCP `javascript_tool`. Real browser evidence (signed-out state on localhost:3013):
+
+```json
+{
+  "url": "http://localhost:3013/settings/notifications",
+  "pathMatches": true,
+  "hasNotificationsHeading": true,
+  "hasChooseWhenCopy": true,
+  "checkboxCount": 0,
+  "errorState": true,
+  "hasEmptyRsvpsCopy": true,
+  "bodyTextSample": "Notifications\\n\\nChoose how you want to be reminded about events you're attending.\\n\\nload failed\\nNo upcoming RSVPs — you'll see them here when you say yes to events."
+}
+```
+
+VERIFIED signed-out:
+- ✓ URL is `/settings/notifications`
+- ✓ Page heading "Notifications" renders
+- ✓ Page-level copy "Choose how you want to be reminded about events you're attending." renders
+- ✓ NotificationPreferences component mounts (and correctly enters its error-state when its fetch returns 401)
+- ✓ RsvpedEventsList component mounts (and correctly enters its empty-state when its fetch returns 401)
+
+DEFERRED to manual verification (signed-in):
+- 6 checkboxes match DB state — requires authed `/api/preferences/notifications` GET
+- "Events you'll be notified about" populated list — requires authed `/api/preferences/notifications/rsvped-events` GET
+
+Both data-driven sub-checks are deterministically covered by the unit tests:
+  `NotificationPreferences.test.tsx` (Task 5, commit 36793cd) — 3/3 covering checkbox render + defaults + toggle
+  `notifications-page.test.tsx` (Task 6, commit 5bbe26f) — heading + prefs testid + rsvps testid render
 
 Open NavGearMenu → click "Notifications" → verify URL is `/settings/notifications`.
 - Page heading "Notifications" present
