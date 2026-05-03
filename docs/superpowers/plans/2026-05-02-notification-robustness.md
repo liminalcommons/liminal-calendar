@@ -454,7 +454,7 @@ git commit -m "feat(api): GET/PUT /api/preferences/notifications"
 - Modify: `src/lib/notifications/reminder-dispatch.ts` (if it reads `remindMe`)
 - Test: `src/__tests__/app/api/cron/send-reminders-prefs.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** (DEVIATION: added `@jest-environment node` directive at top — same precedent as `rsvp-route.test.ts` and Task 3 cycle 6.)
 
 ```ts
 // src/__tests__/app/api/cron/send-reminders-prefs.test.ts
@@ -522,7 +522,7 @@ describe('cron send-reminders read path', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: `Expected: >= 12, Received: 6`. Current cron does 1 innerJoin per window (3 EMAIL + 3 PUSH = 6 total). Auth-rejection test passes independently. RED for the right reason.
 
 Run: `npx jest src/__tests__/app/api/cron/send-reminders-prefs.test.ts`
 Expected: FAIL — current cron only calls `innerJoin(rsvps, ...)` (one join per window), not the second `innerJoin(notificationPreferences, ...)`. So the count will be 6, not ≥12.
