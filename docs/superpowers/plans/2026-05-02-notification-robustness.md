@@ -1224,7 +1224,7 @@ describe('SubscribePrompt notifications step', () => {
 Run: `npx jest src/__tests__/components/SubscribePrompt-prefs.test.tsx`
 Expected: FAIL — current notifications step is a plain button, no checkboxes.
 
-- [ ] **Step 3: Modify SubscribePrompt notifications step**
+- [x] **Step 3: Modify SubscribePrompt notifications step** — replaced inner `<div className="px-6 pt-6 pb-4">` body content (lines 126-156) with the plan's prescribed JSX. Added `import { NotificationPreferences } from '@/components/NotificationPreferences'` at the top. Preserved the existing footer "You can change this anytime in Settings" (line 158-162) — plan said "replace the body" without specifying the footer, so kept it as it's still relevant copy. Body change: text from "Get notifications 1 hour, 15 minutes, and right as an event starts..." (hardcoded copy) to "Choose when to be reminded for events you RSVP to." + `<NotificationPreferences />` component. The Enable/Maybe later buttons preserved (now below the checkbox grid via `mt-5`). Replaced "Setting up..." with "Setting up…" (em-dash) per plan.
 
 In the `step === 'notifications'` branch (lines ~122-166), replace the body with:
 
@@ -1267,7 +1267,7 @@ In the `step === 'notifications'` branch (lines ~122-166), replace the body with
 
 Add `import { NotificationPreferences } from '@/components/NotificationPreferences';` at the top.
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 1/1 pass for SubscribePrompt-prefs.test.tsx. Full suite: 47/47 suites, 356/356 tests pass — no regression. Typecheck: `npx tsc --noEmit` exit=0.
 
 Run: `npx jest src/__tests__/components/SubscribePrompt-prefs.test.tsx`
 Expected: PASS.

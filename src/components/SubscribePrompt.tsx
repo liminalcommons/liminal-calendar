@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { Calendar, ExternalLink, Check, Bell } from 'lucide-react'
 import { useFeedUrls } from '@/lib/use-feed-urls'
 import { apiFetch } from '@/lib/api-fetch'
+import { NotificationPreferences } from '@/components/NotificationPreferences'
 
 const STORAGE_KEY = 'calendar-subscribe-dismissed'
 
@@ -133,18 +134,21 @@ export function SubscribePrompt() {
                 <p className="text-sm text-grove-text-muted">Step 1 of 2</p>
               </div>
             </div>
+
             <p className="text-sm text-grove-text leading-relaxed mb-5">
-              Get notifications <strong>1 hour, 15 minutes, and right as an event starts</strong> for anything you RSVP to. Enough runway to show up without losing the day.
+              Choose when to be reminded for events you RSVP to.
             </p>
 
-            <div className="space-y-2">
+            <NotificationPreferences />
+
+            <div className="space-y-2 mt-5">
               <button
                 onClick={handleEnableNotifications}
                 disabled={pushLoading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-grove-accent-deep text-grove-surface font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 <Bell size={16} />
-                {pushLoading ? 'Setting up...' : 'Enable notifications'}
+                {pushLoading ? 'Setting up…' : 'Enable notifications'}
               </button>
               <button
                 onClick={handleSkipNotifications}
