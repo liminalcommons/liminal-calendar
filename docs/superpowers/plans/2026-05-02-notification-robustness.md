@@ -1386,7 +1386,7 @@ git commit -m "feat(ui): SubscribePrompt iOS guard swaps Enable for install inst
 - Modify: `src/app/api/calendar/feed.ics/route.ts`
 - Test: `src/__tests__/app/api/feed-ics-filter.test.ts`
 
-- [ ] **Step 1: Read the existing feed route to understand its current shape**
+- [x] **Step 1: Read the existing feed route to understand its current shape** — read `src/app/api/calendar/feed.ics/route.ts` (68 lines). Current shape: reads optional `token` query param via `request.nextUrl.searchParams.get('token')`; if token present, looks up member by `feedToken` to derive `_userId` (currently UNUSED — comment says "Future: use _userId to apply per-user algorithmic filtering"); selects all events with `db.select().from(events).orderBy(asc(events.startsAt))`; maps to ICS format via `dbEventToDisplayEvent` + `generateCalendarFeed`; returns ICS with cache-control. Imports already include `asc, eq` from drizzle-orm and `events, members` from schema. Step 3 will add `?filter=rsvps-only` branch using `_userId` — per Task 11 plan: subquery rsvps for eventIds, then filter events via `inArray`. Will need to add `and, not, inArray` to drizzle-orm imports + `rsvps` to schema imports.
 
 Run: `cat src/app/api/calendar/feed.ics/route.ts`
 
