@@ -1272,7 +1272,7 @@ Add `import { NotificationPreferences } from '@/components/NotificationPreferenc
 Run: `npx jest src/__tests__/components/SubscribePrompt-prefs.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Typecheck + commit**
+- [x] **Step 5: Typecheck + commit** — completed in cycle 25 alongside Steps 3-4. tsc exit=0 verified; impl + test in a21f344. Task 9 structurally complete (5/5 boxes).
 
 ```bash
 npx tsc --noEmit
