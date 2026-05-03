@@ -1480,7 +1480,7 @@ if (filter === 'rsvps-only' && _userId) {
 
 Replace the existing `const allEvents = await db.select()...` line (line 35) with the conditional block above.
 
-- [ ] **Step 4: Replace .todo assertions with real tests, run, see GREEN**
+- [x] **Step 4: Replace .todo assertions with real tests, run, see GREEN** — completed in cycles 30-31 alongside Steps 2-3. Test was written with real assertions from the start (the plan's `.todo` placeholders were a brainstorming-phase artifact; the published plan code at Step 2 already had real `expect(...)` calls). Jest 3/3 + tsc exit=0 verified at cycle 31; impl + test in 55e2ffa. Task 11 structurally complete (4/4 boxes).
 
 ```bash
 npx jest src/__tests__/app/api/feed-ics-filter.test.ts
