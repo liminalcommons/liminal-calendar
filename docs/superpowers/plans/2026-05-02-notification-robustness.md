@@ -1031,7 +1031,7 @@ git commit -m "feat(ui): NavGearMenu link to /settings/notifications"
 - Modify: `src/components/InstallPrompt.tsx`
 - Test: `src/__tests__/components/InstallPrompt-ios.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** (DEVIATION: added a `beforeAll` block that stubs `window.matchMedia` because jsdom doesn't provide it, and the existing `InstallPrompt.tsx` line 22 calls `window.matchMedia('(display-mode: standalone)').matches`. Without the stub, all 3 tests crash before any assertion. With the stub, 2 tests already pass (the "should NOT show iOS card" cases — desktop Chrome and iOS-standalone), and 1 test fails for the right reason — the iOS-not-standalone case expects iOS card text that the impl doesn't yet render.)
 
 ```tsx
 // src/__tests__/components/InstallPrompt-ios.test.tsx
@@ -1077,7 +1077,7 @@ describe('InstallPrompt iOS branch', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: 1/3 tests fail. The "iOS Safari not in standalone mode" test cannot find "Add to Home Screen" text because the iOS branch doesn't exist (component returns null in this state). Tests 2 and 3 (the "should NOT show" cases) already pass. RED for the right reason — Step 4 will add the iOS branch and flip test 1 to GREEN.
 
 Run: `npx jest src/__tests__/components/InstallPrompt-ios.test.tsx`
 Expected: FAIL — current InstallPrompt has no iOS branch.
