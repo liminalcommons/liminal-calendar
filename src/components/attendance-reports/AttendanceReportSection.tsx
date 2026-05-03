@@ -103,7 +103,11 @@ export function AttendanceReportSection({ eventId, startsAt, endsAt }: Props) {
   if (!shouldRender) return null;
 
   return (
-    <section aria-labelledby="attendance-report-heading" className="mt-8">
+    <section
+      id="attendance-report"
+      aria-labelledby="attendance-report-heading"
+      className="mt-8"
+    >
       <h2
         id="attendance-report-heading"
         className="text-lg font-serif text-grove-text mb-2"

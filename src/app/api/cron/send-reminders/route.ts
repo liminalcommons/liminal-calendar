@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { events, rsvps, members, notificationLog, notificationPreferences } from '@/lib/db/schema';
-import { and, eq, gte, lte, not, inArray, or } from 'drizzle-orm';
+import {
+  events,
+  rsvps,
+  members,
+  notificationLog,
+  notificationPreferences,
+  attendanceReports,
+} from '@/lib/db/schema';
+import { and, eq, gte, lte, not, inArray, or, sql } from 'drizzle-orm';
 import { WINDOW_TO_COLUMN, type NotificationChannelHorizon } from '@/lib/notifications/preferences';
 import { sendEmail } from '@/lib/email';
 import { buildReminderEmail, type ReminderType } from '@/lib/notifications/reminders';
@@ -13,6 +20,10 @@ import {
   pickPushClickUrl,
   PUSH_WINDOWS,
   EMAIL_WINDOWS,
+  computePostEventWindow,
+  filterUnreportedRecipients,
+  buildPostEventPayload,
+  POST_EVENT_PUSH_WINDOW,
 } from '@/lib/notifications/reminder-dispatch';
 
 export const dynamic = 'force-dynamic';
@@ -201,5 +212,87 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ sent, skipped, errors, pushSent, timestamp: now.toISOString() });
+  // Post-event prompt: ask RSVP=yes attendees to mark whether the event
+  // happened. Fires once per (event, user) via notificationLog dedupe and
+  // is suppressed for users who already filed an attendanceReports row.
+  let postEventSent = 0;
+  {
+    const { windowStart, windowEnd } = computePostEventWindow(
+      now,
+      POST_EVENT_PUSH_WINDOW.minMinAfterEnd,
+      POST_EVENT_PUSH_WINDOW.maxMinAfterEnd,
+    );
+    const effectiveEnd = sql<Date>`COALESCE(${events.endsAt}, ${events.startsAt} + interval '60 minutes')`;
+
+    const due = await db
+      .select({
+        eventId: events.id,
+        title: events.title,
+        userId: rsvps.userId,
+      })
+      .from(events)
+      .innerJoin(rsvps, and(eq(rsvps.eventId, events.id), eq(rsvps.status, 'yes')))
+      .where(and(gte(effectiveEnd, windowStart), lte(effectiveEnd, windowEnd)));
+
+    if (due.length > 0) {
+      const eventIdsForLookup = [...new Set(due.map((d) => d.eventId))];
+
+      const alreadySentPostEvent = await db
+        .select({ eventId: notificationLog.eventId, userId: notificationLog.userId })
+        .from(notificationLog)
+        .where(
+          and(
+            eq(notificationLog.type, POST_EVENT_PUSH_WINDOW.type),
+            inArray(notificationLog.eventId, eventIdsForLookup),
+          ),
+        );
+
+      const alreadyReported = await db
+        .select({ eventId: attendanceReports.eventId, userId: attendanceReports.reporterId })
+        .from(attendanceReports)
+        .where(inArray(attendanceReports.eventId, eventIdsForLookup));
+
+      const unsent = filterUnsentRecipients(due, alreadySentPostEvent);
+      const unreported = filterUnreportedRecipients(unsent, alreadyReported);
+
+      // Group by event so each event gets one push call (multiple userIds).
+      const grouped = new Map<number, { title: string; userIds: string[] }>();
+      for (const r of unreported) {
+        const g = grouped.get(r.eventId);
+        if (g) {
+          if (!g.userIds.includes(r.userId)) g.userIds.push(r.userId);
+        } else {
+          grouped.set(r.eventId, { title: r.title, userIds: [r.userId] });
+        }
+      }
+
+      for (const [eventId, info] of grouped) {
+        const payload = buildPostEventPayload(eventId, info.title);
+        const result = await sendPushToUsers(info.userIds, payload);
+        postEventSent += result.sent;
+
+        if (result.sent > 0) {
+          await db
+            .insert(notificationLog)
+            .values(
+              info.userIds.map((uid) => ({
+                eventId,
+                userId: uid,
+                type: POST_EVENT_PUSH_WINDOW.type,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({
+    sent,
+    skipped,
+    errors,
+    pushSent,
+    postEventSent,
+    timestamp: now.toISOString(),
+  });
 }
