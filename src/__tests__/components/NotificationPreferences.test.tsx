@@ -16,38 +16,40 @@ function mockGetReturns(prefs: Record<string, boolean>) {
 }
 
 describe('<NotificationPreferences>', () => {
-  it('renders six checkboxes after load', async () => {
+  it('renders six toggles after load', async () => {
     mockGetReturns({
       pushOneHour: true, pushFifteenMin: true, pushAtStart: true,
       emailTwentyFourHour: false, emailOneHour: false, emailFifteenMin: false,
     });
     render(<NotificationPreferences />);
     await waitFor(() => {
-      expect(screen.getAllByRole('checkbox')).toHaveLength(6);
+      expect(screen.getAllByRole('switch')).toHaveLength(6);
     });
   });
 
-  it('reflects loaded state in checkbox checked attribute', async () => {
+  it('reflects loaded state in toggle aria-checked attribute', async () => {
     mockGetReturns({
       pushOneHour: true, pushFifteenMin: false, pushAtStart: true,
       emailTwentyFourHour: false, emailOneHour: true, emailFifteenMin: false,
     });
     render(<NotificationPreferences />);
     await waitFor(() => {
-      expect(screen.getByLabelText(/1 hour before/i, { selector: 'input[name="pushOneHour"]' })).toBeChecked();
-      expect(screen.getByLabelText(/15 minutes before/i, { selector: 'input[name="pushFifteenMin"]' })).not.toBeChecked();
+      const pushOneHour = screen.getAllByRole('switch', { name: /1 hour before/i })[0];
+      const pushFifteenMin = screen.getAllByRole('switch', { name: /15 minutes before/i })[0];
+      expect(pushOneHour).toHaveAttribute('aria-checked', 'true');
+      expect(pushFifteenMin).toHaveAttribute('aria-checked', 'false');
     });
   });
 
-  it('PUTs to /api/preferences/notifications when a checkbox toggles', async () => {
+  it('PUTs to /api/preferences/notifications when a toggle is clicked', async () => {
     mockGetReturns({
       pushOneHour: true, pushFifteenMin: true, pushAtStart: true,
       emailTwentyFourHour: false, emailOneHour: false, emailFifteenMin: false,
     });
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) } as Response);
     render(<NotificationPreferences />);
-    await waitFor(() => screen.getAllByRole('checkbox'));
-    fireEvent.click(screen.getByLabelText(/24 hours before/i));
+    await waitFor(() => screen.getAllByRole('switch'));
+    fireEvent.click(screen.getByRole('switch', { name: /24 hours before/i }));
     await waitFor(() => {
       const lastCall = fetchMock.mock.calls.at(-1);
       expect(lastCall?.[0]).toBe('/api/preferences/notifications');

@@ -35,7 +35,7 @@ describe('SubscribePrompt notifications step', () => {
     render(<SubscribePrompt />);
     await waitFor(() => screen.getByRole('heading', { name: /never miss/i }), { timeout: 3000 });
     await waitFor(() => {
-      expect(screen.getAllByRole('checkbox')).toHaveLength(6);
+      expect(screen.getAllByRole('switch')).toHaveLength(6);
     });
   });
 });
