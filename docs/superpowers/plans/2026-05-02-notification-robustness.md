@@ -437,7 +437,7 @@ export async function PUT(request: Request) {
 Run: `npx jest src/__tests__/app/api/preferences-notifications.test.ts`
 Expected: PASS (5 tests).
 
-- [ ] **Step 5: Run typecheck + commit**
+- [x] **Step 5: Run typecheck + commit** — completed in cycle 6 alongside Step 4. tsc exit=0 verified after the GET signature harmonization; files already in commit ba6567c. Tick reflects that Task 3 is structurally complete.
 
 ```bash
 npx tsc --noEmit
