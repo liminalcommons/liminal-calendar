@@ -1907,7 +1907,37 @@ Open NavGearMenu → click "Notifications" → verify URL is `/settings/notifica
 - 6 checkboxes match DB state (with the email_24h toggle from Step 2 reflected)
 - "Events you'll be notified about" list renders
 
-- [ ] **Step 4: Cleanups verified**
+- [x] **Step 4: Cleanups verified** — VERIFIED on both event types via Chrome MCP `javascript_tool` against localhost:3013.
+
+**Recurring event** (`/events/82-20260502` — Steward's Circle, weekly):
+```json
+{
+  "hasRemindMeLabel": false,
+  "hasNewsletterCopy": false,
+  "hasWeeklyBadge": true,          // existing EventDetailView recurrence badge preserved
+  "hasRecurringInlineText": false, // CORRECT: text is inside EventRSVP signed-in branch; signed-out user sees "Sign in to RSVP" instead
+  "hasSignInPrompt": true
+}
+```
+
+**Non-recurring event** (`/events/2` — "test event"):
+```json
+{
+  "hasRemindMeLabel": false,
+  "hasNewsletterCopy": false,
+  "hasRecurrenceBadge": false,
+  "hasRecurringInlineText": false  // CORRECT: event is not recurring
+}
+```
+
+VERIFIED:
+- ✓ No "Remind me" checkbox on either event (cleanup landed for both states)
+- ✓ No "Subscribe to the monthly newsletter" text on either event (cleanup landed)
+- ✓ Recurring event header preserves the "Weekly" recurrence badge from EventDetailView (existing rendering unchanged by this slice)
+- ✓ Recurring inline text correctly hidden in signed-out branch (inside EventRSVP's signed-in JSX block)
+- ✓ Non-recurring event correctly has neither recurrence badge nor inline text
+
+DEFERRED (signed-in only): the recurring inline text "Recurring — applies to all occurrences" actually rendering in the signed-in branch of a recurring event. Unit test `EventRSVP-cleanup.test.tsx` (Task 15, commit df2eaf0) covers this deterministically with a mocked-auth user — 4/4 pass.
 
 Open any event detail. Verify:
 - No "Remind me" checkbox visible
