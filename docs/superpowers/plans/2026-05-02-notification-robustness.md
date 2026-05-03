@@ -690,7 +690,7 @@ describe('<NotificationPreferences>', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: `Could not locate module @/components/NotificationPreferences` (module doesn't exist yet).
 
 Run: `npx jest src/__tests__/components/NotificationPreferences.test.tsx`
 Expected: FAIL — `Cannot find module '@/components/NotificationPreferences'`.
