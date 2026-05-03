@@ -998,7 +998,7 @@ describe('NavGearMenu', () => {
 Run: `npx jest src/__tests__/components/NavGearMenu-notifications-item.test.tsx`
 Expected: FAIL — link not present.
 
-- [ ] **Step 4: Add the link**
+- [x] **Step 4: Add the link** (THREE DEVIATIONS resolved at GREEN time: (1) test now provides required props `isAdmin={false} onSignOut={() => {}}` — plan's `<NavGearMenu />` would fail TS strict; (2) test now `fireEvent.click`s the gear button to open the menu before checking for the Link — menu items live inside `{open && ...}`; (3) test regex changed from `/notifications/i` to `/^notifications$/i` for clarity — though `getByRole('link')` already filters out the existing push-toggle button. Plan's prescribed Link snippet was used as-is; deviations are all on the test side. ALSO: added `onClick={() => setOpen(false)}` to the Link to close the menu on click — matches the existing /admin Link pattern in the same file.)
 
 In `src/components/NavGearMenu.tsx`, add inside the menu items list:
 

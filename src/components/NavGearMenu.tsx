@@ -145,6 +145,15 @@ export function NavGearMenu({ isAdmin, onSignOut }: NavGearMenuProps) {
             </button>
           )}
 
+          <Link
+            href="/settings/notifications"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 text-xs text-grove-text hover:bg-grove-border/30 transition-colors"
+          >
+            <Bell size={13} />
+            Notifications
+          </Link>
+
           <button
             onClick={() => setSubExpanded(!subExpanded)}
             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-grove-text hover:bg-grove-border/30 transition-colors"
