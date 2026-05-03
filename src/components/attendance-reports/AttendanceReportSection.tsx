@@ -42,6 +42,9 @@ export function AttendanceReportSection({ eventId, startsAt, endsAt }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hadInitialReport, setHadInitialReport] = useState(false);
+  // Gate the form behind the GET — without this, the empty form briefly
+  // renders before prefill lands (visible flicker for users with prior reports).
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     if (!shouldRender) return;
@@ -56,9 +59,10 @@ export function AttendanceReportSection({ eventId, startsAt, endsAt }: Props) {
           setNote(data.report.note ?? '');
           setHadInitialReport(true);
         }
+        setLoaded(true);
       })
       .catch(() => {
-        // best-effort; leave defaults
+        if (!cancelled) setLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -110,7 +114,9 @@ export function AttendanceReportSection({ eventId, startsAt, endsAt }: Props) {
         Help others know if this event actually happened. Your report is visible only to admins.
       </p>
 
-      {submitted ? (
+      {!loaded ? (
+        <p className="text-sm text-grove-text-muted italic py-4">Loading…</p>
+      ) : submitted ? (
         <p
           role="status"
           className="text-sm text-grove-accent-deep bg-grove-accent/10 border border-grove-accent/30 rounded-lg px-3 py-2"

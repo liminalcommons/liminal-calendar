@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { AttendanceReportSection } from '@/components/attendance-reports/AttendanceReportSection';
 
 jest.mock('next-auth/react', () => ({
@@ -161,6 +161,30 @@ describe('<AttendanceReportSection>', () => {
     await waitFor(() => {
       expect(screen.getByText(/thanks for reporting/i)).toBeInTheDocument();
     });
+  });
+
+  it('shows a Loading… placeholder while the GET is in flight (R3 flicker fix)', async () => {
+    mockUseSession.mockReturnValue({
+      data: { user: { name: 'A' } },
+      status: 'authenticated',
+    });
+    let resolveFetch: (v: unknown) => void = () => {};
+    fetchMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    render(
+      <AttendanceReportSection eventId={5} endsAt={yesterday} startsAt={yesterday} />,
+    );
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /submit/i })).not.toBeInTheDocument();
+    await act(async () => {
+      resolveFetch({ ok: true, json: async () => ({ report: null }) });
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /submit/i })).toBeInTheDocument(),
+    );
   });
 
   it('disables Submit until both questions are answered', async () => {
