@@ -233,7 +233,7 @@ describe('ensurePreferences (fake db)', () => {
 Run: `npx jest src/__tests__/lib/notifications/preferences.test.ts`
 Expected: FAIL — `Cannot find module '@/lib/notifications/preferences'`.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 ```ts
 // src/lib/notifications/preferences.ts
@@ -283,7 +283,7 @@ export async function updatePreferences(db: any, userId: string, update: Prefere
 }
 ```
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 3 tests pass (`Test Suites: 1 passed`, `Tests: 3 passed`).
 
 Run: `npx jest src/__tests__/lib/notifications/preferences.test.ts`
 Expected: PASS (8 assertions across 3 test blocks).
