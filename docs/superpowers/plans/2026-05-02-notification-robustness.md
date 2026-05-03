@@ -811,7 +811,7 @@ git commit -m "feat(ui): NotificationPreferences shared component"
 - Create: `src/app/settings/notifications/RsvpedEventsList.tsx`
 - Test: `src/__tests__/app/settings/notifications-page.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 // src/__tests__/app/settings/notifications-page.test.tsx
@@ -835,7 +835,7 @@ describe('Settings → Notifications page', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: jest fails at the RsvpedEventsList mock target import (`@/app/settings/notifications/RsvpedEventsList` not found) — module doesn't exist yet. RED for the right reason.
 
 Run: `npx jest src/__tests__/app/settings/notifications-page.test.tsx`
 Expected: FAIL — module not found.
