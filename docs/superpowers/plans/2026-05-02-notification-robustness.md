@@ -971,7 +971,7 @@ git commit -m "feat(ui): /settings/notifications page + RsvpedEventsList"
 
 Run: `grep -n "Link" src/components/NavGearMenu.tsx | head -10`
 
-- [ ] **Step 2: Write a minimal smoke test asserting the new item renders**
+- [x] **Step 2: Write a minimal smoke test asserting the new item renders** (FORESHADOWED PLAN DEFECT: the prescribed test renders `<NavGearMenu />` in closed state, but the menu items live inside `{open && ...}` block — even after Step 4 adds the Link, the closed-state DOM won't contain it. Will need a fireEvent.click in Step 4 cycle to open the menu before checking for the link. ALSO: NavGearMenu requires props `isAdmin: boolean, onSignOut: () => void` — plan's `<NavGearMenu />` without props would TS-error in strict mode, but ts-jest tolerates it for now. Both deviations to be handled at Step 4.)
 
 ```tsx
 // src/__tests__/components/NavGearMenu-notifications-item.test.tsx
@@ -993,7 +993,7 @@ describe('NavGearMenu', () => {
 });
 ```
 
-- [ ] **Step 3: Run the test, see RED**
+- [x] **Step 3: Run the test, see RED** — confirmed: `Unable to find a link with the accessible name /notifications/i`. Test fails because (a) the Link doesn't exist, AND (b) even if it did, the menu is closed by default. Both issues will be addressed at Step 4.
 
 Run: `npx jest src/__tests__/components/NavGearMenu-notifications-item.test.tsx`
 Expected: FAIL — link not present.
