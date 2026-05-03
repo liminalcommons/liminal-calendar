@@ -288,12 +288,12 @@ export async function updatePreferences(db: any, userId: string, update: Prefere
 Run: `npx jest src/__tests__/lib/notifications/preferences.test.ts`
 Expected: PASS (8 assertions across 3 test blocks).
 
-- [ ] **Step 5: Run typecheck**
+- [x] **Step 5: Run typecheck** — confirmed: `npx tsc --noEmit` exit=0 (silent). Already implicit in Step 4's jest run, but verified explicitly per cycle protocol.
 
 Run: `npx tsc --noEmit`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — files already committed across the RED commit (9da2ade) + GREEN commit (f57c380). No new commit needed; positiva's per-RED/GREEN cadence already produced the durable artifacts. Tick reflects that Task 2 is structurally complete.
 
 ```bash
 git add src/lib/notifications/preferences.ts src/__tests__/lib/notifications/preferences.test.ts
