@@ -586,7 +586,7 @@ Expected: PASS.
 Run: `npx jest src/__tests__/app/api/ -t "send-reminders"`
 Expected: PASS (or update mocks if older tests assumed `remindMe = true` filter).
 
-- [ ] **Step 6: Run typecheck + commit**
+- [x] **Step 6: Run typecheck + commit** — completed in cycle 9 alongside Steps 3-5. tsc exit=0 verified; impl + mock-fix files committed at 76ad9b8. Tick reflects Task 4 is structurally complete (6/6 boxes).
 
 ```bash
 npx tsc --noEmit
