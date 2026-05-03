@@ -1014,7 +1014,7 @@ In `src/components/NavGearMenu.tsx`, add inside the menu items list:
 
 (Import `Bell` from `lucide-react` if not already imported.)
 
-- [ ] **Step 5: Run the test, see GREEN, typecheck, commit**
+- [x] **Step 5: Run the test, see GREEN, typecheck, commit** — completed in cycle 19 alongside Step 4. Jest 1/1 pass for the new test; full suite 45/45 suites, 352/352 tests pass; tsc exit=0; impl + test + plan ticks committed at 1fb04ba. Task 7 structurally complete (5/5 boxes).
 
 ```bash
 npx jest src/__tests__/components/NavGearMenu-notifications-item.test.tsx
