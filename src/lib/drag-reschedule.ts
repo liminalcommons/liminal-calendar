@@ -44,3 +44,26 @@ export function applyDeltaMinutes<T extends { starts_at: string; ends_at: string
   const newEnd = new Date(end.getTime() + deltaMinutes * 60_000);
   return { starts_at: newStart.toISOString(), ends_at: newEnd.toISOString() };
 }
+
+/**
+ * Compose a PATCH payload from a drop event. Maps the original block's top
+ * pixel and the drop's final pixel through `pxToMinutesSnapped` (so both ends
+ * of the drag respect the fisheye + grain), takes the difference, and shifts
+ * the event by that delta. Same-pixel drops produce the identity (no PATCH
+ * worth sending — caller can compare and skip).
+ */
+export function computeDropPatch(args: {
+  starts_at: string;
+  ends_at: string | null;
+  originalTopPx: number;
+  finalTopPx: number;
+  hourOffsets: number[];
+  hourHeights: number[];
+  snap: number;
+}): { starts_at: string; ends_at: string | null } {
+  const { starts_at, ends_at, originalTopPx, finalTopPx, hourOffsets, hourHeights, snap } = args;
+  const originalMinutes = pxToMinutesSnapped(originalTopPx, hourOffsets, hourHeights, snap);
+  const newMinutes = pxToMinutesSnapped(finalTopPx, hourOffsets, hourHeights, snap);
+  const delta = newMinutes - originalMinutes;
+  return applyDeltaMinutes({ starts_at, ends_at }, delta);
+}

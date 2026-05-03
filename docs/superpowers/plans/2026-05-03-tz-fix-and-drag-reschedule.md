@@ -452,21 +452,65 @@ since the type allows omission.
 - Modify: `src/components/calendar/EventBlock.tsx`
 - Create: `src/__tests__/components/WeeklyGrid-drag.test.tsx`
 
-- [ ] **Step 1: Failing integration test — pointer drag on owner's event triggers PATCH**
+- [x] **Step 1: Failing tests**
 
-```tsx
-// Mock apiFetch, simulate pointerdown → pointermove → pointerup, assert PATCH called with new times.
+Plan called for a single integration test simulating the full pointer flow.
+Replaced with two narrower TDD layers (cleaner RED, easier to debug):
+
+  (a) `src/__tests__/lib/drag-reschedule.test.ts` — added 5 tests for new
+      `computeDropPatch` helper (identity, shift-down, shift-up, snap-to-grain,
+      null-end preservation). All RED before impl, all GREEN after.
+
+  (b) `src/__tests__/components/DayColumn-isowner-wiring.test.tsx` — 4 tests
+      asserting DayColumn threads `currentUserId` → EventBlock `isOwner`
+      correctly (owner match, non-owner, unauth-null, stringwise comparison
+      for numeric Hylo IDs). All RED before impl, all GREEN after.
+
+The actual pointer-event flow (pointerdown → window pointermove → pointerup
+→ PATCH) is NOT tested at the unit level. It's verified at the B6 Chrome MCP
+E2E layer. Justification: jsdom + window-level listeners + apiFetch mock
+produces a brittle test that doesn't represent the real DOM behavior; the
+math (computeDropPatch) and the wiring (isOwner/onDragStart) are both
+covered, and the integration is small enough that visual smoke catches the
+remaining seams. Negativa: flag as DRIFTING if you disagree with this
+scope choice.
+
+- [x] **Step 2: Implement**
+
+WeeklyGrid:
+- Reads `session.user.hyloId ?? session.user.id ?? null` as `currentUserId`,
+  passes through DayColumn (covered by wiring test).
+- Holds drag state in a `useRef` so pointer-move doesn't re-render.
+- `handleEventDragStart` (forwarded by EventBlock when `isOwner`):
+  * Skips recurring events (B4 will intercept with modal).
+  * Captures the block's top-px relative to the gridRef (accounting for
+    scroll).
+  * Attaches window-level pointermove + pointerup listeners.
+- On pointerup:
+  * `computeDropPatch` produces the new times.
+  * No-op short-circuit if the snapped delta is zero.
+  * Optimistic `updateEvent(id, patch)`.
+  * `apiFetch` PATCH `/api/events/<baseId>` with `startTime`/`endTime`.
+  * On non-OK / throw: roll back the optimistic update.
+
+DayColumn:
+- New props: `currentUserId?: string | null` and
+  `onEventDragStart?: (event, e) => void`.
+- Computes `isOwner = currentUserId != null && String(creator_id) === String(currentUserId)`,
+  forwards to EventBlock.
+
+EventBlock: unchanged (B2 already added `isOwner` and `onDragStart`).
+
+- [x] **Step 3: Tests + typecheck + commit**
+
+```bash
+npx jest src/__tests__/lib/drag-reschedule.test.ts \
+         src/__tests__/components/EventBlock-drag.test.tsx \
+         src/__tests__/components/DayColumn-mounted.test.tsx \
+         src/__tests__/components/DayColumn-isowner-wiring.test.tsx
+# 26/26 pass
+npx tsc --noEmit   # exit 0
 ```
-
-(Full code in spec; pattern: `fireEvent.pointerDown(block, { clientY: 200 })`, etc.)
-
-- [ ] **Step 2: Implement**
-
-`WeeklyGrid` owns the pointer-move + drop handlers, computes `deltaMinutes` via `pxToMinutesSnapped`, calls `applyDeltaMinutes`, optimistically updates via `updateEvent(id, patch)`, then PATCHes the API. On 4xx/5xx, rolls back.
-
-For recurring events, intercept at drop and open `RecurrenceMoveModal` instead of patching directly.
-
-- [ ] **Step 3: Tests + typecheck + commit**
 
 ---
 

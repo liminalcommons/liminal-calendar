@@ -11,6 +11,8 @@ import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
 import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { canCreateEvents } from '@/lib/auth-helpers';
+import { computeDropPatch } from '@/lib/drag-reschedule';
+import { apiFetch } from '@/lib/api-fetch';
 import { MoonPhase } from '@/components/MoonPhase';
 import { TimeGutter } from './TimeGutter';
 import { DayColumn } from './DayColumn';
@@ -29,6 +31,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const userRole = session?.user?.role || 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
+  // Identify the viewing user — DayColumn compares this against each event's
+  // creator_id to decide drag affordance. Hylo ID is the canonical identity
+  // (matches event.creator_id); falls back to user.id (NextAuth user id) if
+  // the session shape varies. `null` = unauthenticated → no drag anywhere.
+  const sessionUser = session?.user as { hyloId?: string; id?: string } | undefined;
+  const currentUserId = sessionUser?.hyloId ?? sessionUser?.id ?? null;
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
@@ -160,6 +168,104 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const handleEventUpdated = useCallback((id: string, patch: Partial<DisplayEvent>) => {
     updateEvent(id, patch);
   }, [updateEvent]);
+
+  // ── Drag-to-reschedule (owner-only; recurring → modal in B4) ──
+  // Drag state is held in a ref so pointer-move handlers don't trigger React
+  // re-renders mid-drag. The grid root captures pointer-down on EventBlock
+  // (forwarded as onEventDragStart from DayColumn), then attaches window-level
+  // move + up listeners until release.
+  const dragRef = useRef<{
+    event: DisplayEvent;
+    startClientY: number;
+    originalTopPx: number;
+  } | null>(null);
+
+  const handleEventDragStart = useCallback(
+    (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => {
+      // Recurring events go through RecurrenceMoveModal in B4; for now they
+      // fall through to the click handler (open EventExpansion). Skip drag.
+      if (event.recurrenceRule) return;
+
+      // Capture the event's CURRENT top-px from the rendered DOM rect minus
+      // the gridRef's scroll offset. We use the block's getBoundingClientRect
+      // and subtract the grid's top edge to get a consistent y-coord space.
+      const blockRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const gridEl = gridRef.current;
+      const gridRect = gridEl?.getBoundingClientRect();
+      const gridScrollTop = gridEl?.scrollTop ?? 0;
+      const originalTopPx = (gridRect ? blockRect.top - gridRect.top : 0) + gridScrollTop;
+
+      dragRef.current = {
+        event,
+        startClientY: e.clientY,
+        originalTopPx,
+      };
+
+      const handleMove = () => {
+        // Visual feedback (live ghost positioning) is intentionally not wired
+        // in v1 — keeps the diff small. The user gets the snapped result on
+        // release, which is the load-bearing UX. B6 Chrome MCP smoke verifies.
+      };
+
+      const handleUp = async (upEvent: PointerEvent) => {
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleUp);
+        const drag = dragRef.current;
+        dragRef.current = null;
+        if (!drag) return;
+
+        const dy = upEvent.clientY - drag.startClientY;
+        const finalTopPx = drag.originalTopPx + dy;
+
+        const patchTimes = computeDropPatch({
+          starts_at: drag.event.starts_at,
+          ends_at: drag.event.ends_at,
+          originalTopPx: drag.originalTopPx,
+          finalTopPx,
+          hourOffsets,
+          hourHeights,
+          snap: 15,
+        });
+
+        // No-op drop (same row after snap)
+        if (patchTimes.starts_at === drag.event.starts_at) return;
+
+        // Optimistic update
+        updateEvent(drag.event.id, patchTimes as Partial<DisplayEvent>);
+
+        // Server PATCH — strip the recurring-instance suffix (e.g. "10-20260412" → "10")
+        // since the underlying record has the bare ID; recurring is gated above
+        // but defensive in case the ID format changes.
+        const baseId = drag.event.id.replace(/-\d{8}$/, '');
+        try {
+          const res = await apiFetch(`/api/events/${baseId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              startTime: patchTimes.starts_at,
+              endTime: patchTimes.ends_at,
+            }),
+          });
+          if (!res.ok) {
+            // Roll back optimistic update
+            updateEvent(drag.event.id, {
+              starts_at: drag.event.starts_at,
+              ends_at: drag.event.ends_at,
+            } as Partial<DisplayEvent>);
+          }
+        } catch {
+          updateEvent(drag.event.id, {
+            starts_at: drag.event.starts_at,
+            ends_at: drag.event.ends_at,
+          } as Partial<DisplayEvent>);
+        }
+      };
+
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerup', handleUp);
+    },
+    [hourHeights, hourOffsets, updateEvent],
+  );
 
   // Week header label
   const weekLabel = (() => {
@@ -316,6 +422,8 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                     spawningIds={spawningIds}
                     onCellClick={canCreate ? handleCellClick : undefined}
                     onEventClick={handleEventClick}
+                    currentUserId={currentUserId}
+                    onEventDragStart={handleEventDragStart}
                   />
                 ))}
               </div>
