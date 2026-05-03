@@ -1498,7 +1498,7 @@ git commit -m "feat(api): feed.ics ?filter=rsvps-only param"
 - Test: `src/__tests__/app/api/cron/heartbeat-check.test.ts`
 - Modify: `vercel.json`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** (DEVIATION: added `/** @jest-environment node */` directive — route imports `next/server` Response, which needs Node env. Same precedent as Tasks 3+4+8+11.)
 
 ```ts
 // src/__tests__/app/api/cron/heartbeat-check.test.ts
@@ -1546,7 +1546,7 @@ describe('heartbeat-check cron', () => {
 });
 ```
 
-- [ ] **Step 2: Run, see RED**
+- [x] **Step 2: Run, see RED** — confirmed: `Could not locate module @/app/api/cron/heartbeat-check/route` (module doesn't exist yet). RED for the right reason.
 
 Run: `npx jest src/__tests__/app/api/cron/heartbeat-check.test.ts`
 Expected: FAIL — module not found.
