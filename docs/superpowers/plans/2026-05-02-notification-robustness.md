@@ -1656,7 +1656,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" \
 Expected: `{"status":"ok", "lastSentAt":"...", "ageSeconds":<small>}`. If `"stale"`, the chora-node trigger is down.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit** — completed in cycle 37 alongside Step 1. docs/notifications/scheduling.md committed at 49de0a2 (with the deviation: backfill subsection added per negativa-5+17 still-open recommendation). Task 13 structurally complete (2/2 boxes).
 
 ```bash
 git add docs/notifications/scheduling.md
