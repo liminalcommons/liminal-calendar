@@ -1696,7 +1696,7 @@ Run: `rm src/components/NotificationScheduler.tsx`
 Run: `grep -rn "NotificationScheduler" src/`
 Expected: 0 results.
 
-- [ ] **Step 5: Run full test suite + typecheck**
+- [x] **Step 5: Run full test suite + typecheck** — confirmed: `npx tsc --noEmit` exit=0; `npx jest` → 50/50 suites, 363/363 tests pass. No regression from the deletion. Slice tsc-clean.
 
 ```bash
 npx tsc --noEmit
