@@ -1795,7 +1795,12 @@ Following the line numbers from the spec:
 )}
 ```
 
-- [ ] **Step 4: Run test, see GREEN, full suite, typecheck, commit**
+- [x] **Step 4: Run test, see GREEN, full suite, typecheck, commit** — completed in cycle 46 alongside Step 3:
+  - `EventRSVP-cleanup.test.tsx` → 4/4 pass
+  - Full suite → 51/51 suites, 367/367 tests pass
+  - tsc exit=0
+  - Committed at df2eaf0
+  Task 15 structurally complete (4/4 boxes).
 
 ```bash
 npx jest src/__tests__/components/EventRSVP-cleanup.test.tsx
