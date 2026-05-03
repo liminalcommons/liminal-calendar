@@ -169,7 +169,7 @@ git commit -m "feat(db): add notification_preferences table"
 - Create: `src/lib/notifications/preferences.ts`
 - Test: `src/__tests__/lib/notifications/preferences.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/__tests__/lib/notifications/preferences.test.ts
@@ -228,7 +228,7 @@ describe('ensurePreferences (fake db)', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: `Could not locate module @/lib/notifications/preferences` (test suite failed to run for the right reason).
 
 Run: `npx jest src/__tests__/lib/notifications/preferences.test.ts`
 Expected: FAIL — `Cannot find module '@/lib/notifications/preferences'`.
