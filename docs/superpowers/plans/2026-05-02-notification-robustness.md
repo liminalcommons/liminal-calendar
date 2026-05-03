@@ -1390,7 +1390,7 @@ git commit -m "feat(ui): SubscribePrompt iOS guard swaps Enable for install inst
 
 Run: `cat src/app/api/calendar/feed.ics/route.ts`
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test** (TWO DEVIATIONS: (1) added `/** @jest-environment node */` directive — same precedent as Tasks 3+4+8 (route imports next/server which needs Node env); (2) FORESHADOWED MOCK-VS-IMPL MISMATCH: the plan's prescribed mock supports `from().where().limit()` (member lookup) and `from().orderBy()` (unfiltered events) and `from().innerJoin().where()` (filtered events with innerJoin). But the plan's prescribed Step 3 impl uses `from().where(inArray(...)).orderBy(...)` for the filtered events query, NOT innerJoin. The mock's `where()` returns `{limit}` (member shape) — calling `.orderBy()` on it would fail. Step 3 GREEN will need either (a) mock fix to make `where()` return `{limit, orderBy}` polymorphically, OR (b) impl change to use innerJoin per the mock's intent. RED test ran successfully: 1/3 fail (correct test) — current route doesn't recognize filter param so unfiltered path runs in the rsvps-only test, putting both events in the ICS body.)
 
 The existing route loads all events with `db.select().from(events).orderBy(asc(events.startsAt))` and uses the `token` only to look up the member (`_userId`) but doesn't currently use it to filter. The test asserts the new filter behavior.
 
