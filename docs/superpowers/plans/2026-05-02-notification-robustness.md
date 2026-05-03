@@ -695,7 +695,7 @@ describe('<NotificationPreferences>', () => {
 Run: `npx jest src/__tests__/components/NotificationPreferences.test.tsx`
 Expected: FAIL — `Cannot find module '@/components/NotificationPreferences'`.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 ```tsx
 // src/components/NotificationPreferences.tsx
@@ -789,7 +789,7 @@ export function NotificationPreferences() {
 }
 ```
 
-- [ ] **Step 4: Run the test, see GREEN**
+- [x] **Step 4: Run the test, see GREEN** — confirmed: 3/3 pass for NotificationPreferences.test.tsx. Full suite: 43/43 suites, 350/350 tests pass. Typecheck exit=0. Chrome MCP verification deferred to Task 6 per negativa-5 (component has no route to navigate to until /settings/notifications page exists).
 
 Run: `npx jest src/__tests__/components/NotificationPreferences.test.tsx`
 Expected: PASS.
