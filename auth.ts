@@ -4,6 +4,7 @@ import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { resolveRole, resolveSessionRole } from '@/lib/auth/role';
 import { syncMember } from '@/lib/auth/member-sync';
+import { applyRedirectPolicy } from '@/lib/auth/redirect-policy';
 
 interface HyloProfile {
   id: string;
@@ -183,6 +184,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
+    // Auth.js v5 default rejects cross-origin redirects, which traps the user on
+    // auth.liminalcalendar.com after the Hylo callback. Allow hops within the
+    // *.liminalcalendar.com family and fall back to the apex otherwise.
+    async redirect({ url, baseUrl }) {
+      return applyRedirectPolicy({ url, baseUrl });
+    },
     async jwt({ token, account, profile }) {
       // First sign-in: persist tokens from the OAuth exchange
       if (account) {

@@ -16,4 +16,10 @@ describe('Settings page', () => {
     expect(screen.getByTestId('prefs')).toBeInTheDocument();
     expect(screen.getByTestId('rsvps')).toBeInTheDocument();
   });
+
+  it('renders a back link to the calendar root', () => {
+    render(<Page />);
+    const back = screen.getByRole('link', { name: /back to calendar/i });
+    expect(back).toHaveAttribute('href', '/');
+  });
 });
