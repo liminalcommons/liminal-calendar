@@ -38,6 +38,9 @@ export const rsvps = pgTable(
     userName: text('user_name').notNull(),
     userImage: text('user_image'),
     status: text('status').notNull(), // 'yes' | 'interested' | 'no'
+    // Vestigial as of the global-preferences slice (2026-05-02).
+    // Cron read-path no longer reads this column; defaulted TRUE on writes.
+    // Re-activated as a per-instance override hook when follow-up B ships.
     remindMe: boolean('remind_me').default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   },
@@ -94,6 +97,23 @@ export const pushSubscriptions = pgTable(
   (table) => [unique('push_sub_user_endpoint').on(table.userId, table.endpoint)],
 );
 
+// Per-user notification preferences. Replaces per-RSVP `rsvps.remindMe`
+// as the cron read-path gate. One row per user, lazily inserted with
+// defaults the first time the user (or cron) reads their preferences.
+// Defaults: push columns TRUE, email columns FALSE — push is primary,
+// email is opt-in.
+export const notificationPreferences = pgTable('notification_preferences', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull().unique(), // Hylo user id OR Clerk user id (matches rsvps.user_id pattern)
+  pushOneHour: boolean('push_1h').notNull().default(true),
+  pushFifteenMin: boolean('push_15min').notNull().default(true),
+  pushAtStart: boolean('push_at_start').notNull().default(true),
+  emailTwentyFourHour: boolean('email_24h').notNull().default(false),
+  emailOneHour: boolean('email_1h').notNull().default(false),
+  emailFifteenMin: boolean('email_15min').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Email opt-in list. Populated from RSVP form (source='rsvp'),
 // signup flow (source='signup'), or admin actions (source='manual').
 // Drives the monthly newsletter and is independent of the members
@@ -111,6 +131,8 @@ export type NewNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert;
 
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type NewNotificationPreferences = typeof notificationPreferences.$inferInsert;
 
 // Type helpers
 export type Event = typeof events.$inferSelect;
