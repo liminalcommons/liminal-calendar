@@ -94,9 +94,17 @@ git commit -m "positiva: cal-tz-drag — extract eventToMinutes to shared module
 
 **Files:**
 - Modify: `src/components/calendar/DayColumn.tsx`
+- Modify: `src/components/calendar/EventBlock.tsx` (add `data-testid="event-block"`)
 - Create: `src/__tests__/components/DayColumn-mounted.test.tsx`
 
-- [ ] **Step 1: Write failing test**
+**Implementation note (A2 retrospective):** Negativa flagged the
+`suppressMount__test` prop as ugly. Implemented instead: `renderToString`
+from `react-dom/server` for the SSR assertion (truer to the bug — proves the
+gate actually suppresses the SSR pass), and plain `render` + `findByTitle`
+for the post-mount assertion. jsdom needed `MessageChannel` and
+`TextEncoder`/`TextDecoder` polyfills imported at the top of the test file.
+
+- [x] **Step 1: Write failing test**
 
 ```tsx
 // src/__tests__/components/DayColumn-mounted.test.tsx
@@ -170,7 +178,7 @@ describe('DayColumn mounted gate', () => {
 Run: `npx jest src/__tests__/components/DayColumn-mounted.test.tsx`
 Expected: FAIL — `suppressMount__test` prop unsupported, or events render on first paint.
 
-- [ ] **Step 2: Add mounted gate to DayColumn**
+- [x] **Step 2: Add mounted gate to DayColumn**
 
 ```tsx
 // In DayColumn.tsx, inside the component:
@@ -183,16 +191,16 @@ useEffect(() => { setMounted(true); }, []);
 
 Add a `data-testid="event-block"` to EventBlock's wrapper div.
 
-For the test-only `suppressMount__test` prop: gate `setMounted(true)` behind `!props.suppressMount__test`. (Yes, ugly — but the alternative is mocking `useEffect` which is worse.)
+(Test-only prop ditched in favor of `renderToString` — see retrospective above.)
 
-- [ ] **Step 3: Run test → PASS**
+- [x] **Step 3: Run test → PASS**
 
 ```bash
 npx jest src/__tests__/components/DayColumn-mounted.test.tsx
 npx tsc --noEmit
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/components/calendar/DayColumn.tsx src/components/calendar/EventBlock.tsx src/__tests__/components/DayColumn-mounted.test.tsx

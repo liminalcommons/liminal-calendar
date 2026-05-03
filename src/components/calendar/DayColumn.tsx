@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
 import { HourCell } from './HourCell';
@@ -36,6 +36,16 @@ const DayColumn = React.memo(function DayColumn({
   onCellClick,
   onEventClick,
 }: DayColumnProps) {
+  // Mount gate — events position using browser-local TZ via getHours(), which
+  // returns UTC during SSR (Vercel's Node runs UTC). Without this gate the
+  // event blocks render at SSR-UTC rows then snap to local-TZ rows on
+  // hydration, producing a visible flash and (near midnight UTC) wrong-day
+  // placement. We suppress event rendering entirely until after mount so the
+  // first paint is correct. HourCells render unconditionally — they're
+  // TZ-independent.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const dateKey = toDateKey(day);
   const dayEvents = events.filter(e => toDateKey(new Date(e.starts_at)) === dateKey);
 
@@ -61,8 +71,9 @@ const DayColumn = React.memo(function DayColumn({
         />
       ))}
 
-      {/* Event overlays — positioned using golden hour offsets */}
-      {dayEvents.map(event => {
+      {/* Event overlays — positioned using golden hour offsets. Gated on
+          `mounted` so SSR (UTC) doesn't paint at the wrong rows. */}
+      {mounted && dayEvents.map(event => {
         const overlap = overlapMap.get(event.id) ?? { colIndex: 0, colTotal: 1 };
         return (
           <EventBlock

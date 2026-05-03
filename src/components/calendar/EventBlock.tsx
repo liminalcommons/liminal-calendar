@@ -123,6 +123,7 @@ const EventBlock = React.memo(function EventBlock({
   return (
     <div
       ref={blockRef}
+      data-testid="event-block"
       className={`absolute rounded-md overflow-hidden cursor-pointer
                  shadow-sm hover:shadow-md hover:brightness-110
                  transition-all duration-300 ease-out z-10
