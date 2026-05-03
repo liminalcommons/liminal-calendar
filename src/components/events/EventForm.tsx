@@ -242,18 +242,21 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   const [isLoading, setIsLoading] = useState(mode === 'edit');
   const [error, setError] = useState<string | null>(null);
 
-  // Sync external values from chat panel
+  // Sync external values from chat panel.
+  // CRITICAL: deps must NOT include local form state (durationMinutes,
+  // selectedDayIndex, etc.). Otherwise every time the user picks a new time
+  // or day, this effect re-fires with the stale chat-panel values and
+  // silently REVERTS the user's choice — the bug that made Sunday selection
+  // snap back to Monday and time changes snap back to the chat-panel default.
+  // Chat panel must send both startTime and endTime when it wants to set
+  // them; we don't derive end from local duration here anymore.
   useEffect(() => {
     if (!externalValues) return
     if (externalValues.title !== undefined) setTitle(externalValues.title)
     if (externalValues.description !== undefined) setDescription(externalValues.description)
     if (externalValues.meetingLink !== undefined) setMeetingLink(externalValues.meetingLink)
     if (externalValues.imageUrl !== undefined) setImageUrl(externalValues.imageUrl)
-    if (externalValues.startTime !== undefined) {
-      setStartTime(externalValues.startTime)
-      const newEnd = addMinutesToTimeStr(externalValues.startTime, durationMinutes)
-      setEndTime(newEnd)
-    }
+    if (externalValues.startTime !== undefined) setStartTime(externalValues.startTime)
     if (externalValues.endTime !== undefined) setEndTime(externalValues.endTime)
     if (externalValues.recurrence !== undefined) {
       setRecurrence(externalValues.recurrence as RecurrenceValue)
@@ -264,7 +267,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       const dayOfWeek = d.getDay()
       setSelectedDayIndex(dayOfWeek === 0 ? 6 : dayOfWeek - 1)
     }
-  }, [externalValues, durationMinutes])
+  }, [externalValues])
 
   // Notify parent of internal value changes
   useEffect(() => {
