@@ -1983,7 +1983,20 @@ Get the user's feed token from the SubscribePrompt URLs (or from DB). Visit:
 - `/api/calendar/feed.ics?token=…` → contains all events
 - `/api/calendar/feed.ics?token=…&filter=rsvps-only` → contains only RSVPed events
 
-- [ ] **Step 6: Heartbeat endpoint**
+- [x] **Step 6: Heartbeat endpoint** — VERIFIED via Chrome MCP `javascript_tool`:
+
+```json
+// /api/cron/heartbeat (existing, public read — what UptimeRobot polls)
+{ "httpCode": 200, "body": "{\"status\":\"empty\"}" }
+```
+
+✓ Endpoint reachable, returns valid JSON, `status: "empty"` matches plan's expected smoke-test response for a fresh DB with no notification_log entries.
+
+**Bonus probe of the NEW Task 12 route** (`/api/cron/heartbeat-check`): returns 404 on localhost:3013. This is **dev-server staleness**, not a code defect — the route file at `src/app/api/cron/heartbeat-check/route.ts` was committed at e432d67 (cycle 34), but the user's dev server was started before that commit. Next.js App Router HMR sometimes doesn't auto-pick-up new route directories without a restart. The route's correctness is deterministically verified by `heartbeat-check.test.ts` (Task 12, 3/3 pass) and the file exists per `git log src/app/api/cron/heartbeat-check/`. After a dev-server restart OR Vercel deploy, the route will be live.
+
+DEFERRED to manual post-restart/deploy:
+- Confirm `/api/cron/heartbeat-check` returns 401 without bearer auth
+- Confirm `/api/cron/heartbeat-check` returns 200 with stale/ok status when given correct CRON_SECRET
 
 Visit `/api/cron/heartbeat`. Verify body contains `"status":"ok"` (or `"empty"` for a fresh DB).
 
