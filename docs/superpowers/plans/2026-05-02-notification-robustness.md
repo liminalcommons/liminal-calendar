@@ -1173,7 +1173,7 @@ git commit -m "feat(ui): InstallPrompt iOS Safari branch"
 **Files:**
 - Modify: `src/components/SubscribePrompt.tsx`
 
-- [ ] **Step 1: Update the existing notification step test (or add one) for the new shape**
+- [x] **Step 1: Update the existing notification step test (or add one) for the new shape** — chose ADD path (no existing SubscribePrompt tests in `src/__tests__/components/`). Test mocks fetch to return default prefs, mocks next-auth + use-feed-urls, and stubs window.PushManager + window.Notification per plan. Added one `// eslint-disable-next-line @typescript-eslint/no-explicit-any` for the PushManager assignment.
 
 ```tsx
 // src/__tests__/components/SubscribePrompt-prefs.test.tsx
@@ -1219,7 +1219,7 @@ describe('SubscribePrompt notifications step', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: heading "Never miss" is found, but `getAllByRole('checkbox')` returns 0 (current notifications step is an Enable button + Maybe later button, no checkbox grid). Test waits for 6 checkboxes, never sees them, times out. RED for the right reason.
 
 Run: `npx jest src/__tests__/components/SubscribePrompt-prefs.test.tsx`
 Expected: FAIL — current notifications step is a plain button, no checkboxes.
