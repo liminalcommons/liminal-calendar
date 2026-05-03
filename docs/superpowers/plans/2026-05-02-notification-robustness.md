@@ -2000,9 +2000,11 @@ DEFERRED to manual post-restart/deploy:
 
 Visit `/api/cron/heartbeat`. Verify body contains `"status":"ok"` (or `"empty"` for a fresh DB).
 
-- [ ] **Step 7: Console hygiene**
+- [x] **Step 7: Console hygiene**
 
 Read all console messages during Steps 2-5 with pattern filter excluding known third-party noise. Expected: 0 errors with `[liminal]` or `Calendar` prefix.
+
+PASS — Chrome MCP `read_console_messages` (tab 1025353669) on `/settings/notifications` and `/events/2` returned 2 messages on each, both third-party noise (React DevTools INFO + Clerk dev-keys WARNING). Zero slice-level errors matching `[liminal]|NotificationPreferences|InstallPrompt|EventRSVP|push|VAPID|fail|exception`.
 
 - [ ] **Step 8: Acceptance gate**
 
