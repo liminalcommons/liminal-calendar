@@ -967,7 +967,7 @@ git commit -m "feat(ui): /settings/notifications page + RsvpedEventsList"
 - Modify: `src/components/NavGearMenu.tsx` (add a Link item)
 - Test: extend existing NavGearMenu tests if any, otherwise add a smoke test
 
-- [ ] **Step 1: Read the current NavGearMenu and locate the menu items list.**
+- [x] **Step 1: Read the current NavGearMenu and locate the menu items list.** — Read NavGearMenu.tsx in full. Findings: `Bell` and `Link` are already imported (lines 4-5). Menu items live in the `{open && ...}` block (lines 127-186). The menu already contains an **"Enable/Disable notifications"** push-subscription toggle (lines 137-146 — the togglePush button) that manages `push_subscriptions` table directly. Step 4 will add a **second** notification-related item: a `Link` to `/settings/notifications` for the new granular preferences UI. Both items will coexist (toggle = browser-level push subscription; link = per-window/channel preferences) per spec §7.3 / §7.1 separation. UX-coexistence flag for negativa-8 visibility: two notification-related items in the same menu may need disambiguation labels in a future polish cycle.
 
 Run: `grep -n "Link" src/components/NavGearMenu.tsx | head -10`
 
