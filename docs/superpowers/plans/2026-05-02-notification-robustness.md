@@ -1681,7 +1681,7 @@ No other references. Safe to delete in Step 3.
 Run: `grep -rn "NotificationScheduler" src/ --include="*.tsx" --include="*.ts"`
 Expected: hits only in `src/components/NotificationScheduler.tsx` and `src/app/layout.tsx`.
 
-- [ ] **Step 2: Remove the mount and import from layout.tsx**
+- [x] **Step 2: Remove the mount and import from layout.tsx** — deleted line 11 (`import { NotificationScheduler } ...`) and line 50 (`<NotificationScheduler />`). Remaining global mounts are unchanged: ServiceWorkerRegistration, InstallPrompt, SessionExpiredBanner, MobileRedirect, SubscribePrompt, BugReportFab.
 
 In `src/app/layout.tsx`:
 - Delete line 11: `import { NotificationScheduler } from "@/components/NotificationScheduler";`
