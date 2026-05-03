@@ -1551,7 +1551,7 @@ describe('heartbeat-check cron', () => {
 Run: `npx jest src/__tests__/app/api/cron/heartbeat-check.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement** — wrote `src/app/api/cron/heartbeat-check/route.ts` exactly as plan-prescribed (no deviations needed). Pre-cycle reading per negativa-16: confirmed `desc` is exported by drizzle-orm (matches the existing `asc` import pattern in send-reminders/route.ts) and `notificationLog.sentAt` column exists per schema.ts. All test mocks aligned with impl call chain.
 
 ```ts
 // src/app/api/cron/heartbeat-check/route.ts
