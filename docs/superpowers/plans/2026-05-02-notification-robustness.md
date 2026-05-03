@@ -1691,7 +1691,7 @@ In `src/app/layout.tsx`:
 
 Run: `rm src/components/NotificationScheduler.tsx`
 
-- [ ] **Step 4: Verify zero remaining references**
+- [x] **Step 4: Verify zero remaining references** — confirmed: `grep -rn "NotificationScheduler" src/` → 0 matches across 0 files. Spec §10 deletion target fully eliminated. Negativa-20 independently re-verified the same result.
 
 Run: `grep -rn "NotificationScheduler" src/`
 Expected: 0 results.
