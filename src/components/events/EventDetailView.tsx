@@ -14,6 +14,7 @@ import { formatDuration } from '@/lib/calendar-utils';
 import { downloadICS } from '@/lib/ics-generator';
 import { apiFetch } from '@/lib/api-fetch';
 import { EventRSVP } from './EventRSVP';
+import { CommentSection } from '@/components/comments/CommentSection';
 
 interface EventDetailViewProps {
   eventId: string;
@@ -270,6 +271,11 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         >
           Add to Calendar (.ics)
         </button>
+
+        {/* Comments */}
+        <div className="pt-2 border-t border-grove-border">
+          <CommentSection eventId={Number(event.id)} />
+        </div>
 
         {/* Edit / Delete (creator only) */}
         {(canEdit || canDelete) && (
