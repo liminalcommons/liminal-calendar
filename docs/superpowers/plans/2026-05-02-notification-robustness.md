@@ -596,6 +596,27 @@ git commit -m "feat(cron): swap remindMe gate for per-window prefs join"
 
 ---
 
+## Task 4.5: Backfill notification_preferences for existing users
+
+**Inserted in response to negativa-4's HIGH-PRIORITY WARN.** Task 4 swapped the cron read path to an INNER JOIN on `notification_preferences`. Existing production users with RSVPs but no prefs row would be silently excluded until they actively visit settings. User selected option A (backfill migration, mirrors spec §5.1 defaults exactly).
+
+**Files:**
+- Create: `src/lib/db/migrations/notification-preferences-backfill.sql`
+
+- [x] **Step 1: Write the backfill SQL** — pure data migration, no jest test (matches `push-subscriptions.sql` precedent for SQL-only migrations). Idempotent: `ON CONFLICT (user_id) DO NOTHING`.
+
+```sql
+INSERT INTO notification_preferences (user_id)
+SELECT DISTINCT user_id FROM rsvps
+ON CONFLICT (user_id) DO NOTHING;
+```
+
+- [x] **Step 2: Document operator runbook** — file header explains WHY (silent-regression mitigation), HOW (idempotent INSERT … SELECT DISTINCT), and WHEN (once at deploy of this slice). Future runs are no-ops.
+
+- [x] **Step 3: Commit** — committed alongside this plan update.
+
+---
+
 ## Task 5: `<NotificationPreferences>` shared component
 
 **Files:**
