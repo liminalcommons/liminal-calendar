@@ -1812,6 +1812,23 @@ git commit -m "chore(ui): EventRSVP — drop remindMe toggle + newsletter, add r
 
 ---
 
+## Task 15.5: Wire `recurrenceRule` prop in EventDetailView
+
+**Inserted in response to negativa-23's BLOCKER-LIGHT finding.** Task 15 added the `recurrenceRule` prop to `<EventRSVP>` and the conditional rendering of the inline "Recurring — applies to all occurrences" text, but the only production caller (`EventDetailView.tsx:253`) didn't pass the prop. Spec §7.5 was half-delivered until this 1-line fix.
+
+**Files:**
+- Modify: `src/components/events/EventDetailView.tsx` (1 line)
+
+- [x] **Step 1: Wire the prop** — added `recurrenceRule={event.recurrenceRule}` to the `<EventRSVP>` invocation at line 253. The `event` object on EventDetailView already has `recurrenceRule` from the DisplayEvent type. Tests + tsc unaffected.
+
+```tsx
+<EventRSVP eventId={event.id} initialResponse={event.myResponse} recurrenceRule={event.recurrenceRule} />
+```
+
+- [x] **Step 2: Verify** — `npx tsc --noEmit` exit=0; `npx jest` → 51/51 suites, 367/367 tests pass. Spec §7.5 now FULLY delivered (cleanups DONE + recurring-text WIRED).
+
+---
+
 ## Task 16: Chrome MCP E2E acceptance verification
 
 **Files:** none (this is the final acceptance gate, run after all prior tasks pass)

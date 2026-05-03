@@ -250,7 +250,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
 
         {/* RSVP section */}
         <div className="pt-2 border-t border-grove-border">
-          <EventRSVP eventId={event.id} initialResponse={event.myResponse} />
+          <EventRSVP eventId={event.id} initialResponse={event.myResponse} recurrenceRule={event.recurrenceRule} />
         </div>
 
         {/* Add to Calendar */}
