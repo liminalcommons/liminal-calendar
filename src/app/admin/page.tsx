@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { NavBar } from '@/components/NavBar';
 import { apiFetch } from '@/lib/api-fetch';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
+import { ReportsPanel } from '@/components/admin/ReportsPanel';
 
 interface Member {
   id: number;
@@ -59,6 +61,8 @@ function ProviderBadge({ member }: { member: Member }) {
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') === 'reports' ? 'reports' : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
@@ -142,11 +146,51 @@ export default function AdminPage() {
           ← Back to Calendar
         </button>
         <div className="mb-6">
-          <h1 className="text-2xl font-serif text-grove-text">Member Directory</h1>
+          <h1 className="text-2xl font-serif text-grove-text">Admin</h1>
           <p className="text-sm text-grove-text-muted mt-1">
-            {members.length} {members.length === 1 ? 'member' : 'members'} · Assign roles to control event creation permissions
+            Manage members, roles, and review attendance reports.
           </p>
         </div>
+
+        {/* Tabs */}
+        <nav role="tablist" aria-label="Admin sections" className="flex gap-2 mb-6 border-b border-grove-border">
+          <Link
+            href="/admin?tab=members"
+            role="tab"
+            aria-selected={tab === 'members'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'members'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Members
+          </Link>
+          <Link
+            href="/admin?tab=reports"
+            role="tab"
+            aria-selected={tab === 'reports'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'reports'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Reports
+          </Link>
+        </nav>
+
+        {tab === 'reports' ? (
+          <section role="tabpanel" aria-label="Attendance reports">
+            <ReportsPanel />
+          </section>
+        ) : (
+          <section role="tabpanel" aria-label="Member directory" className="mb-2">
+            <div className="mb-4">
+              <p className="text-sm text-grove-text-muted">
+                {members.length} {members.length === 1 ? 'member' : 'members'} · Assign roles to control event creation permissions
+              </p>
+            </div>
 
         {/* Role legend */}
         <div className="flex gap-4 mb-6 text-xs">
@@ -257,6 +301,8 @@ export default function AdminPage() {
             </table>
             </div>
           </div>
+        )}
+          </section>
         )}
       </main>
     </div>
