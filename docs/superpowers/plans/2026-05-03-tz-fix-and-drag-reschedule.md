@@ -17,7 +17,7 @@
 **Files:**
 - Create: `src/__tests__/lib/event-time-display.test.ts`
 
-- [ ] **Step 1: Write failing test for current behavior**
+- [x] **Step 1: Write failing test for current behavior**
 
 ```ts
 // src/__tests__/lib/event-time-display.test.ts
@@ -49,7 +49,7 @@ describe('eventToMinutes', () => {
 Run: `npx jest src/__tests__/lib/event-time-display.test.ts -t eventToMinutes`
 Expected: FAIL — module not found.
 
-- [ ] **Step 2: Extract `eventToMinutes` to a shared module**
+- [x] **Step 2: Extract `eventToMinutes` to a shared module**
 
 ```ts
 // src/lib/event-time-display.ts
@@ -75,12 +75,12 @@ export function eventToMinutes(event: Pick<DisplayEvent, 'starts_at' | 'ends_at'
 
 Then update `src/components/calendar/DayColumn.tsx` to import from `@/lib/event-time-display` instead of defining inline.
 
-- [ ] **Step 3: Run test → PASS**
+- [x] **Step 3: Run test → PASS**
 
 Run: `npx jest src/__tests__/lib/event-time-display.test.ts`
 Expected: PASS.
 
-- [ ] **Step 4: typecheck + commit**
+- [x] **Step 4: typecheck + commit**
 
 ```bash
 npx tsc --noEmit
