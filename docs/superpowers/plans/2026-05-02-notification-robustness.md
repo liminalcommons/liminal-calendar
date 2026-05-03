@@ -1704,7 +1704,7 @@ npx jest
 ```
 Expected: all pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit** — commits already landed via micro-cycles: a93539e (layout edit) + 723c721 (file delete via git rm). The plan's Step 6 prescribed a single combined commit, but positiva's cadence committed each micro-step separately for tighter audit trail. Task 14 structurally complete (6/6 boxes).
 
 ```bash
 git add -u src/app/layout.tsx
