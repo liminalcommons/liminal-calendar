@@ -308,7 +308,7 @@ git commit -m "feat(notifications): preferences lib + WINDOW_TO_COLUMN map"
 - Create: `src/app/api/preferences/notifications/route.ts`
 - Test: `src/__tests__/app/api/preferences-notifications.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // src/__tests__/app/api/preferences-notifications.test.ts
@@ -381,7 +381,7 @@ describe('PUT /api/preferences/notifications', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, see RED**
+- [x] **Step 2: Run the test, see RED** — confirmed: `Could not locate module @/app/api/preferences/notifications/route` (test suite failed to run for the right reason).
 
 Run: `npx jest src/__tests__/app/api/preferences-notifications.test.ts`
 Expected: FAIL — `Cannot find module '@/app/api/preferences/notifications/route'`.
