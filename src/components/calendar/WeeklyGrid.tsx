@@ -13,6 +13,7 @@ import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@
 import { canCreateEvents } from '@/lib/auth-helpers';
 import { computeDropPatch } from '@/lib/drag-reschedule';
 import { apiFetch } from '@/lib/api-fetch';
+import { RecurrenceMoveModal, type RecurrenceMoveScope } from './RecurrenceMoveModal';
 import { MoonPhase } from '@/components/MoonPhase';
 import { TimeGutter } from './TimeGutter';
 import { DayColumn } from './DayColumn';
@@ -169,23 +170,70 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     updateEvent(id, patch);
   }, [updateEvent]);
 
-  // ── Drag-to-reschedule (owner-only; recurring → modal in B4) ──
+  // ── Drag-to-reschedule (owner-only) ──
   // Drag state is held in a ref so pointer-move handlers don't trigger React
   // re-renders mid-drag. The grid root captures pointer-down on EventBlock
   // (forwarded as onEventDragStart from DayColumn), then attaches window-level
-  // move + up listeners until release.
+  // move + up listeners until release. Recurring events open RecurrenceMoveModal
+  // on drop instead of patching directly.
   const dragRef = useRef<{
     event: DisplayEvent;
     startClientY: number;
     originalTopPx: number;
+    moved: boolean;
   } | null>(null);
+  // After a successful drag (pointer moved past threshold), suppress the next
+  // click that the browser fires as part of the pointer sequence. Without this,
+  // dragging an owner block opens EventExpansion at the new position right
+  // after the move completes (negativa cycle 5 WARN).
+  const suppressNextClickRef = useRef(false);
+  const [pendingRecurringMove, setPendingRecurringMove] = useState<{
+    event: DisplayEvent;
+    patchTimes: { starts_at: string; ends_at: string | null };
+  } | null>(null);
+
+  const executeMovePatch = useCallback(
+    async (
+      event: DisplayEvent,
+      patchTimes: { starts_at: string; ends_at: string | null },
+      scope: RecurrenceMoveScope | null,
+    ) => {
+      // Optimistic update for the on-screen instance.
+      updateEvent(event.id, patchTimes as Partial<DisplayEvent>);
+
+      // Strip the recurring-instance suffix (e.g. "10-20260412" → "10")
+      // since the underlying record has the bare ID.
+      const baseId = event.id.replace(/-\d{8}$/, '');
+      try {
+        const res = await apiFetch(`/api/events/${baseId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            startTime: patchTimes.starts_at,
+            endTime: patchTimes.ends_at,
+            // For recurring events, scope='all' tells the server to also
+            // shift the recurrence rule template. Non-recurring sends null.
+            ...(scope ? { scope } : {}),
+          }),
+        });
+        if (!res.ok) {
+          updateEvent(event.id, {
+            starts_at: event.starts_at,
+            ends_at: event.ends_at,
+          } as Partial<DisplayEvent>);
+        }
+      } catch {
+        updateEvent(event.id, {
+          starts_at: event.starts_at,
+          ends_at: event.ends_at,
+        } as Partial<DisplayEvent>);
+      }
+    },
+    [updateEvent],
+  );
 
   const handleEventDragStart = useCallback(
     (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => {
-      // Recurring events go through RecurrenceMoveModal in B4; for now they
-      // fall through to the click handler (open EventExpansion). Skip drag.
-      if (event.recurrenceRule) return;
-
       // Capture the event's CURRENT top-px from the rendered DOM rect minus
       // the gridRef's scroll offset. We use the block's getBoundingClientRect
       // and subtract the grid's top edge to get a consistent y-coord space.
@@ -199,20 +247,32 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         event,
         startClientY: e.clientY,
         originalTopPx,
+        moved: false,
       };
 
-      const handleMove = () => {
-        // Visual feedback (live ghost positioning) is intentionally not wired
-        // in v1 — keeps the diff small. The user gets the snapped result on
-        // release, which is the load-bearing UX. B6 Chrome MCP smoke verifies.
+      const handleMove = (mvEvent: PointerEvent) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+        // Threshold of 4px to distinguish a click from a drag.
+        if (Math.abs(mvEvent.clientY - drag.startClientY) > 4) {
+          drag.moved = true;
+        }
       };
 
-      const handleUp = async (upEvent: PointerEvent) => {
+      const handleUp = (upEvent: PointerEvent) => {
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleUp);
         const drag = dragRef.current;
         dragRef.current = null;
         if (!drag) return;
+
+        // No drag movement → this is just a click; let onClick fire normally.
+        if (!drag.moved) return;
+
+        // Drag completed — suppress the impending click event.
+        suppressNextClickRef.current = true;
+        // Reset on next tick so unrelated clicks aren't swallowed.
+        setTimeout(() => { suppressNextClickRef.current = false; }, 350);
 
         const dy = upEvent.clientY - drag.startClientY;
         const finalTopPx = drag.originalTopPx + dy;
@@ -230,41 +290,39 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         // No-op drop (same row after snap)
         if (patchTimes.starts_at === drag.event.starts_at) return;
 
-        // Optimistic update
-        updateEvent(drag.event.id, patchTimes as Partial<DisplayEvent>);
-
-        // Server PATCH — strip the recurring-instance suffix (e.g. "10-20260412" → "10")
-        // since the underlying record has the bare ID; recurring is gated above
-        // but defensive in case the ID format changes.
-        const baseId = drag.event.id.replace(/-\d{8}$/, '');
-        try {
-          const res = await apiFetch(`/api/events/${baseId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              startTime: patchTimes.starts_at,
-              endTime: patchTimes.ends_at,
-            }),
-          });
-          if (!res.ok) {
-            // Roll back optimistic update
-            updateEvent(drag.event.id, {
-              starts_at: drag.event.starts_at,
-              ends_at: drag.event.ends_at,
-            } as Partial<DisplayEvent>);
-          }
-        } catch {
-          updateEvent(drag.event.id, {
-            starts_at: drag.event.starts_at,
-            ends_at: drag.event.ends_at,
-          } as Partial<DisplayEvent>);
+        // Recurring → open the scope modal; user must explicitly confirm.
+        if (drag.event.recurrenceRule) {
+          setPendingRecurringMove({ event: drag.event, patchTimes });
+          return;
         }
+
+        // Non-recurring → fire and forget (rollback is inside executeMovePatch).
+        void executeMovePatch(drag.event, patchTimes, null);
       };
 
       window.addEventListener('pointermove', handleMove);
       window.addEventListener('pointerup', handleUp);
     },
-    [hourHeights, hourOffsets, updateEvent],
+    [hourHeights, hourOffsets, executeMovePatch],
+  );
+
+  const handleEventClickGuarded = useCallback(
+    (event: DisplayEvent, rect: DOMRect) => {
+      // Suppress click immediately after a drag (pointerup → click sequence).
+      if (suppressNextClickRef.current) return;
+      handleEventClick(event, rect);
+    },
+    [handleEventClick],
+  );
+
+  const handleRecurringMoveConfirm = useCallback(
+    (scope: RecurrenceMoveScope) => {
+      const pending = pendingRecurringMove;
+      setPendingRecurringMove(null);
+      if (!pending) return;
+      void executeMovePatch(pending.event, pending.patchTimes, scope);
+    },
+    [pendingRecurringMove, executeMovePatch],
   );
 
   // Week header label
@@ -341,6 +399,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           onCreated={handleEventCreated}
         />
       )}
+      <RecurrenceMoveModal
+        isOpen={pendingRecurringMove !== null}
+        eventTitle={pendingRecurringMove?.event.title ?? ''}
+        onConfirm={handleRecurringMoveConfirm}
+        onCancel={() => setPendingRecurringMove(null)}
+      />
 
       {/* ── Main area: calendar + sidebar side by side ── */}
       <div className="flex flex-1 min-h-0">
@@ -421,7 +485,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                     dissolvingIds={dissolvingIds}
                     spawningIds={spawningIds}
                     onCellClick={canCreate ? handleCellClick : undefined}
-                    onEventClick={handleEventClick}
+                    onEventClick={handleEventClickGuarded}
                     currentUserId={currentUserId}
                     onEventDragStart={handleEventDragStart}
                   />

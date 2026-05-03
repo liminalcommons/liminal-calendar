@@ -519,14 +519,44 @@ npx tsc --noEmit   # exit 0
 **Files:**
 - Create: `src/components/calendar/RecurrenceMoveModal.tsx`
 - Create: `src/__tests__/components/RecurrenceMoveModal.test.tsx`
+- Modify: `src/components/calendar/WeeklyGrid.tsx` (wire modal + fix click-after-drag)
 
-- [ ] **Step 1: Failing test — three radios, "this only" + "this and following" disabled**
+- [x] **Step 1: Failing test — three radios, "this only" + "this and following" disabled**
 
-- [ ] **Step 2: Implement modal** — reuse the RSVP modal's patterns for accessibility (focus trap, escape to close, click outside to close).
+Wrote 9 tests covering: three labeled radios, two disabled in v1, "all events"
+default-checked, confirm calls onConfirm('all'), Cancel button calls onCancel,
+Escape key closes, isOpen=false renders nothing, role="dialog" + aria-modal +
+aria-labelledby, event title in heading.
 
-- [ ] **Step 3: Wire into WeeklyGrid drop handler**
+- [x] **Step 2: Implement modal** — reuse the RSVP modal's patterns for accessibility (focus trap, escape to close, click outside to close).
 
-- [ ] **Step 4: Test + typecheck + commit**
+The codebase didn't have a single dedicated RSVP scope-modal component to copy
+verbatim; took the patterns from `EventExpansion`'s a11y (Escape close,
+backdrop click, role="dialog") and crafted the three-radio fieldset with
+disabled states + "Coming soon" text on the unsupported branches.
+
+- [x] **Step 3: Wire into WeeklyGrid drop handler**
+
+WeeklyGrid changes (also addresses negativa cycle 5 click-after-drag WARN):
+- Extracted PATCH+rollback into `executeMovePatch(event, patchTimes, scope)`
+  so non-recurring (`scope=null`) and recurring (`scope='all'`) share the
+  same code path.
+- New state `pendingRecurringMove`: when a drag drops on a recurring event,
+  store the proposed move and open the modal instead of patching directly.
+- `handleRecurringMoveConfirm(scope)` calls `executeMovePatch` with the
+  scope. Server PATCH body now includes `scope` for recurring drops; B5
+  will teach the server to propagate to the recurrence template.
+- **Click-after-drag fix:** track `dragRef.moved` (true after >4px move) +
+  `suppressNextClickRef`. After a successful drag, the next click event
+  (which the browser fires by default) is swallowed. Reset on a 350ms
+  timeout so unrelated clicks aren't lost.
+
+- [x] **Step 4: Test + typecheck + commit**
+
+```bash
+npx jest <touched suites>   # 35/35 pass (5 + 5 + 2 + 4 + 9 + 10 = 35)
+npx tsc --noEmit            # exit 0
+```
 
 ---
 
