@@ -28,6 +28,16 @@ export function SubscribePrompt() {
   const [pushLoading, setPushLoading] = useState(false)
   const { webcalUrl, googleUrl, outlookUrl } = useFeedUrls()
 
+  // iOS Safari (not yet installed to home screen) needs special handling — the
+  // Notification API is unavailable until the app is in standalone mode. Detect
+  // the not-installed iOS state so we can swap the Enable button for install
+  // instructions. Mirrors InstallPrompt.tsx's iOS detection pattern.
+  const isIosNotInstalled = typeof window !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
+    'standalone' in window.navigator &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    !(window.navigator as any).standalone
+
   useEffect(() => {
     if (status !== 'authenticated') return
     const dismissed = localStorage.getItem(STORAGE_KEY)
@@ -141,22 +151,41 @@ export function SubscribePrompt() {
 
             <NotificationPreferences />
 
-            <div className="space-y-2 mt-5">
-              <button
-                onClick={handleEnableNotifications}
-                disabled={pushLoading}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-grove-accent-deep text-grove-surface font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                <Bell size={16} />
-                {pushLoading ? 'Setting up…' : 'Enable notifications'}
-              </button>
-              <button
-                onClick={handleSkipNotifications}
-                className="w-full px-4 py-2.5 rounded-lg border border-grove-border text-sm text-grove-text hover:bg-grove-border/20 transition-colors"
-              >
-                Maybe later
-              </button>
-            </div>
+            {isIosNotInstalled ? (
+              <div className="space-y-2 mt-5">
+                <div className="rounded-lg border border-grove-border p-3 text-xs text-grove-text">
+                  <p className="font-semibold text-sm mb-1">Install app first</p>
+                  <ol className="list-decimal ml-5 space-y-0.5 text-grove-text-muted">
+                    <li>Tap the Share button at the bottom of Safari</li>
+                    <li>Scroll down → &quot;Add to Home Screen&quot;</li>
+                    <li>Open from the home-screen icon to enable notifications</li>
+                  </ol>
+                </div>
+                <button
+                  onClick={handleSkipNotifications}
+                  className="w-full px-4 py-2.5 rounded-lg border border-grove-border text-sm text-grove-text hover:bg-grove-border/20"
+                >
+                  Skip for now
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2 mt-5">
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={pushLoading}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-grove-accent-deep text-grove-surface font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  <Bell size={16} />
+                  {pushLoading ? 'Setting up…' : 'Enable notifications'}
+                </button>
+                <button
+                  onClick={handleSkipNotifications}
+                  className="w-full px-4 py-2.5 rounded-lg border border-grove-border text-sm text-grove-text hover:bg-grove-border/20 transition-colors"
+                >
+                  Maybe later
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="px-6 py-2.5 border-t border-grove-border/30">

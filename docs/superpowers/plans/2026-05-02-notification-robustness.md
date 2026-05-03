@@ -1333,7 +1333,7 @@ describe('SubscribePrompt iOS guard', () => {
 Run: `npx jest src/__tests__/components/SubscribePrompt-ios.test.tsx`
 Expected: FAIL — Enable button still present.
 
-- [ ] **Step 3: Add the iOS guard**
+- [x] **Step 3: Add the iOS guard** — added `isIosNotInstalled` derivation right after the `useFeedUrls()` hook (before the existing useEffect). Wrapped the Enable/Maybe-later button block (post-Task-9) inside `{isIosNotInstalled ? <iOS install card> : <existing Enable block>}`. Detection pattern matches InstallPrompt.tsx (Task 8) exactly per negativa-12 improvement: same UA regex (`/iPad|iPhone|iPod/`), same `'standalone' in navigator` check, same `!(window.navigator as any).standalone` early return. iOS card uses numbered `<ol>` instructions (Tap Share → Add to Home Screen → Open from home-screen icon) + a "Skip for now" button.
 
 In SubscribePrompt, derive an `isIosNotInstalled` flag (top of component body):
 
@@ -1369,7 +1369,7 @@ In the notifications step, conditionally swap the Enable block:
 )}
 ```
 
-- [ ] **Step 4: Run the test, see GREEN, typecheck, commit**
+- [x] **Step 4: Run the test, see GREEN, typecheck, commit** — confirmed: SubscribePrompt-ios 1/1 pass; full suite 48/48 suites, 357/357 tests pass; tsc exit=0. Task 10 structurally complete (4/4 boxes).
 
 ```bash
 npx jest src/__tests__/components/SubscribePrompt-ios.test.tsx
