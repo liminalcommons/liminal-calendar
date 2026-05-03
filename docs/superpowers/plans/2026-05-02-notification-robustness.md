@@ -951,7 +951,7 @@ This approach avoids extending `/api/events` with a `mine` filter (smaller blast
 Run: `npx jest src/__tests__/app/settings/notifications-page.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Run typecheck + commit**
+- [x] **Step 5: Run typecheck + commit** — completed in cycle 15 alongside Steps 3-4. tsc exit=0 verified; 3 files committed at 5bbe26f. Task 6 structurally complete (5/5 boxes).
 
 ```bash
 npx tsc --noEmit
