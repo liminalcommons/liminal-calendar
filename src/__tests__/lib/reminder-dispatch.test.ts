@@ -5,6 +5,10 @@ import {
   pickPushClickUrl,
   PUSH_WINDOWS,
   EMAIL_WINDOWS,
+  computePostEventWindow,
+  filterUnreportedRecipients,
+  buildPostEventPayload,
+  POST_EVENT_PUSH_WINDOW,
 } from '@/lib/notifications/reminder-dispatch';
 
 describe('computeReminderWindow', () => {
@@ -100,5 +104,87 @@ describe('constants', () => {
     const emailTypes = EMAIL_WINDOWS.map(([t]) => t);
     const pushTypes = PUSH_WINDOWS.map((w) => w.type);
     for (const et of emailTypes) expect(pushTypes).not.toContain(et);
+  });
+});
+
+describe('computePostEventWindow', () => {
+  it('returns [now - maxMinAfterEnd, now - minMinAfterEnd] of effective-end timestamps', () => {
+    const now = new Date('2026-05-03T12:00:00Z');
+    const { windowStart, windowEnd } = computePostEventWindow(now, 30, 1440);
+    expect(windowStart.toISOString()).toBe('2026-05-02T12:00:00.000Z');
+    expect(windowEnd.toISOString()).toBe('2026-05-03T11:30:00.000Z');
+  });
+
+  it('windowStart is strictly older than windowEnd', () => {
+    const now = new Date('2026-05-03T12:00:00Z');
+    const { windowStart, windowEnd } = computePostEventWindow(now, 30, 1440);
+    expect(windowStart.getTime()).toBeLessThan(windowEnd.getTime());
+  });
+});
+
+describe('filterUnreportedRecipients', () => {
+  it('drops (event,user) pairs that already have an attendance report', () => {
+    const due = [
+      { eventId: 1, userId: 'a' },
+      { eventId: 1, userId: 'b' },
+      { eventId: 2, userId: 'a' },
+    ];
+    const reported = [{ eventId: 1, userId: 'b' }];
+    expect(filterUnreportedRecipients(due, reported)).toEqual([
+      { eventId: 1, userId: 'a' },
+      { eventId: 2, userId: 'a' },
+    ]);
+  });
+
+  it('returns all rows when nothing has been reported', () => {
+    const due = [{ eventId: 1, userId: 'a' }];
+    expect(filterUnreportedRecipients(due, [])).toEqual(due);
+  });
+
+  it('matches on (eventId, reporterId) pair, not reporterId alone', () => {
+    const due = [{ eventId: 2, userId: 'a' }];
+    const reported = [{ eventId: 1, userId: 'a' }];
+    expect(filterUnreportedRecipients(due, reported)).toEqual(due);
+  });
+});
+
+describe('buildPostEventPayload', () => {
+  it('produces a deep-link to the event detail page anchored at the report section', () => {
+    const p = buildPostEventPayload(42, 'Coffee House');
+    expect(p.url).toBe('https://calendar.castalia.one/events/42#attendance-report');
+  });
+
+  it('honors a custom base url', () => {
+    const p = buildPostEventPayload(42, 'X', 'https://alt.example');
+    expect(p.url).toBe('https://alt.example/events/42#attendance-report');
+  });
+
+  it('uses a per-event tag so duplicate prompts collapse on the device', () => {
+    expect(buildPostEventPayload(7, 'X').tag).toBe('post-event-7');
+    expect(buildPostEventPayload(8, 'X').tag).toBe('post-event-8');
+  });
+
+  it('puts the event title in the notification title', () => {
+    const p = buildPostEventPayload(1, 'Quarterly Sync');
+    expect(p.title).toContain('Quarterly Sync');
+  });
+
+  it('body invites a yes/no follow-up without prejudging the answer', () => {
+    const p = buildPostEventPayload(1, 'X');
+    expect(p.body.length).toBeGreaterThan(0);
+  });
+});
+
+describe('POST_EVENT_PUSH_WINDOW', () => {
+  it('uses a unique dedupe type distinct from pre-event PUSH_WINDOWS', () => {
+    const pre = PUSH_WINDOWS.map((w) => w.type);
+    expect(pre).not.toContain(POST_EVENT_PUSH_WINDOW.type);
+  });
+
+  it('declares an "after end" window — minMinAfterEnd >= 0 and < maxMinAfterEnd', () => {
+    expect(POST_EVENT_PUSH_WINDOW.minMinAfterEnd).toBeGreaterThanOrEqual(0);
+    expect(POST_EVENT_PUSH_WINDOW.minMinAfterEnd).toBeLessThan(
+      POST_EVENT_PUSH_WINDOW.maxMinAfterEnd,
+    );
   });
 });

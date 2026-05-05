@@ -93,3 +93,71 @@ export const EMAIL_WINDOWS: [string, number, number][] = [
   ['1hr', 55, 65],
   ['15min', 10, 20],
 ];
+
+/**
+ * Post-event push: triggered after the event has ended to ask attendees
+ * whether it actually happened. Mirrors PUSH_WINDOWS but its window axis is
+ * "minutes since the event's effective end" rather than "minutes until start".
+ *
+ * Effective end = endsAt, falling back to startsAt + 60min (see eventEndedAt
+ * in @/lib/event-time). Wide window (30 min .. 24 h) means a missed cron tick
+ * is harmless; the (eventId, userId, type) unique key on notificationLog
+ * prevents duplicates.
+ */
+export const POST_EVENT_PUSH_WINDOW = {
+  type: 'push-post-event',
+  minMinAfterEnd: 30,
+  maxMinAfterEnd: 1440,
+} as const;
+
+/**
+ * Returns the [windowStart, windowEnd] of effective-end timestamps the cron
+ * should consider this tick. windowStart is the older boundary
+ * (now - maxMinAfterEnd), windowEnd is the more recent one
+ * (now - minMinAfterEnd). Events whose effective end falls in [start, end]
+ * are eligible for the post-event push.
+ */
+export function computePostEventWindow(
+  now: Date,
+  minMinAfterEnd: number,
+  maxMinAfterEnd: number,
+) {
+  return {
+    windowStart: new Date(now.getTime() - maxMinAfterEnd * 60_000),
+    windowEnd: new Date(now.getTime() - minMinAfterEnd * 60_000),
+  };
+}
+
+/**
+ * Drop (event, user) pairs that already have an attendance report row.
+ * Mirror of filterUnsentRecipients but keyed against the attendanceReports
+ * table rather than notificationLog — a user who has already reported
+ * doesn't need another nudge.
+ */
+export function filterUnreportedRecipients<T extends DueEventRow>(
+  due: T[],
+  alreadyReported: DueEventRow[],
+): T[] {
+  const reportedSet = new Set(
+    alreadyReported.map((s) => `${s.eventId}:${s.userId}`),
+  );
+  return due.filter((d) => !reportedSet.has(`${d.eventId}:${d.userId}`));
+}
+
+/**
+ * Build the push payload for the post-event prompt. Deep-links to the event
+ * detail page anchored at #attendance-report (the AttendanceReportSection
+ * carries that DOM id), so a tap drops the user straight at the form.
+ */
+export function buildPostEventPayload(
+  eventId: number,
+  eventTitle: string,
+  fallbackBase = 'https://calendar.castalia.one',
+): { title: string; body: string; url: string; tag: string } {
+  return {
+    title: `How did ${eventTitle} go?`,
+    body: 'Tap to mark whether it happened.',
+    url: `${fallbackBase}/events/${eventId}#attendance-report`,
+    tag: `post-event-${eventId}`,
+  };
+}
