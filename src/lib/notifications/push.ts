@@ -4,8 +4,17 @@ import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '';
-const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
+// web-push rejects standard base64 padding (`=`); the VAPID env vars in
+// Vercel were stored with padding from the original keygen output, so
+// normalize here rather than asking everyone to re-upload trimmed values.
+function stripBase64Padding(s: string): string {
+  return s.replace(/=+$/g, '');
+}
+
+const VAPID_PUBLIC = stripBase64Padding(
+  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '',
+);
+const VAPID_PRIVATE = stripBase64Padding(process.env.VAPID_PRIVATE_KEY || '');
 const VAPID_EMAIL = process.env.VAPID_EMAIL || 'mailto:accounts@liminalcommons.com';
 
 let configured = false;
