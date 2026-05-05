@@ -14,6 +14,14 @@ interface EventBlockProps {
   isDissolving?: boolean;
   isSpawning?: boolean;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
+  /** Owner-only drag affordance. When true, the block surfaces a draggable
+   *  marker and forwards pointerdown to `onDragStart`. Admins who are not
+   *  the event creator MUST receive `false` here (the calendar's permission
+   *  rule: only the creator can move). */
+  isOwner?: boolean;
+  /** Pointerdown handler invoked only when `isOwner` is true. WeeklyGrid
+   *  owns the drag lifecycle; EventBlock just emits the start signal. */
+  onDragStart?: (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => void;
 }
 
 function hashId(id: string): number {
@@ -87,6 +95,8 @@ const EventBlock = React.memo(function EventBlock({
   isDissolving,
   isSpawning,
   onEventClick,
+  isOwner = false,
+  onDragStart,
 }: EventBlockProps) {
   const blockRef = useRef<HTMLDivElement>(null);
 
@@ -123,6 +133,8 @@ const EventBlock = React.memo(function EventBlock({
   return (
     <div
       ref={blockRef}
+      data-testid="event-block"
+      data-draggable={isOwner ? 'true' : 'false'}
       className={`absolute rounded-md overflow-hidden cursor-pointer
                  shadow-sm hover:shadow-md hover:brightness-110
                  transition-all duration-300 ease-out z-10
@@ -136,6 +148,7 @@ const EventBlock = React.memo(function EventBlock({
         background: hasImage ? undefined : bgGradient,
       }}
       onClick={(e) => onEventClick(event, (e.currentTarget as HTMLDivElement).getBoundingClientRect())}
+      onPointerDown={isOwner && onDragStart ? (e) => onDragStart(event, e) : undefined}
       title={event.title}
     >
       {/* Banner image background */}
