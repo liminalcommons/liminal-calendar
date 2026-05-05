@@ -175,5 +175,27 @@ export async function runMigrations() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS attendance_reports_event_idx ON attendance_reports(event_id)`;
 
+  // Inbox notifications — sibling of notification_log. Each row is one thing
+  // the user should be aware of, with denormalized title/url for fast render
+  // and seen_at for read state. event_id is nullable so future system-level
+  // notifications (e.g., welcome, push-permission-restored) can land here.
+  await sql`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
+      actor_id TEXT,
+      actor_name TEXT,
+      title TEXT NOT NULL,
+      body TEXT,
+      url TEXT NOT NULL,
+      payload JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      seen_at TIMESTAMPTZ
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS notifications_user_recent_idx ON notifications(user_id, created_at DESC)`;
+
   return { success: true, message: 'Migrations complete' };
 }
