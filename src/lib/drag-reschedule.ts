@@ -33,6 +33,42 @@ export function pxToMinutesSnapped(
   return Math.min(24 * 60 - snap, Math.max(0, snapped));
 }
 
+/**
+ * Inverse of `pxToMinutesSnapped`'s slot lookup: convert a minutes-since-midnight
+ * value back to the corresponding pixel offset within the day column. Used by
+ * the drag preview to compute the snapped target Y so the dragging block
+ * visually lands on each 15-min slot as the user moves.
+ */
+export function minutesToPx(
+  minutes: number,
+  hourOffsets: number[],
+  hourHeights: number[],
+): number {
+  const slot = Math.min(Math.max(0, Math.floor(minutes / 30)), hourOffsets.length - 1);
+  const frac = (minutes - slot * 30) / 30;
+  return hourOffsets[slot] + frac * hourHeights[slot];
+}
+
+/**
+ * Live drag preview: given the block's true rendered top px and the cursor's
+ * raw vertical delta since pointerdown, return the *snapped* translateY value
+ * the block should display. Translation is 0 until the cursor crosses the
+ * nearest 15-min boundary; after that the block jumps in 15-min increments
+ * (matching the eventual snapped drop).
+ */
+export function computeSnappedDeltaPx(args: {
+  originalTopPx: number;
+  rawDeltaPx: number;
+  hourOffsets: number[];
+  hourHeights: number[];
+  snap: number;
+}): number {
+  const targetPx = args.originalTopPx + args.rawDeltaPx;
+  const snappedMinutes = pxToMinutesSnapped(targetPx, args.hourOffsets, args.hourHeights, args.snap);
+  const snappedTargetPx = minutesToPx(snappedMinutes, args.hourOffsets, args.hourHeights);
+  return snappedTargetPx - args.originalTopPx;
+}
+
 export function applyDeltaMinutes<T extends { starts_at: string; ends_at: string | null }>(
   ev: T,
   deltaMinutes: number,

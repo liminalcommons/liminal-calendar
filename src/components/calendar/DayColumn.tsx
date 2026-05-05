@@ -28,6 +28,12 @@ interface DayColumnProps {
   currentUserId?: string | null;
   /** Forwarded to EventBlock.onDragStart. WeeklyGrid owns the drag lifecycle. */
   onEventDragStart?: (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => void;
+  /** Live drag preview — id of the block currently being dragged (or null) and
+   *  the snapped translateY in px to apply to that block. WeeklyGrid pushes
+   *  this only on snap-step changes, so re-renders happen ~once per 15-min
+   *  worth of cursor travel. */
+  draggingEventId?: string | null;
+  dragDeltaPx?: number;
 }
 
 const DayColumn = React.memo(function DayColumn({
@@ -43,6 +49,8 @@ const DayColumn = React.memo(function DayColumn({
   onEventClick,
   currentUserId,
   onEventDragStart,
+  draggingEventId,
+  dragDeltaPx = 0,
 }: DayColumnProps) {
   // Mount gate — events position using browser-local TZ via getHours(), which
   // returns UTC during SSR (Vercel's Node runs UTC). Without this gate the
@@ -98,6 +106,8 @@ const DayColumn = React.memo(function DayColumn({
             onEventClick={onEventClick}
             isOwner={isOwner}
             onDragStart={onEventDragStart}
+            isDragging={draggingEventId === event.id}
+            dragDeltaPx={draggingEventId === event.id ? dragDeltaPx : 0}
           />
         );
       })}

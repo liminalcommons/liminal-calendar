@@ -1,4 +1,10 @@
-import { pxToMinutesSnapped, applyDeltaMinutes, computeDropPatch } from '@/lib/drag-reschedule';
+import {
+  pxToMinutesSnapped,
+  applyDeltaMinutes,
+  computeDropPatch,
+  minutesToPx,
+  computeSnappedDeltaPx,
+} from '@/lib/drag-reschedule';
 
 describe('pxToMinutesSnapped', () => {
   // each 30-min slot is 20px tall; 48 slots cover the day
@@ -120,5 +126,67 @@ describe('computeDropPatch', () => {
     });
     expect(out.ends_at).toBeNull();
     expect(new Date(out.starts_at).getHours()).toBe(11);
+  });
+});
+
+describe('minutesToPx', () => {
+  // each 30-min slot is 20px; 48 slots cover the day
+  const heights = new Array(48).fill(20);
+  const offsets = new Array(48).fill(0).map((_, i) => i * 20);
+
+  it('returns slot top px at slot boundary', () => {
+    expect(minutesToPx(60, offsets, heights)).toBe(40); // 1:00am at 40px
+  });
+
+  it('interpolates within a slot', () => {
+    expect(minutesToPx(75, offsets, heights)).toBe(50); // 1:15am halfway through slot 2
+  });
+
+  it('clamps high minutes to last slot', () => {
+    // last slot starts at offset 47*20=940; 23:30 (1410min) lands at slot 47 frac=0
+    expect(minutesToPx(1410, offsets, heights)).toBe(940);
+  });
+});
+
+describe('computeSnappedDeltaPx', () => {
+  // each 30-min slot is 20px; 15-min snap step = 10px
+  const heights = new Array(48).fill(20);
+  const offsets = new Array(48).fill(0).map((_, i) => i * 20);
+
+  it('returns 0 when raw delta is below half a snap step', () => {
+    // originalTopPx=400 (10:00am), drag +4px (~6 min) → snaps to 10:00 → 0
+    const out = computeSnappedDeltaPx({
+      originalTopPx: 400, rawDeltaPx: 4,
+      hourOffsets: offsets, hourHeights: heights, snap: 15,
+    });
+    expect(out).toBe(0);
+  });
+
+  it('jumps one snap step (10px) once the raw delta crosses 7.5min worth', () => {
+    // originalTopPx=400 (10:00am), drag +8px (~12 min) → snaps to 10:15 → +10px
+    const out = computeSnappedDeltaPx({
+      originalTopPx: 400, rawDeltaPx: 8,
+      hourOffsets: offsets, hourHeights: heights, snap: 15,
+    });
+    expect(out).toBe(10);
+  });
+
+  it('jumps backward in snap steps for upward drag', () => {
+    // originalTopPx=400 (10:00am), drag -10px (~-15 min) → snaps to 9:45 → -10px
+    const out = computeSnappedDeltaPx({
+      originalTopPx: 400, rawDeltaPx: -10,
+      hourOffsets: offsets, hourHeights: heights, snap: 15,
+    });
+    expect(out).toBe(-10);
+  });
+
+  it('handles non-snap-aligned originalTopPx (event starts mid-slot)', () => {
+    // originalTopPx=403 (≈10:04.5, snaps to 10:00), drag +30px → final px 433
+    // (≈10:49.5, snaps to 10:45). Snapped target px = 430. Delta = 430 - 403 = 27.
+    const out = computeSnappedDeltaPx({
+      originalTopPx: 403, rawDeltaPx: 30,
+      hourOffsets: offsets, hourHeights: heights, snap: 15,
+    });
+    expect(out).toBe(27);
   });
 });

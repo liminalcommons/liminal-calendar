@@ -5,13 +5,15 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { useUserTimezone } from '@/lib/timezone-utils';
 import type { DisplayEvent } from '@/lib/display-event';
 import { getWeekStart, getWeekDays, DAY_NAMES } from '@/lib/calendar-utils';
 import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
 import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { canCreateEvents } from '@/lib/auth-helpers';
-import { computeDropPatch } from '@/lib/drag-reschedule';
+import { computeDropPatch, computeSnappedDeltaPx } from '@/lib/drag-reschedule';
 import { apiFetch } from '@/lib/api-fetch';
 import { RecurrenceMoveModal, type RecurrenceMoveScope } from './RecurrenceMoveModal';
 import { MoonPhase } from '@/components/MoonPhase';
@@ -38,6 +40,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   // the session shape varies. `null` = unauthenticated → no drag anywhere.
   const sessionUser = session?.user as { hyloId?: string; id?: string } | undefined;
   const currentUserId = sessionUser?.hyloId ?? sessionUser?.id ?? null;
+  const userTz = useUserTimezone();
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
     getWeekStart(new Date())
@@ -198,6 +201,17 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     event: DisplayEvent;
     patchTimes: { starts_at: string; ends_at: string | null };
   } | null>(null);
+  // Live drag preview state. Updated only when the snapped step changes (every
+  // 15 min equivalent of px), so React doesn't re-render on every pointermove.
+  // `id` identifies the dragging block so DayColumn → EventBlock can apply the
+  // live transform to ONLY that block. `previewStartIso` feeds the floating
+  // time tooltip rendered above the grid.
+  const [dragLive, setDragLive] = useState<{
+    id: string;
+    snappedDeltaPx: number;
+    previewStartIso: string;
+    previewEndIso: string | null;
+  } | null>(null);
 
   const executeMovePatch = useCallback(
     async (
@@ -257,18 +271,59 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         moved: false,
       };
 
+      // Track the last snapped delta we pushed to React state so we can skip
+      // setStates that wouldn't change the rendered transform.
+      let lastSnappedDelta: number | null = null;
+
       const handleMove = (mvEvent: PointerEvent) => {
         const drag = dragRef.current;
         if (!drag) return;
+        const rawDeltaPx = mvEvent.clientY - drag.startClientY;
         // Threshold of 4px to distinguish a click from a drag.
-        if (Math.abs(mvEvent.clientY - drag.startClientY) > 4) {
-          drag.moved = true;
+        if (Math.abs(rawDeltaPx) > 4) {
+          if (!drag.moved) {
+            drag.moved = true;
+            // Lock the body cursor so it stays "grabbing" even when the pointer
+            // sweeps over an underlying element with a different cursor.
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+          }
         }
+        if (!drag.moved) return;
+
+        const snappedDeltaPx = computeSnappedDeltaPx({
+          originalTopPx: drag.originalTopPx,
+          rawDeltaPx,
+          hourOffsets,
+          hourHeights,
+          snap: 15,
+        });
+        if (snappedDeltaPx === lastSnappedDelta) return;
+        lastSnappedDelta = snappedDeltaPx;
+
+        const previewTimes = computeDropPatch({
+          starts_at: drag.event.starts_at,
+          ends_at: drag.event.ends_at,
+          originalTopPx: drag.originalTopPx,
+          finalTopPx: drag.originalTopPx + rawDeltaPx,
+          hourOffsets,
+          hourHeights,
+          snap: 15,
+        });
+        setDragLive({
+          id: drag.event.id,
+          snappedDeltaPx,
+          previewStartIso: previewTimes.starts_at,
+          previewEndIso: previewTimes.ends_at,
+        });
       };
 
       const handleUp = (upEvent: PointerEvent) => {
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setDragLive(null);
         const drag = dragRef.current;
         dragRef.current = null;
         if (!drag) return;
@@ -387,6 +442,29 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         </div>
       </div>
 
+      {/* ── Live drag preview tooltip ── */}
+      {dragLive && (
+        <div
+          data-testid="drag-preview-tooltip"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50
+                     bg-grove-surface border border-grove-accent/60
+                     shadow-lg rounded-full px-4 py-1.5
+                     text-sm font-medium text-grove-text pointer-events-none
+                     flex items-center gap-2"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-grove-accent animate-pulse" />
+          <span>
+            {formatInTimeZone(new Date(dragLive.previewStartIso), userTz, 'EEE h:mm a')}
+            {dragLive.previewEndIso && (
+              <>
+                {' – '}
+                {formatInTimeZone(new Date(dragLive.previewEndIso), userTz, 'h:mm a')}
+              </>
+            )}
+          </span>
+        </div>
+      )}
+
       {/* ── Popovers ── */}
       {expansion && (
         <EventExpansion
@@ -495,6 +573,8 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                     onEventClick={handleEventClickGuarded}
                     currentUserId={currentUserId}
                     onEventDragStart={handleEventDragStart}
+                    draggingEventId={dragLive?.id ?? null}
+                    dragDeltaPx={dragLive?.snappedDeltaPx ?? 0}
                   />
                 ))}
               </div>
