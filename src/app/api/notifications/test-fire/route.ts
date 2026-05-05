@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  * Used to verify the bell + dropdown work end-to-end without waiting for
  * a real cron tick or domain trigger.
  *
- * Body: { userId: string, title?: string, type?: string }
+ * Body: { userId: string, title?: string, type?: string, push?: boolean }
+ * When push=true, also calls sendPushToUsers — for end-to-end OS-push test.
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
