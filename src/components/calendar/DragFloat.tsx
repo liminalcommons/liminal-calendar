@@ -1,13 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 
 interface DragFloatProps {
   event: DisplayEvent;
-  cursorX: number;
-  cursorY: number;
+  /** Initial cursor position — used once at mount to position the float
+   *  before the first pointermove tick. After mount, position is owned by
+   *  WeeklyGrid via the forwarded ref (direct DOM mutation, no React state).
+   *  This avoids a setState-per-pixel re-render storm that made the float
+   *  feel laggy and flickery. */
+  initialCursorX: number;
+  initialCursorY: number;
   grabOffsetX: number;
   grabOffsetY: number;
   width: number;
@@ -34,44 +39,45 @@ function hashId(id: string): number {
 }
 
 /**
- * Floating clone of the dragged EventBlock that follows the cursor in real
- * time. Rendered fixed-positioned at the document level so it stays visible
- * even as the underlying grid changes (e.g., when the user crosses the week
- * edge and the visible week advances).
- *
- * Receives the original grab offset so the cursor remains at the same
- * relative point on the float as where the user grabbed the block.
+ * Floating clone of the dragged EventBlock. Position is JS-owned (the parent
+ * mutates `style.transform` on every native pointermove), so React never
+ * fights for the cursor. The component intentionally has NO `transform` in
+ * its JSX style — that lets the parent's DOM updates persist across React
+ * re-renders triggered by snap/edge state changes.
  */
-export function DragFloat({
-  event,
-  cursorX,
-  cursorY,
-  grabOffsetX,
-  grabOffsetY,
-  width,
-  height,
-  userTz,
-}: DragFloatProps) {
-  const left = cursorX - grabOffsetX;
-  const top = cursorY - grabOffsetY;
+export const DragFloat = forwardRef<HTMLDivElement, DragFloatProps>(function DragFloat(
+  { event, initialCursorX, initialCursorY, grabOffsetX, grabOffsetY, width, height, userTz },
+  ref,
+) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  useImperativeHandle(ref, () => innerRef.current as HTMLDivElement);
+
+  // Set initial transform AFTER mount so the float lands at the cursor
+  // immediately. Subsequent updates come via the forwarded ref.
+  useLayoutEffect(() => {
+    if (!innerRef.current) return;
+    const x = initialCursorX - grabOffsetX;
+    const y = initialCursorY - grabOffsetY;
+    innerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.02)`;
+  }, []); // mount-only
+
   const bgGradient = EVENT_GRADIENTS[hashId(event.id)];
   const hasImage = !!event.imageUrl;
   const startStr = formatInTimeZone(new Date(event.starts_at), userTz, 'h:mma').toLowerCase().replace(':00', '');
 
   return (
     <div
+      ref={innerRef}
       data-testid="drag-float"
-      className="fixed pointer-events-none z-[60] rounded-md overflow-hidden
-                 border border-white/30 select-none"
+      className="fixed top-0 left-0 pointer-events-none z-[60] rounded-md overflow-hidden
+                 border border-white/30 select-none will-change-transform"
       style={{
-        left,
-        top,
         width,
         height,
         background: hasImage ? undefined : bgGradient,
         boxShadow: '0 18px 36px -8px rgba(0,0,0,0.55), 0 6px 14px -2px rgba(0,0,0,0.40)',
         opacity: 0.94,
-        transform: 'scale(1.02)',
+        // NB: NO `transform` here on purpose — owned by parent via ref.
       }}
     >
       {hasImage && (
@@ -92,4 +98,4 @@ export function DragFloat({
       </div>
     </div>
   );
-}
+});

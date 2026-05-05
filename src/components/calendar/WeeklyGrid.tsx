@@ -220,29 +220,27 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     event: DisplayEvent;
     patchTimes: { starts_at: string; ends_at: string | null };
   } | null>(null);
-  // Live drag preview state. Updated at most once per animation frame (rAF
-  // coalesced) so React reconciles smoothly without a setState per pointermove.
-  // The DragFloat reads cursorX/Y; the snap-ghost reads snapTarget; the
-  // floating time tooltip reads snapTarget.previewStartIso.
+  // Live drag preview state. setState ONLY fires when something semantically
+  // changes (snap step crossing, edge zone enter/exit, drag start/end). Cursor
+  // position is owned by JS via dragFloatRef.current.style.transform — no
+  // setState per pointermove, so the float follows at native frame rate
+  // without re-rendering WeeklyGrid + the day grid.
+  const dragFloatRef = useRef<HTMLDivElement>(null);
   const [dragLive, setDragLive] = useState<{
     event: DisplayEvent;
-    cursorX: number;
-    cursorY: number;
+    initialCursorX: number;
+    initialCursorY: number;
     grabOffsetX: number;
     grabOffsetY: number;
     blockWidth: number;
     blockHeight: number;
     snapTarget: {
-      dayIndex: number;          // 0–6 within the visible week
+      dayIndex: number;
       starts_at: string;
       ends_at: string | null;
       topPx: number;
       heightPx: number;
     } | null;
-    /** Set when the cursor is inside a left/right edge zone of the grid. The
-     *  EdgeIndicator renders a chevron + pulsing strip on that side, and a
-     *  300ms timer auto-advances the visible week. Re-armed after each advance
-     *  so the user can drag through multiple weeks without exiting the zone. */
     edgeZone: 'left' | 'right' | null;
   } | null>(null);
 
@@ -363,6 +361,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         const mvEvent = drag.lastEvent;
         const cursorX = mvEvent.clientX;
         const cursorY = mvEvent.clientY;
+        if (!drag.moved) return; // float not yet visible
 
         // ── Cross-week edge auto-advance ──
         // After advancing, the timer is RE-ARMED so a user holding the cursor
@@ -384,32 +383,54 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
             }
             drag.edgeDirection = edgeZone;
             if (edgeZone) {
-              const scheduleAdvance = () => {
+              // First advance has a longer hold (more reaction time before
+              // the user is "committed" to a cross-week drag). Subsequent
+              // re-arms are slower (700ms) so continuous paging feels
+              // deliberate, not rapid-fire.
+              const scheduleAdvance = (delay: number) => {
                 if (!dragRef.current || dragRef.current.edgeDirection !== edgeZone) return;
                 if (edgeZone === 'left') setCurrentWeekStart(prev => subWeeks(prev, 1));
                 else setCurrentWeekStart(prev => addWeeks(prev, 1));
-                // Re-arm so continued hold pages again.
                 if (dragRef.current && dragRef.current.edgeDirection === edgeZone) {
-                  dragRef.current.edgeAdvanceTimer = window.setTimeout(scheduleAdvance, 350);
+                  dragRef.current.edgeAdvanceTimer = window.setTimeout(
+                    () => scheduleAdvance(700),
+                    delay,
+                  );
                 }
               };
-              drag.edgeAdvanceTimer = window.setTimeout(scheduleAdvance, 350);
+              drag.edgeAdvanceTimer = window.setTimeout(() => scheduleAdvance(700), 600);
             }
           }
         }
 
         const snapTarget = computeSnapAt(cursorX, cursorY);
 
-        setDragLive({
-          event: drag.event,
-          cursorX,
-          cursorY,
-          grabOffsetX: drag.grabOffsetX,
-          grabOffsetY: drag.grabOffsetY,
-          blockWidth: drag.blockWidth,
-          blockHeight: drag.blockHeight,
-          snapTarget,
-          edgeZone,
+        // Only setState when something semantic changed. Cursor X/Y are owned
+        // by the float ref, NOT React state, so cursor movement alone does
+        // not trigger a re-render.
+        setDragLive(prev => {
+          if (!prev) {
+            // First semantic update for this drag — mount the float.
+            return {
+              event: drag.event,
+              initialCursorX: cursorX,
+              initialCursorY: cursorY,
+              grabOffsetX: drag.grabOffsetX,
+              grabOffsetY: drag.grabOffsetY,
+              blockWidth: drag.blockWidth,
+              blockHeight: drag.blockHeight,
+              snapTarget,
+              edgeZone,
+            };
+          }
+          const sameSnap =
+            (prev.snapTarget == null && snapTarget == null)
+            || (prev.snapTarget != null && snapTarget != null
+                && prev.snapTarget.dayIndex === snapTarget.dayIndex
+                && prev.snapTarget.starts_at === snapTarget.starts_at);
+          const sameEdge = prev.edgeZone === edgeZone;
+          if (sameSnap && sameEdge) return prev;
+          return { ...prev, snapTarget, edgeZone };
         });
       };
 
@@ -417,8 +438,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         const drag = dragRef.current;
         if (!drag) return;
         drag.lastEvent = mvEvent;
-        // Movement threshold — set synchronously so a quick drag-and-release
-        // still registers (rAF may not have ticked yet when pointerup fires).
+        // Threshold — synchronous so quick releases still register the drag.
         if (!drag.moved) {
           const dx = mvEvent.clientX - drag.startClientX;
           const dy = mvEvent.clientY - drag.startClientY;
@@ -428,6 +448,15 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
             document.body.style.userSelect = 'none';
           }
         }
+        // Mutate the float's transform DIRECTLY on every native pointermove.
+        // Bypasses React entirely, so the cursor follows at native frame rate
+        // (no setState, no reconciliation, no flicker).
+        if (drag.moved && dragFloatRef.current) {
+          const x = mvEvent.clientX - drag.grabOffsetX;
+          const y = mvEvent.clientY - drag.grabOffsetY;
+          dragFloatRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.02)`;
+        }
+        // Snap detection + edge zone are rAF-coalesced (lower frequency).
         if (drag.rafId != null) return;
         drag.rafId = requestAnimationFrame(computeAndApply);
       };
@@ -557,9 +586,10 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
       {dragLive && (
         <>
           <DragFloat
+            ref={dragFloatRef}
             event={dragLive.event}
-            cursorX={dragLive.cursorX}
-            cursorY={dragLive.cursorY}
+            initialCursorX={dragLive.initialCursorX}
+            initialCursorY={dragLive.initialCursorY}
             grabOffsetX={dragLive.grabOffsetX}
             grabOffsetY={dragLive.grabOffsetY}
             width={dragLive.blockWidth}
