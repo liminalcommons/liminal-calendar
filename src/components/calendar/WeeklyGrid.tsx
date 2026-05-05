@@ -313,7 +313,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
       // cursor is not over any DayColumn (e.g., outside the grid). Shared by
       // the rAF preview update AND the synchronous handleUp drop logic.
       const computeSnapAt = (cursorX: number, cursorY: number) => {
-        const gridEl = gridRef.current;
         const probeY = cursorY - (dragRef.current?.grabOffsetY ?? 0)
           + (dragRef.current?.blockHeight ?? 0) / 2;
         const els = document.elementsFromPoint(cursorX, probeY);
@@ -323,8 +322,13 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         if (!dayColEl || !dragRef.current) return null;
         const dayIndex = parseInt(dayColEl.getAttribute('data-day-index')!, 10);
         const colRect = dayColEl.getBoundingClientRect();
-        const scrollTop = gridEl?.scrollTop ?? 0;
-        const blockTopY = (cursorY - dragRef.current.grabOffsetY) - colRect.top + scrollTop;
+        // colRect.top is already in viewport coords AFTER the grid's scroll,
+        // and the column's children are positioned in the column's *local*
+        // coords (which match viewport offsets from colRect.top, regardless
+        // of how far the grid has been scrolled). Adding scrollTop here was
+        // double-counting and pushing blockTopY past the day's end → clamped
+        // to 23:45 → vertical drag silently produced a no-op.
+        const blockTopY = (cursorY - dragRef.current.grabOffsetY) - colRect.top;
         const destDay = addDays(currentWeekStartRef.current, dayIndex);
         const destDayMidnight = new Date(destDay);
         destDayMidnight.setHours(0, 0, 0, 0);
