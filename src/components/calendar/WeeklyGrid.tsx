@@ -15,6 +15,7 @@ import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@
 import { canCreateEvents } from '@/lib/auth-helpers';
 import { computeCrossDayDropTimes } from '@/lib/drag-reschedule';
 import { DragFloat } from './DragFloat';
+import { DragEdgeIndicator } from './DragEdgeIndicator';
 import { apiFetch } from '@/lib/api-fetch';
 import { RecurrenceMoveModal, type RecurrenceMoveScope } from './RecurrenceMoveModal';
 import { MoonPhase } from '@/components/MoonPhase';
@@ -238,6 +239,11 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
       topPx: number;
       heightPx: number;
     } | null;
+    /** Set when the cursor is inside a left/right edge zone of the grid. The
+     *  EdgeIndicator renders a chevron + pulsing strip on that side, and a
+     *  300ms timer auto-advances the visible week. Re-armed after each advance
+     *  so the user can drag through multiple weeks without exiting the zone. */
+    edgeZone: 'left' | 'right' | null;
   } | null>(null);
 
   const executeMovePatch = useCallback(
@@ -359,30 +365,35 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         const cursorY = mvEvent.clientY;
 
         // ── Cross-week edge auto-advance ──
+        // After advancing, the timer is RE-ARMED so a user holding the cursor
+        // in the edge zone can keep paging through weeks (300ms per page).
+        // The advance closure reschedules itself instead of clearing.
         const gridEl = gridRef.current;
+        let edgeZone: 'left' | 'right' | null = null;
         if (gridEl) {
           const gr = gridEl.getBoundingClientRect();
           const distLeft = cursorX - gr.left;
           const distRight = gr.right - cursorX;
-          const inLeftEdge = distLeft >= 0 && distLeft < 40;
-          const inRightEdge = distRight >= 0 && distRight < 40;
-          const dir = inLeftEdge ? 'left' : inRightEdge ? 'right' : null;
-          if (dir !== drag.edgeDirection) {
+          const inLeftEdge = distLeft >= 0 && distLeft < 56;
+          const inRightEdge = distRight >= 0 && distRight < 56;
+          edgeZone = inLeftEdge ? 'left' : inRightEdge ? 'right' : null;
+          if (edgeZone !== drag.edgeDirection) {
             if (drag.edgeAdvanceTimer != null) {
               clearTimeout(drag.edgeAdvanceTimer);
               drag.edgeAdvanceTimer = null;
             }
-            drag.edgeDirection = dir;
-            if (dir === 'left') {
-              drag.edgeAdvanceTimer = window.setTimeout(() => {
-                setCurrentWeekStart(prev => subWeeks(prev, 1));
-                if (dragRef.current) dragRef.current.edgeAdvanceTimer = null;
-              }, 500);
-            } else if (dir === 'right') {
-              drag.edgeAdvanceTimer = window.setTimeout(() => {
-                setCurrentWeekStart(prev => addWeeks(prev, 1));
-                if (dragRef.current) dragRef.current.edgeAdvanceTimer = null;
-              }, 500);
+            drag.edgeDirection = edgeZone;
+            if (edgeZone) {
+              const scheduleAdvance = () => {
+                if (!dragRef.current || dragRef.current.edgeDirection !== edgeZone) return;
+                if (edgeZone === 'left') setCurrentWeekStart(prev => subWeeks(prev, 1));
+                else setCurrentWeekStart(prev => addWeeks(prev, 1));
+                // Re-arm so continued hold pages again.
+                if (dragRef.current && dragRef.current.edgeDirection === edgeZone) {
+                  dragRef.current.edgeAdvanceTimer = window.setTimeout(scheduleAdvance, 350);
+                }
+              };
+              drag.edgeAdvanceTimer = window.setTimeout(scheduleAdvance, 350);
             }
           }
         }
@@ -398,6 +409,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           blockWidth: drag.blockWidth,
           blockHeight: drag.blockHeight,
           snapTarget,
+          edgeZone,
         });
       };
 
@@ -554,6 +566,12 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
             height={dragLive.blockHeight}
             userTz={userTz}
           />
+          {dragLive.edgeZone && gridRef.current && (
+            <DragEdgeIndicator
+              side={dragLive.edgeZone}
+              gridRect={gridRef.current.getBoundingClientRect()}
+            />
+          )}
           {dragLive.snapTarget && (
             <div
               data-testid="drag-preview-tooltip"
