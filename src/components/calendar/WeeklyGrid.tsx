@@ -52,6 +52,10 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   });
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
+  // Set true on a successful drag (pointer moved past threshold) so the
+  // synthetic click that fires after pointerup doesn't trigger a popover or a
+  // cell navigation. Read by handleEventClickGuarded AND handleCellClick.
+  const suppressNextClickRef = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const [centerSlot, setCenterSlot] = useState(24); // slot 24 = 12:00 PM
 
@@ -152,6 +156,10 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   }, [goToToday, goToPrevWeek, goToNextWeek]);
 
   const handleCellClick = useCallback((day: Date, hour: number, rect: DOMRect) => {
+    // Suppress synthetic click immediately after a drag (pointerup → click).
+    // Without this, releasing the drag over an empty HourCell navigates to
+    // the create-event page instead of completing the drop.
+    if (suppressNextClickRef.current) return;
     // If the event-detail popover is open, treat this click as a popover
     // dismissal rather than a "create new event" navigation. Real users on
     // touch devices can have synthesized events route to a HourCell when the
@@ -207,11 +215,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     // Latest pointermove event so the rAF callback uses fresh coords.
     lastEvent: PointerEvent | null;
   } | null>(null);
-  // After a successful drag (pointer moved past threshold), suppress the next
-  // click that the browser fires as part of the pointer sequence. Without this,
-  // dragging an owner block opens EventExpansion at the new position right
-  // after the move completes (negativa cycle 5 WARN).
-  const suppressNextClickRef = useRef(false);
   const [pendingRecurringMove, setPendingRecurringMove] = useState<{
     event: DisplayEvent;
     patchTimes: { starts_at: string; ends_at: string | null };
@@ -306,6 +309,43 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         lastEvent: null,
       };
 
+      // Pure snap calculation from a cursor (clientX/Y). Returns null if the
+      // cursor is not over any DayColumn (e.g., outside the grid). Shared by
+      // the rAF preview update AND the synchronous handleUp drop logic.
+      const computeSnapAt = (cursorX: number, cursorY: number) => {
+        const gridEl = gridRef.current;
+        const probeY = cursorY - (dragRef.current?.grabOffsetY ?? 0)
+          + (dragRef.current?.blockHeight ?? 0) / 2;
+        const els = document.elementsFromPoint(cursorX, probeY);
+        const dayColEl = els.find(
+          (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-day-index'),
+        );
+        if (!dayColEl || !dragRef.current) return null;
+        const dayIndex = parseInt(dayColEl.getAttribute('data-day-index')!, 10);
+        const colRect = dayColEl.getBoundingClientRect();
+        const scrollTop = gridEl?.scrollTop ?? 0;
+        const blockTopY = (cursorY - dragRef.current.grabOffsetY) - colRect.top + scrollTop;
+        const destDay = addDays(currentWeekStartRef.current, dayIndex);
+        const destDayMidnight = new Date(destDay);
+        destDayMidnight.setHours(0, 0, 0, 0);
+        const out = computeCrossDayDropTimes({
+          blockTopYInColumn: blockTopY,
+          destDayMidnight,
+          originalStartIso: dragRef.current.event.starts_at,
+          originalEndIso: dragRef.current.event.ends_at,
+          hourOffsets,
+          hourHeights,
+          snap: 15,
+        });
+        return {
+          dayIndex,
+          starts_at: out.starts_at,
+          ends_at: out.ends_at,
+          topPx: out.snappedTopPx,
+          heightPx: out.snappedHeightPx,
+        };
+      };
+
       const computeAndApply = () => {
         const drag = dragRef.current;
         if (!drag || !drag.lastEvent) return;
@@ -313,16 +353,6 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         const mvEvent = drag.lastEvent;
         const cursorX = mvEvent.clientX;
         const cursorY = mvEvent.clientY;
-
-        // ── Movement threshold gate ──
-        const dx = cursorX - drag.startClientX;
-        const dy = cursorY - drag.startClientY;
-        if (Math.hypot(dx, dy) > 4 && !drag.moved) {
-          drag.moved = true;
-          document.body.style.cursor = 'grabbing';
-          document.body.style.userSelect = 'none';
-        }
-        if (!drag.moved) return;
 
         // ── Cross-week edge auto-advance ──
         const gridEl = gridRef.current;
@@ -353,46 +383,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           }
         }
 
-        // ── Snap target detection ──
-        // Find the DayColumn under the cursor (or under the block's TOP, which
-        // is grabOffsetY pixels above the cursor — that's where the event
-        // would actually LAND).
-        const probeY = cursorY - drag.grabOffsetY + drag.blockHeight / 2;
-        const els = document.elementsFromPoint(cursorX, probeY);
-        const dayColEl = els.find(
-          (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-day-index'),
-        );
-
-        let snapTarget: { dayIndex: number; starts_at: string; ends_at: string | null; topPx: number; heightPx: number } | null = null;
-        if (dayColEl) {
-          const dayIndex = parseInt(dayColEl.getAttribute('data-day-index')!, 10);
-          const colRect = dayColEl.getBoundingClientRect();
-          const scrollTop = gridEl?.scrollTop ?? 0;
-          const blockTopY = (cursorY - drag.grabOffsetY) - colRect.top + scrollTop;
-          // Compute the destination day's wall-clock midnight from the live
-          // (post-edge-advance) week start. weekDays from closure is stale
-          // after a week advance — recompute against currentWeekStartRef.
-          const destDay = addDays(currentWeekStartRef.current, dayIndex);
-          const destDayMidnight = new Date(destDay);
-          destDayMidnight.setHours(0, 0, 0, 0);
-
-          const out = computeCrossDayDropTimes({
-            blockTopYInColumn: blockTopY,
-            destDayMidnight,
-            originalStartIso: drag.event.starts_at,
-            originalEndIso: drag.event.ends_at,
-            hourOffsets,
-            hourHeights,
-            snap: 15,
-          });
-          snapTarget = {
-            dayIndex,
-            starts_at: out.starts_at,
-            ends_at: out.ends_at,
-            topPx: out.snappedTopPx,
-            heightPx: out.snappedHeightPx,
-          };
-        }
+        const snapTarget = computeSnapAt(cursorX, cursorY);
 
         setDragLive({
           event: drag.event,
@@ -410,43 +401,53 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         const drag = dragRef.current;
         if (!drag) return;
         drag.lastEvent = mvEvent;
+        // Movement threshold — set synchronously so a quick drag-and-release
+        // still registers (rAF may not have ticked yet when pointerup fires).
+        if (!drag.moved) {
+          const dx = mvEvent.clientX - drag.startClientX;
+          const dy = mvEvent.clientY - drag.startClientY;
+          if (Math.hypot(dx, dy) > 4) {
+            drag.moved = true;
+            document.body.style.cursor = 'grabbing';
+            document.body.style.userSelect = 'none';
+          }
+        }
         if (drag.rafId != null) return;
         drag.rafId = requestAnimationFrame(computeAndApply);
       };
 
-      const handleUp = (_upEvent: PointerEvent) => {
+      const handleUp = (upEvent: PointerEvent) => {
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         const drag = dragRef.current;
-        // Capture snap target BEFORE clearing dragLive (the React state has the
-        // last-rendered target, but for the drop decision we use the most
-        // recent rAF-applied state — read the closure's setDragLive callback).
-        let pendingSnap: { starts_at: string; ends_at: string | null } | null = null;
-        setDragLive(prev => {
-          if (prev?.snapTarget) {
-            pendingSnap = { starts_at: prev.snapTarget.starts_at, ends_at: prev.snapTarget.ends_at };
-          }
-          return null;
-        });
-        if (drag?.edgeAdvanceTimer != null) {
-          clearTimeout(drag.edgeAdvanceTimer);
-        }
+        if (drag?.edgeAdvanceTimer != null) clearTimeout(drag.edgeAdvanceTimer);
         if (drag?.rafId != null) cancelAnimationFrame(drag.rafId);
+
+        if (!drag) {
+          setDragLive(null);
+          return;
+        }
+
+        // Compute the FINAL snap target from the release cursor synchronously —
+        // do not rely on dragLive (the rAF preview may not have caught the last
+        // pointermove before pointerup fired). This is the source of truth for
+        // the drop.
+        const finalSnap = drag.moved ? computeSnapAt(upEvent.clientX, upEvent.clientY) : null;
         dragRef.current = null;
-        if (!drag) return;
+        setDragLive(null);
 
         if (!drag.moved) return;
 
         suppressNextClickRef.current = true;
         setTimeout(() => { suppressNextClickRef.current = false; }, 350);
 
-        // No valid drop target (cursor outside grid) → cancel.
-        if (!pendingSnap) return;
-        const patchTimes = pendingSnap as { starts_at: string; ends_at: string | null };
+        // Cursor wasn't over any DayColumn → cancel drop.
+        if (!finalSnap) return;
+        const patchTimes = { starts_at: finalSnap.starts_at, ends_at: finalSnap.ends_at };
 
-        // No-op drop (same time after snap)
+        // No-op drop (same time after snap).
         if (patchTimes.starts_at === drag.event.starts_at) return;
 
         if (drag.event.recurrenceRule) {
