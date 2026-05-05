@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createNotification } from '@/lib/notifications/inbox/repo';
+import { sendPushToUsers } from '@/lib/notifications/push';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,28 +27,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { userId, title, type } = (body ?? {}) as {
+  const { userId, title, type, push } = (body ?? {}) as {
     userId?: string;
     title?: string;
     type?: string;
+    push?: boolean;
   };
 
   if (!userId || typeof userId !== 'string') {
     return NextResponse.json({ error: 'userId (string) required' }, { status: 400 });
   }
 
+  const finalTitle = title ?? 'Test notification — bell + inbox working';
+  const finalBody = 'This is a synthetic notification fired via /api/notifications/test-fire.';
+
+  let notification: unknown = null;
+  let pushResult: { sent: number; failed: number } | null = null;
+
   try {
-    const row = await createNotification(db, {
+    notification = await createNotification(db, {
       userId,
       type: type ?? 'test.fixture',
-      title: title ?? 'Test notification — bell + inbox working',
-      body: 'This is a synthetic notification fired via /api/notifications/test-fire.',
+      title: finalTitle,
+      body: finalBody,
       url: '/',
       payload: { source: 'test-fire', firedAt: new Date().toISOString() },
     });
-    return NextResponse.json({ success: true, notification: row });
   } catch (err) {
-    console.error('[POST /api/notifications/test-fire]', err);
+    console.error('[POST /api/notifications/test-fire] inbox', err);
     return NextResponse.json(
       {
         error: 'Failed to insert test notification',
@@ -56,4 +63,20 @@ export async function POST(request: NextRequest) {
       { status: 500 },
     );
   }
+
+  if (push) {
+    try {
+      pushResult = await sendPushToUsers([userId], {
+        title: finalTitle,
+        body: finalBody,
+        url: '/',
+        tag: `test-fire-${Date.now()}`,
+      });
+    } catch (err) {
+      console.error('[POST /api/notifications/test-fire] push', err);
+      pushResult = { sent: 0, failed: -1 };
+    }
+  }
+
+  return NextResponse.json({ success: true, notification, push: pushResult });
 }
