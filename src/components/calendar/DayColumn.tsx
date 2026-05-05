@@ -5,6 +5,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
 import { HourCell } from './HourCell';
 import { EventBlock } from './EventBlock';
+import { DragSnapGhost } from './DragSnapGhost';
 import { computeOverlapLayout } from './overlap';
 import { SLOTS_PER_DAY } from '@/lib/golden-hours';
 import { eventToMinutes } from '@/lib/event-time-display';
@@ -28,12 +29,18 @@ interface DayColumnProps {
   currentUserId?: string | null;
   /** Forwarded to EventBlock.onDragStart. WeeklyGrid owns the drag lifecycle. */
   onEventDragStart?: (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => void;
-  /** Live drag preview — id of the block currently being dragged (or null) and
-   *  the snapped translateY in px to apply to that block. WeeklyGrid pushes
-   *  this only on snap-step changes, so re-renders happen ~once per 15-min
-   *  worth of cursor travel. */
+  /** ID of the event currently being dragged anywhere in the grid. The matching
+   *  EventBlock in this column (if any) renders faded so the user sees where
+   *  the event WAS while the float follows the cursor. */
   draggingEventId?: string | null;
-  dragDeltaPx?: number;
+  /** Day index of the snap target (0–6 within the visible week, -1 if not in
+   *  this week's view). When this column's index matches, the snap-ghost
+   *  outline is drawn at `snapTopPx` / `snapHeightPx`. */
+  snapTargetDayIndex?: number;
+  /** This column's own day index (0–6) for matching against snapTargetDayIndex. */
+  dayIndex?: number;
+  snapTopPx?: number;
+  snapHeightPx?: number;
 }
 
 const DayColumn = React.memo(function DayColumn({
@@ -50,7 +57,10 @@ const DayColumn = React.memo(function DayColumn({
   currentUserId,
   onEventDragStart,
   draggingEventId,
-  dragDeltaPx = 0,
+  snapTargetDayIndex,
+  dayIndex,
+  snapTopPx,
+  snapHeightPx,
 }: DayColumnProps) {
   // Mount gate — events position using browser-local TZ via getHours(), which
   // returns UTC during SSR (Vercel's Node runs UTC). Without this gate the
@@ -72,8 +82,14 @@ const DayColumn = React.memo(function DayColumn({
 
   const overlapMap = computeOverlapLayout(overlapInput);
 
+  const isSnapTarget = dayIndex !== undefined && snapTargetDayIndex === dayIndex
+    && snapTopPx !== undefined && snapHeightPx !== undefined;
+
   return (
-    <div className="relative flex-1 min-w-0 border-l border-grove-border">
+    <div
+      className="relative flex-1 min-w-0 border-l border-grove-border"
+      data-day-index={dayIndex}
+    >
       {/* 30-min slot cells */}
       {SLOTS.map(slot => (
         <HourCell
@@ -107,10 +123,13 @@ const DayColumn = React.memo(function DayColumn({
             isOwner={isOwner}
             onDragStart={onEventDragStart}
             isDragging={draggingEventId === event.id}
-            dragDeltaPx={draggingEventId === event.id ? dragDeltaPx : 0}
           />
         );
       })}
+
+      {isSnapTarget && (
+        <DragSnapGhost topPx={snapTopPx!} heightPx={snapHeightPx!} />
+      )}
     </div>
   );
 });

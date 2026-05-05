@@ -103,3 +103,55 @@ export function computeDropPatch(args: {
   const delta = newMinutes - originalMinutes;
   return applyDeltaMinutes({ starts_at, ends_at }, delta);
 }
+
+/**
+ * Snap-target computation for cross-day (and cross-week) drag. Given the
+ * block's TOP Y inside the destination day column (cursor Y minus the grab
+ * offset within the original block, plus scroll), the destination day's
+ * wall-clock midnight, and the original event's duration, return the new
+ * starts_at + ends_at the event would have if dropped at the snapped row.
+ *
+ * Duration is preserved verbatim (drag never resizes). Returns the snapped
+ * top px and height inside the destination column so the snap-ghost can be
+ * rendered without recomputing.
+ */
+export function computeCrossDayDropTimes(args: {
+  blockTopYInColumn: number;
+  destDayMidnight: Date;
+  originalStartIso: string;
+  originalEndIso: string | null;
+  hourOffsets: number[];
+  hourHeights: number[];
+  snap: number;
+}): {
+  starts_at: string;
+  ends_at: string | null;
+  snappedTopPx: number;
+  snappedHeightPx: number;
+} {
+  const snappedMinutes = pxToMinutesSnapped(
+    args.blockTopYInColumn,
+    args.hourOffsets,
+    args.hourHeights,
+    args.snap,
+  );
+  const newStart = new Date(args.destDayMidnight);
+  newStart.setHours(Math.floor(snappedMinutes / 60), snappedMinutes % 60, 0, 0);
+
+  const origStart = new Date(args.originalStartIso);
+  const origEnd = args.originalEndIso ? new Date(args.originalEndIso) : null;
+  const durationMs = origEnd ? origEnd.getTime() - origStart.getTime() : null;
+  const newEnd = durationMs != null ? new Date(newStart.getTime() + durationMs) : null;
+
+  const snappedTopPx = minutesToPx(snappedMinutes, args.hourOffsets, args.hourHeights);
+  const heightPx = durationMs != null
+    ? minutesToPx(snappedMinutes + durationMs / 60_000, args.hourOffsets, args.hourHeights) - snappedTopPx
+    : 30;
+
+  return {
+    starts_at: newStart.toISOString(),
+    ends_at: newEnd ? newEnd.toISOString() : null,
+    snappedTopPx,
+    snappedHeightPx: Math.max(heightPx, 16),
+  };
+}

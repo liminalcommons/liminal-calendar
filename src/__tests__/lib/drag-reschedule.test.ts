@@ -4,6 +4,7 @@ import {
   computeDropPatch,
   minutesToPx,
   computeSnappedDeltaPx,
+  computeCrossDayDropTimes,
 } from '@/lib/drag-reschedule';
 
 describe('pxToMinutesSnapped', () => {
@@ -188,5 +189,71 @@ describe('computeSnappedDeltaPx', () => {
       hourOffsets: offsets, hourHeights: heights, snap: 15,
     });
     expect(out).toBe(27);
+  });
+});
+
+describe('computeCrossDayDropTimes', () => {
+  // each 30-min slot is 20px; 15-min snap step = 10px
+  const heights = new Array(48).fill(20);
+  const offsets = new Array(48).fill(0).map((_, i) => i * 20);
+
+  it('returns the snapped time on the destination day, preserving duration', () => {
+    // Original event Mon 10:00–11:00. Drop at Wed 14:00 (slot 28 top = 560px).
+    const origStart = new Date(2026, 4, 4, 10, 0).toISOString();   // Mon May 4 10:00
+    const origEnd = new Date(2026, 4, 4, 11, 0).toISOString();     // Mon May 4 11:00
+    const wedMidnight = new Date(2026, 4, 6, 0, 0);                // Wed May 6
+    const out = computeCrossDayDropTimes({
+      blockTopYInColumn: 560, // 14:00
+      destDayMidnight: wedMidnight,
+      originalStartIso: origStart,
+      originalEndIso: origEnd,
+      hourOffsets: offsets,
+      hourHeights: heights,
+      snap: 15,
+    });
+    const ns = new Date(out.starts_at);
+    expect(ns.getDate()).toBe(6);    // Wed
+    expect(ns.getHours()).toBe(14);
+    expect(ns.getMinutes()).toBe(0);
+    const ne = new Date(out.ends_at!);
+    expect(ne.getHours()).toBe(15);  // 1hr duration preserved
+    expect(out.snappedTopPx).toBe(560);
+    expect(out.snappedHeightPx).toBe(40); // 1hr = 2 slots × 20px
+  });
+
+  it('snaps a non-aligned blockTopY to the nearest 15-min row', () => {
+    const origStart = new Date(2026, 4, 4, 10, 0).toISOString();
+    const wedMidnight = new Date(2026, 4, 6, 0, 0);
+    const out = computeCrossDayDropTimes({
+      blockTopYInColumn: 567, // ~14:10.5 → snaps to 14:15 (slot 28 + half)
+      destDayMidnight: wedMidnight,
+      originalStartIso: origStart,
+      originalEndIso: null,
+      hourOffsets: offsets,
+      hourHeights: heights,
+      snap: 15,
+    });
+    const ns = new Date(out.starts_at);
+    expect(ns.getHours()).toBe(14);
+    expect(ns.getMinutes()).toBe(15);
+    expect(out.ends_at).toBeNull();
+  });
+
+  it('clamps the snapped minutes inside the day', () => {
+    const origStart = new Date(2026, 4, 4, 10, 0).toISOString();
+    const wedMidnight = new Date(2026, 4, 6, 0, 0);
+    const out = computeCrossDayDropTimes({
+      blockTopYInColumn: 999999, // way past end of day
+      destDayMidnight: wedMidnight,
+      originalStartIso: origStart,
+      originalEndIso: null,
+      hourOffsets: offsets,
+      hourHeights: heights,
+      snap: 15,
+    });
+    const ns = new Date(out.starts_at);
+    // pxToMinutesSnapped clamps to 24*60 - snap = 1425 min = 23:45
+    expect(ns.getHours()).toBe(23);
+    expect(ns.getMinutes()).toBe(45);
   });
 });

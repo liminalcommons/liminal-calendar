@@ -22,13 +22,11 @@ interface EventBlockProps {
   /** Pointerdown handler invoked only when `isOwner` is true. WeeklyGrid
    *  owns the drag lifecycle; EventBlock just emits the start signal. */
   onDragStart?: (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => void;
-  /** True while this block is being actively dragged. Drives elevated styling
-   *  and disables the release transition (snap motion is handled by
-   *  `dragDeltaPx`). */
+  /** True while this block is being actively dragged. The block stays in
+   *  place but fades — a separate DragFloat (rendered by WeeklyGrid) follows
+   *  the cursor, and a DragSnapGhost (rendered by the destination DayColumn)
+   *  shows the snap target. */
   isDragging?: boolean;
-  /** Live snapped translateY for the dragging block. Ignored when
-   *  `isDragging` is false. */
-  dragDeltaPx?: number;
 }
 
 function hashId(id: string): number {
@@ -105,7 +103,6 @@ const EventBlock = React.memo(function EventBlock({
   isOwner = false,
   onDragStart,
   isDragging = false,
-  dragDeltaPx = 0,
 }: EventBlockProps) {
   const blockRef = useRef<HTMLDivElement>(null);
 
@@ -144,18 +141,10 @@ const EventBlock = React.memo(function EventBlock({
   // so we don't override here. Non-owners get the default pointer for
   // popover-open behavior.
   const cursorClass = isOwner ? 'cursor-grab' : 'cursor-pointer';
-  // While dragging: lift visually (stronger shadow, slight scale + opacity).
-  // The release transition is enabled on non-dragging blocks so the snap-back
-  // (or settle into final row) eases instead of jumping.
-  const transform = isDragging
-    ? `translate3d(0, ${dragDeltaPx}px, 0) scale(1.02)`
-    : undefined;
-  const transitionStyle = isDragging
-    ? 'box-shadow 120ms ease-out'
-    : 'transform 160ms cubic-bezier(0.22,1,0.36,1), box-shadow 160ms ease-out, opacity 160ms ease-out';
-  const dragShadow = isDragging
-    ? '0 12px 28px -6px rgba(0,0,0,0.55), 0 4px 12px -2px rgba(0,0,0,0.35)'
-    : undefined;
+  // While dragging: fade in place to indicate the source — the actual visual
+  // tracking happens via DragFloat. Release transition lets the block ease
+  // back to full opacity if the drop is cancelled or completes in this slot.
+  const transitionStyle = 'opacity 160ms ease-out';
 
   return (
     <div
@@ -174,11 +163,8 @@ const EventBlock = React.memo(function EventBlock({
         left: `calc(${leftPct}% + 1px)`,
         width: `calc(${widthPct}% - 2px)`,
         background: hasImage ? undefined : bgGradient,
-        transform,
         transition: transitionStyle,
-        opacity: isDragging ? 0.92 : undefined,
-        boxShadow: dragShadow,
-        zIndex: isDragging ? 30 : undefined,
+        opacity: isDragging ? 0.30 : undefined,
         // Disable native scroll/zoom gestures on owner blocks so a finger drag
         // never pages the grid instead of moving the event.
         touchAction: isOwner ? 'none' : undefined,

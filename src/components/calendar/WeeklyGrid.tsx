@@ -13,7 +13,8 @@ import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
 import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { canCreateEvents } from '@/lib/auth-helpers';
-import { computeDropPatch, computeSnappedDeltaPx } from '@/lib/drag-reschedule';
+import { computeCrossDayDropTimes } from '@/lib/drag-reschedule';
+import { DragFloat } from './DragFloat';
 import { apiFetch } from '@/lib/api-fetch';
 import { RecurrenceMoveModal, type RecurrenceMoveScope } from './RecurrenceMoveModal';
 import { MoonPhase } from '@/components/MoonPhase';
@@ -188,9 +189,23 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   // on drop instead of patching directly.
   const dragRef = useRef<{
     event: DisplayEvent;
+    // Cursor's grab offset within the original block (so the float clone keeps
+    // the cursor at the same relative point on the block).
+    grabOffsetX: number;
+    grabOffsetY: number;
+    blockWidth: number;
+    blockHeight: number;
+    startClientX: number;
     startClientY: number;
-    originalTopPx: number;
     moved: boolean;
+    // Cross-week edge auto-advance state. Set when the cursor enters a left/
+    // right edge zone; the timer fires goToPrevWeek/goToNextWeek and clears.
+    edgeDirection: 'left' | 'right' | null;
+    edgeAdvanceTimer: number | null;
+    // rAF coalescing for pointermove → setState.
+    rafId: number | null;
+    // Latest pointermove event so the rAF callback uses fresh coords.
+    lastEvent: PointerEvent | null;
   } | null>(null);
   // After a successful drag (pointer moved past threshold), suppress the next
   // click that the browser fires as part of the pointer sequence. Without this,
@@ -201,16 +216,25 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     event: DisplayEvent;
     patchTimes: { starts_at: string; ends_at: string | null };
   } | null>(null);
-  // Live drag preview state. Updated only when the snapped step changes (every
-  // 15 min equivalent of px), so React doesn't re-render on every pointermove.
-  // `id` identifies the dragging block so DayColumn → EventBlock can apply the
-  // live transform to ONLY that block. `previewStartIso` feeds the floating
-  // time tooltip rendered above the grid.
+  // Live drag preview state. Updated at most once per animation frame (rAF
+  // coalesced) so React reconciles smoothly without a setState per pointermove.
+  // The DragFloat reads cursorX/Y; the snap-ghost reads snapTarget; the
+  // floating time tooltip reads snapTarget.previewStartIso.
   const [dragLive, setDragLive] = useState<{
-    id: string;
-    snappedDeltaPx: number;
-    previewStartIso: string;
-    previewEndIso: string | null;
+    event: DisplayEvent;
+    cursorX: number;
+    cursorY: number;
+    grabOffsetX: number;
+    grabOffsetY: number;
+    blockWidth: number;
+    blockHeight: number;
+    snapTarget: {
+      dayIndex: number;          // 0–6 within the visible week
+      starts_at: string;
+      ends_at: string | null;
+      topPx: number;
+      heightPx: number;
+    } | null;
   } | null>(null);
 
   const executeMovePatch = useCallback(
@@ -253,112 +277,182 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     [updateEvent],
   );
 
+  // The visible week's start. Captured in a ref so the in-flight drag handlers
+  // see the LATEST week (cross-week edge advance changes it mid-drag). Without
+  // this, the snap target would always compute against the week present at
+  // pointerdown.
+  const currentWeekStartRef = useRef(currentWeekStart);
+  currentWeekStartRef.current = currentWeekStart;
+
   const handleEventDragStart = useCallback(
     (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => {
-      // Capture the event's CURRENT top-px from the rendered DOM rect minus
-      // the gridRef's scroll offset. We use the block's getBoundingClientRect
-      // and subtract the grid's top edge to get a consistent y-coord space.
-      const blockRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-      const gridEl = gridRef.current;
-      const gridRect = gridEl?.getBoundingClientRect();
-      const gridScrollTop = gridEl?.scrollTop ?? 0;
-      const originalTopPx = (gridRect ? blockRect.top - gridRect.top : 0) + gridScrollTop;
+      const blockEl = e.currentTarget as HTMLElement;
+      const blockRect = blockEl.getBoundingClientRect();
+      const grabOffsetX = e.clientX - blockRect.left;
+      const grabOffsetY = e.clientY - blockRect.top;
 
       dragRef.current = {
         event,
+        grabOffsetX,
+        grabOffsetY,
+        blockWidth: blockRect.width,
+        blockHeight: blockRect.height,
+        startClientX: e.clientX,
         startClientY: e.clientY,
-        originalTopPx,
         moved: false,
+        edgeDirection: null,
+        edgeAdvanceTimer: null,
+        rafId: null,
+        lastEvent: null,
       };
 
-      // Track the last snapped delta we pushed to React state so we can skip
-      // setStates that wouldn't change the rendered transform.
-      let lastSnappedDelta: number | null = null;
+      const computeAndApply = () => {
+        const drag = dragRef.current;
+        if (!drag || !drag.lastEvent) return;
+        drag.rafId = null;
+        const mvEvent = drag.lastEvent;
+        const cursorX = mvEvent.clientX;
+        const cursorY = mvEvent.clientY;
+
+        // ── Movement threshold gate ──
+        const dx = cursorX - drag.startClientX;
+        const dy = cursorY - drag.startClientY;
+        if (Math.hypot(dx, dy) > 4 && !drag.moved) {
+          drag.moved = true;
+          document.body.style.cursor = 'grabbing';
+          document.body.style.userSelect = 'none';
+        }
+        if (!drag.moved) return;
+
+        // ── Cross-week edge auto-advance ──
+        const gridEl = gridRef.current;
+        if (gridEl) {
+          const gr = gridEl.getBoundingClientRect();
+          const distLeft = cursorX - gr.left;
+          const distRight = gr.right - cursorX;
+          const inLeftEdge = distLeft >= 0 && distLeft < 40;
+          const inRightEdge = distRight >= 0 && distRight < 40;
+          const dir = inLeftEdge ? 'left' : inRightEdge ? 'right' : null;
+          if (dir !== drag.edgeDirection) {
+            if (drag.edgeAdvanceTimer != null) {
+              clearTimeout(drag.edgeAdvanceTimer);
+              drag.edgeAdvanceTimer = null;
+            }
+            drag.edgeDirection = dir;
+            if (dir === 'left') {
+              drag.edgeAdvanceTimer = window.setTimeout(() => {
+                setCurrentWeekStart(prev => subWeeks(prev, 1));
+                if (dragRef.current) dragRef.current.edgeAdvanceTimer = null;
+              }, 500);
+            } else if (dir === 'right') {
+              drag.edgeAdvanceTimer = window.setTimeout(() => {
+                setCurrentWeekStart(prev => addWeeks(prev, 1));
+                if (dragRef.current) dragRef.current.edgeAdvanceTimer = null;
+              }, 500);
+            }
+          }
+        }
+
+        // ── Snap target detection ──
+        // Find the DayColumn under the cursor (or under the block's TOP, which
+        // is grabOffsetY pixels above the cursor — that's where the event
+        // would actually LAND).
+        const probeY = cursorY - drag.grabOffsetY + drag.blockHeight / 2;
+        const els = document.elementsFromPoint(cursorX, probeY);
+        const dayColEl = els.find(
+          (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-day-index'),
+        );
+
+        let snapTarget: { dayIndex: number; starts_at: string; ends_at: string | null; topPx: number; heightPx: number } | null = null;
+        if (dayColEl) {
+          const dayIndex = parseInt(dayColEl.getAttribute('data-day-index')!, 10);
+          const colRect = dayColEl.getBoundingClientRect();
+          const scrollTop = gridEl?.scrollTop ?? 0;
+          const blockTopY = (cursorY - drag.grabOffsetY) - colRect.top + scrollTop;
+          // Compute the destination day's wall-clock midnight from the live
+          // (post-edge-advance) week start. weekDays from closure is stale
+          // after a week advance — recompute against currentWeekStartRef.
+          const destDay = addDays(currentWeekStartRef.current, dayIndex);
+          const destDayMidnight = new Date(destDay);
+          destDayMidnight.setHours(0, 0, 0, 0);
+
+          const out = computeCrossDayDropTimes({
+            blockTopYInColumn: blockTopY,
+            destDayMidnight,
+            originalStartIso: drag.event.starts_at,
+            originalEndIso: drag.event.ends_at,
+            hourOffsets,
+            hourHeights,
+            snap: 15,
+          });
+          snapTarget = {
+            dayIndex,
+            starts_at: out.starts_at,
+            ends_at: out.ends_at,
+            topPx: out.snappedTopPx,
+            heightPx: out.snappedHeightPx,
+          };
+        }
+
+        setDragLive({
+          event: drag.event,
+          cursorX,
+          cursorY,
+          grabOffsetX: drag.grabOffsetX,
+          grabOffsetY: drag.grabOffsetY,
+          blockWidth: drag.blockWidth,
+          blockHeight: drag.blockHeight,
+          snapTarget,
+        });
+      };
 
       const handleMove = (mvEvent: PointerEvent) => {
         const drag = dragRef.current;
         if (!drag) return;
-        const rawDeltaPx = mvEvent.clientY - drag.startClientY;
-        // Threshold of 4px to distinguish a click from a drag.
-        if (Math.abs(rawDeltaPx) > 4) {
-          if (!drag.moved) {
-            drag.moved = true;
-            // Lock the body cursor so it stays "grabbing" even when the pointer
-            // sweeps over an underlying element with a different cursor.
-            document.body.style.cursor = 'grabbing';
-            document.body.style.userSelect = 'none';
-          }
-        }
-        if (!drag.moved) return;
-
-        const snappedDeltaPx = computeSnappedDeltaPx({
-          originalTopPx: drag.originalTopPx,
-          rawDeltaPx,
-          hourOffsets,
-          hourHeights,
-          snap: 15,
-        });
-        if (snappedDeltaPx === lastSnappedDelta) return;
-        lastSnappedDelta = snappedDeltaPx;
-
-        const previewTimes = computeDropPatch({
-          starts_at: drag.event.starts_at,
-          ends_at: drag.event.ends_at,
-          originalTopPx: drag.originalTopPx,
-          finalTopPx: drag.originalTopPx + rawDeltaPx,
-          hourOffsets,
-          hourHeights,
-          snap: 15,
-        });
-        setDragLive({
-          id: drag.event.id,
-          snappedDeltaPx,
-          previewStartIso: previewTimes.starts_at,
-          previewEndIso: previewTimes.ends_at,
-        });
+        drag.lastEvent = mvEvent;
+        if (drag.rafId != null) return;
+        drag.rafId = requestAnimationFrame(computeAndApply);
       };
 
-      const handleUp = (upEvent: PointerEvent) => {
+      const handleUp = (_upEvent: PointerEvent) => {
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        setDragLive(null);
         const drag = dragRef.current;
+        // Capture snap target BEFORE clearing dragLive (the React state has the
+        // last-rendered target, but for the drop decision we use the most
+        // recent rAF-applied state — read the closure's setDragLive callback).
+        let pendingSnap: { starts_at: string; ends_at: string | null } | null = null;
+        setDragLive(prev => {
+          if (prev?.snapTarget) {
+            pendingSnap = { starts_at: prev.snapTarget.starts_at, ends_at: prev.snapTarget.ends_at };
+          }
+          return null;
+        });
+        if (drag?.edgeAdvanceTimer != null) {
+          clearTimeout(drag.edgeAdvanceTimer);
+        }
+        if (drag?.rafId != null) cancelAnimationFrame(drag.rafId);
         dragRef.current = null;
         if (!drag) return;
 
-        // No drag movement → this is just a click; let onClick fire normally.
         if (!drag.moved) return;
 
-        // Drag completed — suppress the impending click event.
         suppressNextClickRef.current = true;
-        // Reset on next tick so unrelated clicks aren't swallowed.
         setTimeout(() => { suppressNextClickRef.current = false; }, 350);
 
-        const dy = upEvent.clientY - drag.startClientY;
-        const finalTopPx = drag.originalTopPx + dy;
+        // No valid drop target (cursor outside grid) → cancel.
+        if (!pendingSnap) return;
+        const patchTimes = pendingSnap as { starts_at: string; ends_at: string | null };
 
-        const patchTimes = computeDropPatch({
-          starts_at: drag.event.starts_at,
-          ends_at: drag.event.ends_at,
-          originalTopPx: drag.originalTopPx,
-          finalTopPx,
-          hourOffsets,
-          hourHeights,
-          snap: 15,
-        });
-
-        // No-op drop (same row after snap)
+        // No-op drop (same time after snap)
         if (patchTimes.starts_at === drag.event.starts_at) return;
 
-        // Recurring → open the scope modal; user must explicitly confirm.
         if (drag.event.recurrenceRule) {
           setPendingRecurringMove({ event: drag.event, patchTimes });
           return;
         }
-
-        // Non-recurring → fire and forget (rollback is inside executeMovePatch).
         void executeMovePatch(drag.event, patchTimes, null);
       };
 
@@ -442,27 +536,41 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         </div>
       </div>
 
-      {/* ── Live drag preview tooltip ── */}
+      {/* ── Live drag preview: float that follows cursor + time tooltip ── */}
       {dragLive && (
-        <div
-          data-testid="drag-preview-tooltip"
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-50
-                     bg-grove-surface border border-grove-accent/60
-                     shadow-lg rounded-full px-4 py-1.5
-                     text-sm font-medium text-grove-text pointer-events-none
-                     flex items-center gap-2"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-grove-accent animate-pulse" />
-          <span>
-            {formatInTimeZone(new Date(dragLive.previewStartIso), userTz, 'EEE h:mm a')}
-            {dragLive.previewEndIso && (
-              <>
-                {' – '}
-                {formatInTimeZone(new Date(dragLive.previewEndIso), userTz, 'h:mm a')}
-              </>
-            )}
-          </span>
-        </div>
+        <>
+          <DragFloat
+            event={dragLive.event}
+            cursorX={dragLive.cursorX}
+            cursorY={dragLive.cursorY}
+            grabOffsetX={dragLive.grabOffsetX}
+            grabOffsetY={dragLive.grabOffsetY}
+            width={dragLive.blockWidth}
+            height={dragLive.blockHeight}
+            userTz={userTz}
+          />
+          {dragLive.snapTarget && (
+            <div
+              data-testid="drag-preview-tooltip"
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[60]
+                         bg-grove-surface border border-grove-accent/60
+                         shadow-lg rounded-full px-4 py-1.5
+                         text-sm font-medium text-grove-text pointer-events-none
+                         flex items-center gap-2"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-grove-accent animate-pulse" />
+              <span>
+                {formatInTimeZone(new Date(dragLive.snapTarget.starts_at), userTz, 'EEE h:mm a')}
+                {dragLive.snapTarget.ends_at && (
+                  <>
+                    {' – '}
+                    {formatInTimeZone(new Date(dragLive.snapTarget.ends_at), userTz, 'h:mm a')}
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Popovers ── */}
@@ -573,8 +681,11 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                     onEventClick={handleEventClickGuarded}
                     currentUserId={currentUserId}
                     onEventDragStart={handleEventDragStart}
-                    draggingEventId={dragLive?.id ?? null}
-                    dragDeltaPx={dragLive?.snappedDeltaPx ?? 0}
+                    draggingEventId={dragLive?.event.id ?? null}
+                    dayIndex={i}
+                    snapTargetDayIndex={dragLive?.snapTarget?.dayIndex}
+                    snapTopPx={dragLive?.snapTarget?.topPx}
+                    snapHeightPx={dragLive?.snapTarget?.heightPx}
                   />
                 ))}
               </div>
