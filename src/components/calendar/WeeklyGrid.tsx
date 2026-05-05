@@ -148,8 +148,15 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   }, [goToToday, goToPrevWeek, goToNextWeek]);
 
   const handleCellClick = useCallback((day: Date, hour: number, rect: DOMRect) => {
-    setExpansion(null);
-    router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+    // If the event-detail popover is open, treat this click as a popover
+    // dismissal rather than a "create new event" navigation. Real users on
+    // touch devices can have synthesized events route to a HourCell when the
+    // intended target was inside the popover.
+    setExpansion((cur) => {
+      if (cur) return null;
+      router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+      return cur;
+    });
   }, [router]);
 
   const handleEventClick = useCallback((event: DisplayEvent, rect: DOMRect) => {

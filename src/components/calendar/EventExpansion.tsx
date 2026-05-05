@@ -197,6 +197,8 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
       style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)' }}
       role="dialog"
       aria-label={`Event details: ${event.title}`}
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
     >
       {/* Header */}
       <div className="flex items-start justify-between px-4 pt-4 pb-2 gap-2">
