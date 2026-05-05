@@ -6,6 +6,8 @@ import {
   integer,
   boolean,
   unique,
+  index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 export const events = pgTable('events', {
@@ -171,6 +173,43 @@ export type EventComment = typeof eventComments.$inferSelect;
 export type NewEventComment = typeof eventComments.$inferInsert;
 export type AttendanceReport = typeof attendanceReports.$inferSelect;
 export type NewAttendanceReport = typeof attendanceReports.$inferInsert;
+
+// Inbox notifications. Sibling of `notificationLog` (which exists purely for
+// cron-side dedupe of channel deliveries). This table is the source of truth
+// for "user U should know that thing T happened" — it has actor context,
+// denormalized title/url for fast read-path rendering, structured payload for
+// future re-rendering, and per-row seen state. One inbox row may correspond
+// to zero, one, or many `notificationLog` rows depending on which channels
+// (push, email) the dispatch hit; the relationship is intentionally implicit.
+//
+// Type taxonomy (string, dot-separated):
+//   reminder.24hr | reminder.1hr | reminder.15min | reminder.start
+//   post-event.prompt
+//   event.changed | event.cancelled
+//   attendance.negative
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').notNull(), // recipient (hyloId or clerkId)
+    type: text('type').notNull(),
+    eventId: integer('event_id').references(() => events.id, { onDelete: 'cascade' }),
+    actorId: text('actor_id'), // who caused it; null for cron/system triggers
+    actorName: text('actor_name'),
+    title: text('title').notNull(), // ready-to-render headline
+    body: text('body'), // optional secondary line
+    url: text('url').notNull(), // tap target (typically /events/{id} with optional anchor)
+    payload: jsonb('payload'), // type-specific structured context
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    seenAt: timestamp('seen_at', { withTimezone: true }), // null = unread
+  },
+  (table) => [
+    index('notifications_user_recent_idx').on(table.userId, table.createdAt),
+  ],
+);
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
 
 export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;

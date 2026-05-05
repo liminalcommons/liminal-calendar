@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { events } from '@/lib/db/schema';
+import { events, type Event } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import {
   upsertAttendanceReport,
@@ -9,10 +9,11 @@ import {
   REPORT_NOTE_MAX_LENGTH,
 } from '@/lib/attendance-reports/repo';
 import { eventEndedAt, type EventTimeFields } from '@/lib/event-time';
+import { fanoutAttendanceNegative } from '@/lib/notifications/fanout';
 
-async function findEvent(numId: number): Promise<EventTimeFields | null> {
+async function findEvent(numId: number): Promise<(EventTimeFields & Partial<Event>) | null> {
   const rows = await db.select().from(events).where(eq(events.id, numId));
-  return (rows[0] as EventTimeFields | undefined) ?? null;
+  return (rows[0] as (EventTimeFields & Partial<Event>) | undefined) ?? null;
 }
 
 export async function POST(
@@ -100,6 +101,26 @@ export async function POST(
       hostPresent,
       note: normalizedNote,
     });
+
+    // C2 fan-out: notify the host when a negative report comes in. Best-effort.
+    // Skips when both axes are positive, when the host is reporting on their
+    // own event, or when the event row lacks a creatorId (defensive).
+    if ((!eventHappened || !hostPresent) && event.creatorId) {
+      try {
+        await fanoutAttendanceNegative(
+          db,
+          event as Event,
+          { eventHappened, hostPresent },
+          { id: reporterId, name: member.name },
+        );
+      } catch (fanoutErr) {
+        console.error(
+          '[POST /api/events/[id]/attendance-report] fanout failed',
+          fanoutErr,
+        );
+      }
+    }
+
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error('[POST /api/events/[id]/attendance-report]', err);

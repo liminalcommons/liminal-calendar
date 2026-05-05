@@ -8,6 +8,7 @@ import { ViewToggle } from './ViewToggle';
 import { RuneAccent } from './RuneAccent';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { NavGearMenu } from './NavGearMenu';
+import { NotificationButton } from './NotificationButton';
 
 function getInitials(name?: string | null, email?: string | null): string {
   if (name) {
@@ -82,6 +83,9 @@ export function NavBar() {
                 <span className="text-[8px] leading-none">New</span>
               </Link>
             )}
+
+            {/* Notifications inbox */}
+            <NotificationButton />
 
             {/* Avatar — links to profile */}
             <Link href="/profile" className="flex items-center" title="Your profile">

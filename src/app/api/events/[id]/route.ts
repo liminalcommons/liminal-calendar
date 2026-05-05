@@ -5,6 +5,11 @@ import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { eq } from 'drizzle-orm';
+import {
+  diffEventForNotification,
+  fanoutEventChanged,
+  fanoutEventCancelled,
+} from '@/lib/notifications/fanout';
 
 export async function GET(
   _request: NextRequest,
@@ -126,6 +131,20 @@ export async function PATCH(
       .where(eq(events.id, numId))
       .returning();
 
+    // A3 fan-out: diff what materially changed and notify RSVPers (yes /
+    // interested), excluding the editor themselves. Best-effort; never
+    // fails the PATCH response.
+    try {
+      const diff = diffEventForNotification(event, updated);
+      if (diff) {
+        const actorId = (session.user?.hyloId as string | undefined) ?? null;
+        const actorName = (session.user?.name as string | undefined) ?? null;
+        await fanoutEventChanged(db, updated, diff, { id: actorId, name: actorName });
+      }
+    } catch (fanoutErr) {
+      console.error('[PATCH /api/events/[id]] fanout failed', fanoutErr);
+    }
+
     const eventRsvps = await db
       .select()
       .from(rsvps)
@@ -175,6 +194,17 @@ export async function DELETE(
   }
 
   try {
+    // A4 fan-out FIRST — recipient list comes from rsvps which cascade-deletes
+    // when the event row goes away. Best-effort; if fanout throws, still
+    // delete the event but log the failure.
+    try {
+      const actorId = (session.user?.hyloId as string | undefined) ?? null;
+      const actorName = (session.user?.name as string | undefined) ?? null;
+      await fanoutEventCancelled(db, event, { id: actorId, name: actorName });
+    } catch (fanoutErr) {
+      console.error('[DELETE /api/events/[id]] fanout failed', fanoutErr);
+    }
+
     await db.delete(events).where(eq(events.id, numId));
     return NextResponse.json({ success: true });
   } catch (err) {

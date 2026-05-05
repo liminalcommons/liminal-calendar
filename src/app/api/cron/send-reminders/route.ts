@@ -25,6 +25,35 @@ import {
   buildPostEventPayload,
   POST_EVENT_PUSH_WINDOW,
 } from '@/lib/notifications/reminder-dispatch';
+import { createNotification } from '@/lib/notifications/inbox/repo';
+
+// Channel type → inbox type. Email uses bare horizon strings (24hr / 1hr /
+// 15min); push uses push-prefixed strings (push-1hr / push-15min /
+// push-start). Both collapse to the same inbox-type axis.
+function reminderInboxType(channelType: string): string {
+  switch (channelType) {
+    case '24hr':
+    case 'push-24hr': return 'reminder.24hr';
+    case '1hr':
+    case 'push-1hr': return 'reminder.1hr';
+    case '15min':
+    case 'push-15min': return 'reminder.15min';
+    case 'push-start': return 'reminder.start';
+    default: return `reminder.${channelType}`;
+  }
+}
+
+async function safeCreateInboxRow(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  params: Parameters<typeof createNotification>[1],
+): Promise<void> {
+  try {
+    await createNotification(db, params);
+  } catch (err) {
+    console.error('[send-reminders] inbox write failed', err);
+  }
+}
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -150,6 +179,14 @@ export async function GET(request: Request) {
             type,
           })
           .onConflictDoNothing();
+        await safeCreateInboxRow(db, {
+          userId: due.userId,
+          type: reminderInboxType(type),
+          eventId: due.eventId,
+          title: subject,
+          url: `/events/${due.eventId}`,
+          payload: { channel: 'email', horizon: type },
+        });
         sent++;
       } else {
         console.error(
@@ -208,6 +245,17 @@ export async function GET(request: Request) {
           .insert(notificationLog)
           .values(info.userIds.map((uid) => ({ eventId, userId: uid, type: w.type })))
           .onConflictDoNothing();
+        for (const uid of info.userIds) {
+          await safeCreateInboxRow(db, {
+            userId: uid,
+            type: reminderInboxType(w.type),
+            eventId,
+            title: w.title(info.title),
+            body: w.body,
+            url,
+            payload: { channel: 'push', horizon: w.type },
+          });
+        }
       }
     }
   }
@@ -282,6 +330,17 @@ export async function GET(request: Request) {
               })),
             )
             .onConflictDoNothing();
+          for (const uid of info.userIds) {
+            await safeCreateInboxRow(db, {
+              userId: uid,
+              type: 'post-event.prompt',
+              eventId,
+              title: payload.title,
+              body: payload.body,
+              url: payload.url,
+              payload: { channel: 'push', horizon: 'post-event' },
+            });
+          }
         }
       }
     }
