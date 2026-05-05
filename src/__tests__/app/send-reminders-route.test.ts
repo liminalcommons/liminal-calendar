@@ -11,6 +11,9 @@ jest.mock('@/lib/email', () => ({
 jest.mock('@/lib/notifications/push', () => ({
   sendPushToUsers: jest.fn().mockResolvedValue({ sent: 0 }),
 }));
+jest.mock('@/lib/notifications/inbox/repo', () => ({
+  createNotification: jest.fn().mockResolvedValue({ id: 1 }),
+}));
 jest.mock('@/lib/notifications/reminders', () => ({
   buildReminderEmail: jest.fn().mockReturnValue({ subject: 'Test', html: '<p>x</p>' }),
 }));
@@ -31,10 +34,12 @@ jest.mock('@/lib/notifications/reminder-dispatch', () => {
 
 import { sendEmail } from '@/lib/email';
 import { sendPushToUsers } from '@/lib/notifications/push';
+import { createNotification } from '@/lib/notifications/inbox/repo';
 import { GET } from '@/app/api/cron/send-reminders/route';
 
 const mockSendEmail = sendEmail as unknown as jest.Mock;
 const mockSendPushToUsers = sendPushToUsers as unknown as jest.Mock;
+const mockCreateNotification = createNotification as unknown as jest.Mock;
 
 // Build a queue-driven fake for db.select. Each .select() call shifts the next
 // pre-canned result off the queue. Each result is the array eventually
@@ -138,6 +143,15 @@ describe('GET /api/cron/send-reminders', () => {
     expect(body.errors).toBe(0);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
     expect(mockSendEmail.mock.calls[0][0]).toBe('alice@x.y');
+    // Inbox row written for the recipient.
+    expect(mockCreateNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'h-42',
+        type: 'reminder.24hr',
+        eventId: 1,
+      }),
+    );
   });
 
   it('sends email to a Clerk-only Member (lookup matches members.clerkId)', async () => {
@@ -255,6 +269,15 @@ describe('GET /api/cron/send-reminders', () => {
     expect(payload.title).toContain('After-Party');
     expect(payload.url).toContain('/events/100#attendance-report');
     expect(payload.tag).toBe('post-event-100');
+    // Inbox row written for the post-event prompt.
+    expect(mockCreateNotification).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 'h-9',
+        type: 'post-event.prompt',
+        eventId: 100,
+      }),
+    );
   });
 
   it('post-event: skips users who already filed an attendance report', async () => {
