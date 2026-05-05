@@ -35,10 +35,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { title, body: pushBody, url } = (body ?? {}) as {
+  const { title, body: pushBody, url, userIds: explicitUserIds } = (body ?? {}) as {
     title?: string;
     body?: string;
     url?: string;
+    userIds?: string[];
   };
 
   if (!title || typeof title !== 'string') {
@@ -48,19 +49,29 @@ export async function POST(request: NextRequest) {
   const finalBody = pushBody && typeof pushBody === 'string' ? pushBody : '';
   const finalUrl = url && typeof url === 'string' ? url : '/';
 
-  // Collect distinct recipient user_ids from push_subscriptions.
+  // If caller passes userIds explicitly, skip the DB enumeration (faster +
+  // dodges any Neon connection issues for one-off tests). Otherwise broadcast
+  // to every distinct user with at least one push subscription.
   let userIds: string[] = [];
   let deviceCount = 0;
-  try {
-    const rows = await db.select({ userId: pushSubscriptions.userId }).from(pushSubscriptions);
-    deviceCount = (rows as { userId: string }[]).length;
-    userIds = [...new Set((rows as { userId: string }[]).map((r) => r.userId))];
-  } catch (err) {
-    console.error('[POST /api/notifications/broadcast] subscription lookup', err);
-    return NextResponse.json(
-      { error: 'Failed to enumerate push subscriptions' },
-      { status: 500 },
-    );
+  if (Array.isArray(explicitUserIds) && explicitUserIds.length > 0) {
+    userIds = [...new Set(explicitUserIds.filter((u) => typeof u === 'string'))];
+    deviceCount = userIds.length;
+  } else {
+    try {
+      const rows = await db.select().from(pushSubscriptions);
+      deviceCount = (rows as { userId: string }[]).length;
+      userIds = [...new Set((rows as { userId: string }[]).map((r) => r.userId))];
+    } catch (err) {
+      console.error('[POST /api/notifications/broadcast] subscription lookup', err);
+      return NextResponse.json(
+        {
+          error: 'Failed to enumerate push subscriptions',
+          details: err instanceof Error ? err.message : String(err),
+        },
+        { status: 500 },
+      );
+    }
   }
 
   if (userIds.length === 0) {
