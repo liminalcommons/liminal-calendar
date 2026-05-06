@@ -4,11 +4,13 @@ import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 
-// web-push rejects standard base64 padding (`=`); the VAPID env vars in
-// Vercel were stored with padding from the original keygen output, so
-// normalize here rather than asking everyone to re-upload trimmed values.
+// web-push rejects standard base64 padding (`=`) AND any whitespace
+// contamination. The Vercel env var for VAPID was uploaded with a trailing
+// newline from the original keygen output (verified via diagnostic on
+// 2026-05-05), so normalize here rather than asking everyone to re-upload
+// trimmed values.
 function stripBase64Padding(s: string): string {
-  return s.replace(/=+$/g, '');
+  return s.trim().replace(/=+$/g, '');
 }
 
 const VAPID_PUBLIC = stripBase64Padding(
