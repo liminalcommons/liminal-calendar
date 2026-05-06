@@ -339,17 +339,25 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
 
   useEffect(() => {
     if (mode === 'create') {
-      // Default: tomorrow
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      setCurrentWeekStart(getWeekStart(tomorrow));
-      const dayOfWeek = tomorrow.getDay();
-      const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      setSelectedDayIndex(dayIndex);
-      setStartTime('18:00');
-      setEndTime('19:00');
-      setDurationMinutes(60);
+      // Defaults — but defer to externalValues when caller seeded the form
+      // (e.g. clicking an empty calendar cell passes ?day=&slot= into
+      // /events/new, which the page surfaces as externalValues.date /
+      // .startTime / .endTime). Without these guards the create-mode init
+      // would clobber the URL-seeded values back to tomorrow @ 18:00.
+      if (externalValues?.date === undefined) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        setCurrentWeekStart(getWeekStart(tomorrow));
+        const dayOfWeek = tomorrow.getDay();
+        const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        setSelectedDayIndex(dayIndex);
+      }
+      if (externalValues?.startTime === undefined) setStartTime('18:00');
+      if (externalValues?.endTime === undefined) setEndTime('19:00');
+      if (externalValues?.startTime === undefined && externalValues?.endTime === undefined) {
+        setDurationMinutes(60);
+      }
       return;
     }
 
