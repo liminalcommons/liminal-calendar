@@ -2,7 +2,7 @@
 import webPush from 'web-push';
 import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/lib/db/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 // web-push rejects standard base64 padding (`=`) AND any whitespace
 // contamination. The Vercel env var for VAPID was uploaded with a trailing
@@ -44,10 +44,13 @@ export async function sendPushToUsers(
 
   ensureVapid();
 
+  // sql`user_id = ANY(...)` instead of inArray(...) — the Neon HTTP driver
+  // cannot bind a JS array to an `IN ($1)` placeholder; ANY accepts the
+  // array as a single parameter and matches against each element.
   const subs = await db
     .select()
     .from(pushSubscriptions)
-    .where(inArray(pushSubscriptions.userId, userIds));
+    .where(sql`${pushSubscriptions.userId} = ANY(${userIds})`);
 
   let sent = 0;
   let failed = 0;
