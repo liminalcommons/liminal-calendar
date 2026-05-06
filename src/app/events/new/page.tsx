@@ -1,18 +1,40 @@
 'use client'
 
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { NavBar } from '@/components/NavBar'
 import { EventForm } from '@/components/events/EventForm'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { MobileTabLayout } from '@/components/MobileTabLayout'
 import type { EventFormValues } from '@/lib/chat-tools'
 
-export default function NewEventPage() {
+function NewEventPageInner() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [externalValues, setExternalValues] = useState<Partial<EventFormValues>>({})
+  const searchParams = useSearchParams()
+
+  const initialFromUrl = useMemo<Partial<EventFormValues>>(() => {
+    const out: Partial<EventFormValues> = {}
+    const day = searchParams.get('day')
+    const slotStr = searchParams.get('slot')
+    if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) out.date = day
+    if (slotStr != null) {
+      const slot = Number(slotStr)
+      if (Number.isFinite(slot) && slot >= 0 && slot < 48) {
+        const h = Math.floor(slot / 2)
+        const m = (slot % 2) * 30
+        out.startTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        const endTotal = h * 60 + m + 60
+        const eh = Math.min(23, Math.floor(endTotal / 60))
+        const em = endTotal >= 24 * 60 ? 30 : endTotal % 60
+        out.endTime = `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`
+      }
+    }
+    return out
+  }, [searchParams])
+
+  const [externalValues, setExternalValues] = useState<Partial<EventFormValues>>(initialFromUrl)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -83,5 +105,13 @@ export default function NewEventPage() {
         />
       </main>
     </div>
+  )
+}
+
+export default function NewEventPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewEventPageInner />
+    </Suspense>
   )
 }
