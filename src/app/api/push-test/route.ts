@@ -63,10 +63,19 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ success: true, ...result, userIds, diagnostic });
   } catch (err) {
+    // Drill into nested errors — Drizzle wraps the underlying Postgres
+    // / Neon error and the message field only shows "Failed query".
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const e = err as any;
     return NextResponse.json(
       {
         error: 'sendPushToUsers threw',
-        details: err instanceof Error ? err.message : String(err),
+        details: e?.message ?? String(err),
+        cause: e?.cause?.message ?? null,
+        causeCode: e?.cause?.code ?? null,
+        causeName: e?.cause?.name ?? null,
+        sourceError: e?.sourceError?.message ?? null,
+        stack: e?.stack?.split('\n').slice(0, 5).join('\n') ?? null,
         diagnostic,
       },
       { status: 500 },
