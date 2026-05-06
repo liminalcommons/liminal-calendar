@@ -1,8 +1,8 @@
 // @ts-expect-error no types for web-push
 import webPush from 'web-push';
 import { db } from '@/lib/db';
-import { pushSubscriptions } from '@/lib/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { pushSubscriptions, type PushSubscription } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 // web-push rejects standard base64 padding (`=`) AND any whitespace
 // contamination. The Vercel env var for VAPID was uploaded with a trailing
@@ -44,13 +44,17 @@ export async function sendPushToUsers(
 
   ensureVapid();
 
-  // sql`user_id = ANY(...)` instead of inArray(...) — the Neon HTTP driver
-  // cannot bind a JS array to an `IN ($1)` placeholder; ANY accepts the
-  // array as a single parameter and matches against each element.
-  const subs = await db
-    .select()
-    .from(pushSubscriptions)
-    .where(sql`${pushSubscriptions.userId} = ANY(${userIds})`);
+  // Per-user loop instead of inArray/ANY — the Neon HTTP driver can't bind
+  // JS arrays to either `IN ($1)` or `ANY($1)` placeholders. N queries for
+  // N userIds is fine for typical broadcast/fan-out sizes (<100 recipients).
+  const subs: PushSubscription[] = [];
+  for (const userId of userIds) {
+    const rows = await db
+      .select()
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.userId, userId));
+    subs.push(...(rows as PushSubscription[]));
+  }
 
   let sent = 0;
   let failed = 0;
