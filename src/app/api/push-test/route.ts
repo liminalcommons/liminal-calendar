@@ -34,6 +34,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'userIds (string[]) required' }, { status: 400 });
   }
 
+  // Diagnostic: report VAPID key shape (no key contents leaked).
+  const rawPublic = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || '';
+  const rawPrivate = process.env.VAPID_PRIVATE_KEY || '';
+  const diagnostic = {
+    publicKey: {
+      length: rawPublic.length,
+      hasEquals: rawPublic.includes('='),
+      hasPlus: rawPublic.includes('+'),
+      hasSlash: rawPublic.includes('/'),
+      firstChars: rawPublic.slice(0, 4),
+      lastChars: rawPublic.slice(-4),
+    },
+    privateKey: {
+      length: rawPrivate.length,
+      hasEquals: rawPrivate.includes('='),
+      hasPlus: rawPrivate.includes('+'),
+      hasSlash: rawPrivate.includes('/'),
+    },
+  };
+
   try {
     const result = await sendPushToUsers(userIds, {
       title: title ?? 'Push test',
@@ -41,12 +61,13 @@ export async function POST(request: NextRequest) {
       url: '/',
       tag: `push-test-${Date.now()}`,
     });
-    return NextResponse.json({ success: true, ...result, userIds });
+    return NextResponse.json({ success: true, ...result, userIds, diagnostic });
   } catch (err) {
     return NextResponse.json(
       {
         error: 'sendPushToUsers threw',
         details: err instanceof Error ? err.message : String(err),
+        diagnostic,
       },
       { status: 500 },
     );
