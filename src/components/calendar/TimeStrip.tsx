@@ -54,6 +54,42 @@ export function TimeStrip({ startTime, durationMinutes = 60 }: TimeStripProps) {
   const durHours = Math.min(24, Math.max(0.25, durationMinutes / 60));
   const bandWidthPct = (durHours / 24) * 100;
 
+  // Compute the "everyone awake" window — slice of the user's local day where
+  // every zone in ZONES is between 9am and 9pm local. Sample the day at 15min
+  // resolution against the event date, then collapse to contiguous intervals.
+  const HUMANE_START = 9;   // 9am
+  const HUMANE_END   = 21;  // 9pm (exclusive top edge — 21:00 itself counts as too late)
+  const overlapBands = useMemo(() => {
+    const STEP_MIN = 15;
+    const STEPS = (24 * 60) / STEP_MIN; // 96
+    const dayAnchor = new Date(safeStart);
+    dayAnchor.setHours(0, 0, 0, 0); // user-local midnight on the event's date
+    const inWindow: boolean[] = [];
+    for (let i = 0; i < STEPS; i++) {
+      const probe = new Date(dayAnchor.getTime() + i * STEP_MIN * 60_000);
+      const ok = ZONES.every(z => {
+        const h = parseInt(formatInTimeZone(probe, z.id, 'H'), 10);
+        return h >= HUMANE_START && h < HUMANE_END;
+      });
+      inWindow.push(ok);
+    }
+    // Collapse to contiguous true-intervals (in 0..24 hour units).
+    const bands: { start: number; end: number }[] = [];
+    let runStart = -1;
+    for (let i = 0; i <= STEPS; i++) {
+      const here = i < STEPS && inWindow[i];
+      if (here && runStart < 0) runStart = i;
+      if (!here && runStart >= 0) {
+        bands.push({
+          start: (runStart * STEP_MIN) / 60,
+          end:   (i        * STEP_MIN) / 60,
+        });
+        runStart = -1;
+      }
+    }
+    return bands;
+  }, [safeStart]);
+
   const zoneLabels = useMemo(
     () => ZONES.map(z => {
       const local = formatInTimeZone(safeStart, z.id, 'h:mma').toLowerCase().replace(':00', '');
@@ -72,9 +108,22 @@ export function TimeStrip({ startTime, durationMinutes = 60 }: TimeStripProps) {
         style={{ background: STRIP_GRADIENT }}
         aria-label="24-hour day/night strip with selected event window"
       >
+        {/* "Everyone awake" overlap window — green band(s) where 9am ≤ local < 9pm
+            in every region. Rendered under the cursor so the cursor stays visible. */}
+        {overlapBands.map((b, i) => (
+          <div
+            key={i}
+            className="absolute top-0 bottom-0 bg-emerald-400/35 border-x border-emerald-300/60"
+            style={{
+              left:  `${(b.start / 24) * 100}%`,
+              width: `${((b.end - b.start) / 24) * 100}%`,
+            }}
+            aria-hidden
+          />
+        ))}
         {/* Duration band */}
         <div
-          className="absolute top-0 bottom-0 bg-grove-accent/40 border-l-2 border-r border-grove-accent"
+          className="absolute top-0 bottom-0 bg-grove-accent/50 border-l-2 border-r border-grove-accent"
           style={{ left: `${cursorPct}%`, width: `${bandWidthPct}%` }}
           aria-hidden
         />
@@ -89,8 +138,13 @@ export function TimeStrip({ startTime, durationMinutes = 60 }: TimeStripProps) {
         ))}
       </div>
 
-      {/* One-line zone readout */}
+      {/* One-line zone readout — with a small legend dot for the green window. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+        <span className="inline-flex items-center gap-1 text-grove-text-muted">
+          <span className="inline-block w-2 h-2 rounded-sm bg-emerald-400/70 border border-emerald-300/80" />
+          everyone awake
+        </span>
+        <span className="text-grove-text-dim">·</span>
         {zoneLabels.map(z => (
           <span
             key={z.id}
