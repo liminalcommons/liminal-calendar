@@ -271,7 +271,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           className="text-[11px] text-grove-accent-deep hover:text-grove-accent transition-colors mr-auto"
           onClick={onClose}
         >
-          More options →
+          Open full editor →
         </Link>
         <button
           onClick={onClose}
