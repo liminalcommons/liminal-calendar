@@ -331,14 +331,16 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
     return isLateNightInAnyTimezone(selectedStartDate, communityTzIds);
   }, [selectedStartDate]);
 
-  // When the chosen time is unsocial somewhere, propose the earliest user-local
-  // slot on the same day where every region (NA/SA/EU) is between 9am–9pm. We
-  // sample at 30min resolution. Returns "HH:mm" or null if no slot fits today.
-  const suggestedHumaneStart: string | null = useMemo(() => {
+  // When the chosen time is unsocial somewhere, compute the *range* of
+  // user-local hours where every region (NA/SA/EU) sits between 9am–9pm.
+  // Returned as a human-readable range in the user's own timezone — so a
+  // California host sees Pacific hours, a Madrid host sees CET, etc.
+  const humaneRangeLocal: string | null = useMemo(() => {
     if (!selectedStartDate || !lateNightWarning) return null;
-    const REGIONS = ['America/New_York', 'America/Sao_Paulo', 'Europe/Madrid'];
+    const REGIONS = ['America/Los_Angeles', 'America/New_York', 'America/Sao_Paulo', 'Europe/Madrid'];
     const day = new Date(selectedStartDate);
     day.setHours(0, 0, 0, 0);
+    const goodSlots: number[] = [];
     for (let slot = 0; slot < 48; slot++) {
       const probe = new Date(day.getTime() + slot * 30 * 60_000);
       const ok = REGIONS.every(tz => {
@@ -347,14 +349,15 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         const h24 = (h % 12) + (isPm ? 12 : 0);
         return h24 >= 9 && h24 < 21;
       });
-      if (ok) {
-        const hh = String(Math.floor(slot / 2)).padStart(2, '0');
-        const mm = (slot % 2) === 0 ? '00' : '30';
-        return `${hh}:${mm}`;
-      }
+      if (ok) goodSlots.push(slot);
     }
-    return null;
-  }, [selectedStartDate, lateNightWarning]);
+    if (goodSlots.length === 0) return null;
+    const fmt = (slot: number) => {
+      const probe = new Date(day.getTime() + slot * 30 * 60_000);
+      return formatTimeInTimezone(probe, timezone);
+    };
+    return `${fmt(goodSlots[0])} – ${fmt(goodSlots[goodSlots.length - 1])}`;
+  }, [selectedStartDate, lateNightWarning, timezone]);
 
   // ── Init ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -755,23 +758,13 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         </div>
       )}
 
-      {/* Suggested humane slot + AI nudge — only when current pick is unsocial. */}
+      {/* Humane range hint + AI nudge — only when current pick is unsocial. */}
       {lateNightWarning && (
         <div className="flex flex-wrap items-center gap-2 text-xs -mt-1">
-          {suggestedHumaneStart && (
-            <button
-              type="button"
-              onClick={() => handleStartTimeChange(suggestedHumaneStart)}
-              className="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200
-                         text-emerald-800 hover:bg-emerald-100 transition-colors"
-            >
-              Try {(() => {
-                const [h, m] = suggestedHumaneStart.split(':').map(Number);
-                const hh = ((h + 11) % 12) + 1;
-                const ampm = h >= 12 ? 'PM' : 'AM';
-                return `${hh}:${String(m).padStart(2, '0')} ${ampm}`;
-              })()} (everyone awake)
-            </button>
+          {humaneRangeLocal && (
+            <span className="px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800">
+              Everyone awake (your time): {humaneRangeLocal}
+            </span>
           )}
           <span className="text-grove-text-muted">
             or ask the assistant on the left for the best time across regions →
