@@ -11,7 +11,6 @@ import type { EventFormValues } from '@/lib/chat-tools';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
-import { TimeStrip } from './TimeStrip';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 
 interface QuickCreatePopoverProps {
@@ -228,10 +227,6 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
             ))}
           </select>
         </div>
-        <TimeStrip
-          startTime={buildStartTime(day, hour)}
-          durationMinutes={durationMinutes}
-        />
       </div>
 
       {/* Captured fields summary (chips) — shows what the assistant has set */}

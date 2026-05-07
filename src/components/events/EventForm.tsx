@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
-import { TimeStrip } from '@/components/calendar/TimeStrip';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
 import { ImageUpload } from '@/components/ImageUpload';
 import { apiFetch } from '@/lib/api-fetch';
@@ -729,11 +728,6 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
             </span>
           )}
         </div>
-      )}
-
-      {/* Around-the-world day/night visualization for the chosen start time. */}
-      {selectedStartDate && (
-        <TimeStrip startTime={selectedStartDate} durationMinutes={durationMinutes} />
       )}
 
       {/* Recurrence */}

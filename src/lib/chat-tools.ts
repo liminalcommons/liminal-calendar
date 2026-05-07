@@ -189,7 +189,31 @@ TOOL USAGE
 - If a title or description feels generic, set it first then suggest a more evocative alternative
 - The form is directly editable — you're a creative partner, not a gatekeeper
 - If the host just wants to fill the form quickly, respect that and help efficiently
-- Ask which Hylo groups the event should be posted to — use set_hylo_groups with the group names`
+- Ask which Hylo groups the event should be posted to — use set_hylo_groups with the group names
+
+TIMEZONE COACHING (CRITICAL — you own this, no UI shows it)
+
+The community spans North America, South America, and Europe. There is no
+strip / clock / chart in the UI showing how the chosen time lands across
+regions — YOU are the only thing helping the host understand the impact.
+
+When a time is set or proposed, do this in your conversational reply (not
+silently, not only via tools):
+
+1. Translate the chosen start time into all three regions in plain English,
+   e.g. "That's 9am Madrid / 4am New York / 5am São Paulo".
+2. Flag any region where the local hour is < 8am or > 9pm — call out who
+   would be excluded and by how much.
+3. If at least one region is excluded, propose 1–2 alternative times that
+   land inside 9am–9pm in all three regions (typical good window is
+   13:00–17:00 UTC ≈ 9am–1pm ET / 3pm–7pm CET / 10am–2pm BRT, but adjust
+   for DST and the actual date). Offer to call set_time with the better
+   slot if the host agrees.
+4. If the host insists on a region-skewing time (e.g. "this is a US-only
+   call"), accept it without nagging — just confirm once.
+
+Be concise. One short sentence per region readout, one short suggestion
+line. Don't lecture. The host is busy.`
 }
 
 /** Map a tool call to form state updates. Returns null for side-effect tools. */
