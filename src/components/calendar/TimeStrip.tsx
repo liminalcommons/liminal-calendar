@@ -4,48 +4,35 @@ import React, { useMemo } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 
 interface TimeStripProps {
-  /** The selected event start time (in absolute UTC). The strip shows what
-   *  hour-of-day this lands on for each zone, and renders a vertical cursor
-   *  at that position. */
+  /** The selected event start time (in absolute UTC). */
   startTime: Date;
-  /** Optional event duration in minutes — renders a translucent band from the
-   *  cursor spanning the duration. */
+  /** Event duration in minutes — drawn as a translucent band on the strip. */
   durationMinutes?: number;
 }
 
-/**
- * Six-zone day/night strip for event creation. Each row is a 24h band for one
- * timezone; bands are colored by hour-of-day so a host can instantly see
- * whether their chosen time lands in someone's working day or their 3am.
- *
- * Zones picked to cover the bulk of the user base: 3 USA zones (LA/Chicago/NY)
- * + Brazil + UK + Continental Europe (Madrid = CET, same as Paris/Berlin).
- */
+/** Six audience zones — kept short so the row of labels fits on one line. */
 const ZONES: { id: string; label: string }[] = [
   { id: 'America/Los_Angeles', label: 'LA' },
-  { id: 'America/Chicago',     label: 'Chicago' },
+  { id: 'America/Chicago',     label: 'Chi' },
   { id: 'America/New_York',    label: 'NY' },
-  { id: 'America/Sao_Paulo',   label: 'São Paulo' },
-  { id: 'Europe/London',       label: 'London' },
-  { id: 'Europe/Madrid',       label: 'Madrid' },
+  { id: 'America/Sao_Paulo',   label: 'SP' },
+  { id: 'Europe/London',       label: 'Lon' },
+  { id: 'Europe/Madrid',       label: 'Mad' },
 ];
 
-/** Map an hour 0–23 to a CSS background color via a day/night gradient.
- *  Pure function so it's trivially testable. */
-export function hourToBandColor(hour: number): string {
-  // Night (22-5): deep indigo
-  if (hour >= 22 || hour <= 4) return 'rgba(28, 32, 64, 0.85)';
-  // Dawn (5-7): warm orange
-  if (hour >= 5 && hour <= 7)  return 'rgba(196, 147, 90, 0.55)';
-  // Morning/midday (8-16): light sky
-  if (hour >= 8 && hour <= 16) return 'rgba(150, 195, 220, 0.35)';
-  // Late afternoon (17-18): golden
-  if (hour === 17 || hour === 18) return 'rgba(196, 160, 90, 0.50)';
-  // Evening (19-21): dusky purple
-  return 'rgba(90, 80, 120, 0.65)';
-}
+/** Single 24h day/night gradient — used as the background of the one strip. */
+const STRIP_GRADIENT =
+  'linear-gradient(to right, ' +
+  'rgba(28,32,64,0.85) 0%, ' +     // 0h — night
+  'rgba(28,32,64,0.85) 20%, ' +    // 5h
+  'rgba(196,147,90,0.55) 25%, ' +  // 6h dawn
+  'rgba(150,195,220,0.40) 33%, ' + // 8h morning
+  'rgba(150,195,220,0.40) 67%, ' + // 16h
+  'rgba(196,160,90,0.55) 75%, ' +  // 18h dusk
+  'rgba(90,80,120,0.70) 87%, ' +   // 21h evening
+  'rgba(28,32,64,0.85) 100%)';     // 24h night
 
-/** Returns the fractional hour (0–24) the given UTC date corresponds to in tz. */
+/** Hour-of-day (0–24, fractional) for a UTC date in tz. */
 export function fractionalHourInZone(date: Date, tz: string): number {
   const h = parseInt(formatInTimeZone(date, tz, 'H'), 10);
   const m = parseInt(formatInTimeZone(date, tz, 'm'), 10);
@@ -57,71 +44,65 @@ export function TimeStrip({ startTime, durationMinutes = 60 }: TimeStripProps) {
     ? startTime
     : new Date();
 
-  const rows = useMemo(() => {
-    return ZONES.map(z => {
-      const startFrac = fractionalHourInZone(safeStart, z.id);
-      const local = formatInTimeZone(safeStart, z.id, 'h:mm a');
-      const dayLabel = formatInTimeZone(safeStart, z.id, 'EEE');
-      const startHour = Math.floor(startFrac);
-      const isUnsocial = startHour >= 22 || startHour <= 6;
-      return { ...z, startFrac, local, dayLabel, isUnsocial };
-    });
-  }, [safeStart]);
+  const userTz = useMemo(() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
+    catch { return 'UTC'; }
+  }, []);
 
-  // 24 cells per row, one per hour
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-
-  // Duration in hours, clamped to 24 so the band never wraps off-screen.
+  // Position the cursor according to the user's own local hour-of-day, so the
+  // strip reads as "where in MY day this lands". Zone labels then show what
+  // each city sees at that same instant.
+  const cursorHour = fractionalHourInZone(safeStart, userTz);
+  const cursorPct = (cursorHour / 24) * 100;
   const durHours = Math.min(24, Math.max(0.25, durationMinutes / 60));
+  const bandWidthPct = (durHours / 24) * 100;
+
+  const zoneLabels = useMemo(
+    () => ZONES.map(z => {
+      const local = formatInTimeZone(safeStart, z.id, 'h:mma').toLowerCase().replace(':00', '');
+      const h = parseInt(formatInTimeZone(safeStart, z.id, 'H'), 10);
+      const isUnsocial = h >= 22 || h <= 6;
+      return { ...z, local, isUnsocial };
+    }),
+    [safeStart],
+  );
 
   return (
-    <div className="rounded-md border border-grove-border/50 bg-grove-border/10 p-1.5 select-none">
-      <div className="text-[10px] uppercase tracking-wider text-grove-text-muted px-0.5 pb-1">
-        Around the world
+    <div className="space-y-1 select-none">
+      {/* The single strip */}
+      <div
+        className="relative h-6 rounded-sm overflow-hidden border border-grove-border/40"
+        style={{ background: STRIP_GRADIENT }}
+        aria-label="24-hour day/night strip with selected event window"
+      >
+        {/* Duration band */}
+        <div
+          className="absolute top-0 bottom-0 bg-grove-accent/40 border-l-2 border-r border-grove-accent"
+          style={{ left: `${cursorPct}%`, width: `${bandWidthPct}%` }}
+          aria-hidden
+        />
+        {/* Hour ticks at 6/12/18 */}
+        {[6, 12, 18].map(h => (
+          <div
+            key={h}
+            className="absolute top-0 bottom-0 border-l border-white/15"
+            style={{ left: `${(h / 24) * 100}%` }}
+            aria-hidden
+          />
+        ))}
       </div>
-      <div className="space-y-0.5">
-        {rows.map(row => {
-          const cursorPct = (row.startFrac / 24) * 100;
-          const bandWidthPct = (durHours / 24) * 100;
-          return (
-            <div key={row.id} className="flex items-center gap-1.5">
-              <div className="w-16 shrink-0 text-[10px] leading-none text-grove-text-muted">
-                <div className="font-medium text-grove-text">{row.label}</div>
-                <div className={row.isUnsocial ? 'text-red-400' : ''}>
-                  {row.local}
-                </div>
-              </div>
-              <div className="relative flex-1 h-5 rounded-sm overflow-hidden">
-                {/* 24h band */}
-                <div className="absolute inset-0 flex">
-                  {hours.map(h => (
-                    <div
-                      key={h}
-                      className="flex-1"
-                      style={{ background: hourToBandColor(h) }}
-                    />
-                  ))}
-                </div>
-                {/* Duration band */}
-                <div
-                  className="absolute top-0 bottom-0 bg-grove-accent/40 border-l-2 border-r border-grove-accent"
-                  style={{
-                    left: `${cursorPct}%`,
-                    width: `${bandWidthPct}%`,
-                  }}
-                  aria-hidden
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center justify-between text-[9px] text-grove-text-muted px-[68px] pt-0.5">
-        <span>0</span>
-        <span>6</span>
-        <span>12</span>
-        <span>18</span>
-        <span>24</span>
+
+      {/* One-line zone readout */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+        {zoneLabels.map(z => (
+          <span
+            key={z.id}
+            className={z.isUnsocial ? 'text-red-400' : 'text-grove-text-muted'}
+          >
+            <span className="font-medium text-grove-text">{z.label}</span>{' '}
+            {z.local}
+          </span>
+        ))}
       </div>
     </div>
   );
