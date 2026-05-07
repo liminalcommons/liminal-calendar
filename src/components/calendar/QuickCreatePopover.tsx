@@ -10,7 +10,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { apiFetch } from '@/lib/api-fetch';
-import { COMMUNITY_TIMEZONES, formatTimeInTimezone, getHourInTimezone } from '@/lib/timezone-utils';
+import { TimeStrip } from './TimeStrip';
 
 interface QuickCreatePopoverProps {
   day: Date;
@@ -225,19 +225,12 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           </select>
         </div>
 
-        {/* Timezone preview — show event time across community timezones */}
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-grove-text-muted px-0.5">
-          {COMMUNITY_TIMEZONES.filter((_, i) => i % 2 === 0 || i === COMMUNITY_TIMEZONES.length - 1).map(tz => {
-            const eventStart = buildStartTime(day, hour);
-            const h = getHourInTimezone(eventStart, tz.id);
-            const isLate = h >= 22 || h <= 5;
-            return (
-              <span key={tz.id} className={isLate ? 'text-red-400' : ''}>
-                {tz.label} {formatTimeInTimezone(eventStart, tz.id)}
-              </span>
-            );
-          })}
-        </div>
+        {/* Around-the-world day/night strip — hosts can see at a glance whether
+            the chosen time is mid-day or 3am for major audience zones. */}
+        <TimeStrip
+          startTime={buildStartTime(day, hour)}
+          durationMinutes={durationMinutes}
+        />
 
         {/* Meeting link */}
         <div className="flex items-center gap-2">

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -32,7 +31,6 @@ interface WeeklyGridProps {
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const { data: session } = useSession();
-  const router = useRouter();
   const userRole = session?.user?.role || 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
@@ -167,10 +165,13 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     // intended target was inside the popover.
     setExpansion((cur) => {
       if (cur) return null;
-      router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+      // Open inline quick-create popover anchored to the clicked cell.
+      // Full /events/new is still reachable via the popover's "More options"
+      // link for power users who need fields beyond title/duration/recurrence.
+      setQuickCreate({ day, hour, rect });
       return cur;
     });
-  }, [router]);
+  }, []);
 
   const handleEventClick = useCallback((event: DisplayEvent, rect: DOMRect) => {
     setQuickCreate(null);
