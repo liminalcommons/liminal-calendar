@@ -197,5 +197,42 @@ export async function runMigrations() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS notifications_user_recent_idx ON notifications(user_id, created_at DESC)`;
 
+  // Liminal Marketplace — public submissions for the biweekly Saturday sessions.
+  // Anyone can submit (auth optional); admin reviews via /admin.
+  await sql`
+    CREATE TABLE IF NOT EXISTS marketplace_submissions (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT,
+      phase TEXT NOT NULL,
+      title TEXT NOT NULL,
+      pitch TEXT NOT NULL,
+      problem TEXT,
+      audience TEXT,
+      angle TEXT,
+      takeaway TEXT,
+      mvp TEXT,
+      sharpened_pitch TEXT,
+      materials_url TEXT,
+      material_files JSONB,
+      links TEXT,
+      target_session_date DATE,
+      submitter_user_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  // Idempotent column adds for tables that already exist from the earlier migration.
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS problem TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS audience TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS angle TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS takeaway TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS mvp TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS sharpened_pitch TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS materials_url TEXT`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS material_files JSONB`;
+  await sql`ALTER TABLE marketplace_submissions ADD COLUMN IF NOT EXISTS image_url TEXT`;
+  await sql`CREATE INDEX IF NOT EXISTS marketplace_submissions_status_idx ON marketplace_submissions(status, created_at DESC)`;
+
   return { success: true, message: 'Migrations complete' };
 }

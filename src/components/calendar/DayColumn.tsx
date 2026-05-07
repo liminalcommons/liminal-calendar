@@ -1,14 +1,24 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
+import { useUserTimezone } from '@/lib/timezone-utils';
 import { HourCell } from './HourCell';
 import { EventBlock } from './EventBlock';
 import { DragSnapGhost } from './DragSnapGhost';
 import { computeOverlapLayout } from './overlap';
 import { SLOTS_PER_DAY } from '@/lib/golden-hours';
 import { eventToMinutes } from '@/lib/event-time-display';
+import { isMarketplaceSaturday, MARKETPLACE_DURATION_MIN } from '@/lib/marketplace-anchor';
+
+function minutesToPx(minutes: number, offsets: number[], heights: number[]): number {
+  const slot = Math.min(Math.floor(minutes / 30), 47);
+  const frac = (minutes - slot * 30) / 30;
+  return offsets[slot] + frac * heights[slot];
+}
 
 const SLOTS = Array.from({ length: SLOTS_PER_DAY }, (_, i) => i);
 
@@ -75,6 +85,40 @@ const DayColumn = React.memo(function DayColumn({
   const dateKey = toDateKey(day);
   const dayEvents = events.filter(e => toDateKey(new Date(e.starts_at)) === dateKey);
 
+  const userTz = useUserTimezone();
+
+  // Hardcoded biweekly marquee for the Liminal Marketplace. Suppress when a
+  // real "Liminal Marketplace" event row already exists on this day (item 3
+  // of the rollout — once that event ships, the real row carries the link).
+  const showMarketplaceMarker =
+    mounted &&
+    isMarketplaceSaturday(day) &&
+    !dayEvents.some(e => e.title?.toLowerCase() === 'liminal marketplace');
+
+  let marketplaceTopPx = 0;
+  let marketplaceHeightPx = 0;
+  let marketplaceTimeLabel = '';
+  if (showMarketplaceMarker) {
+    // Anchor the slot to that Saturday at 16:00 UTC (= 13:00 Brasília). Render
+    // in the viewer's local TZ so it aligns with how events appear.
+    const isoDate = `${dateKey}T16:00:00.000Z`;
+    try {
+      const hm = formatInTimeZone(new Date(isoDate), userTz, 'H:m');
+      const [h, m] = hm.split(':').map(Number);
+      const startMin = h * 60 + m;
+      const endMin = startMin + MARKETPLACE_DURATION_MIN;
+      marketplaceTopPx = minutesToPx(startMin, hourOffsets, hourHeights);
+      marketplaceHeightPx = Math.max(
+        minutesToPx(Math.min(endMin, 24 * 60), hourOffsets, hourHeights) - marketplaceTopPx,
+        24,
+      );
+      marketplaceTimeLabel = formatInTimeZone(new Date(isoDate), userTz, 'h:mma').toLowerCase().replace(':00', '');
+    } catch {
+      // If TZ math fails, just hide the marker rather than render at slot 0.
+      marketplaceHeightPx = 0;
+    }
+  }
+
   const overlapInput = dayEvents.map(e => ({
     id: e.id,
     ...eventToMinutes(e),
@@ -129,6 +173,28 @@ const DayColumn = React.memo(function DayColumn({
 
       {isSnapTarget && (
         <DragSnapGhost topPx={snapTopPx!} heightPx={snapHeightPx!} />
+      )}
+
+      {showMarketplaceMarker && marketplaceHeightPx > 0 && (
+        <Link
+          href="/marketplace"
+          className="absolute z-30 left-0 right-0 mx-1 rounded-md
+                     border-2 border-dashed border-grove-accent/80
+                     bg-grove-accent/10 hover:bg-grove-accent/20
+                     transition-colors flex flex-col items-center justify-center
+                     text-center px-2 group"
+          style={{ top: marketplaceTopPx, height: marketplaceHeightPx }}
+          title="Liminal Marketplace — bring an offer"
+        >
+          <span className="text-[10px] uppercase tracking-wider text-grove-accent font-semibold">
+            ✦ Liminal Marketplace
+          </span>
+          {marketplaceHeightPx >= 40 && (
+            <span className="text-[10px] text-grove-text-muted group-hover:text-grove-accent">
+              {marketplaceTimeLabel} · bring an offer →
+            </span>
+          )}
+        </Link>
       )}
     </div>
   );

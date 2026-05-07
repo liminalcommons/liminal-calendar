@@ -10,14 +10,11 @@ interface TimeStripProps {
   durationMinutes?: number;
 }
 
-/** Six audience zones — kept short so the row of labels fits on one line. */
+/** Three regional zones — one representative timezone per region. */
 const ZONES: { id: string; label: string }[] = [
-  { id: 'America/Los_Angeles', label: 'LA' },
-  { id: 'America/Chicago',     label: 'Chi' },
-  { id: 'America/New_York',    label: 'NY' },
-  { id: 'America/Sao_Paulo',   label: 'SP' },
-  { id: 'Europe/London',       label: 'Lon' },
-  { id: 'Europe/Madrid',       label: 'Mad' },
+  { id: 'America/New_York',  label: 'North America' },
+  { id: 'America/Sao_Paulo', label: 'South America' },
+  { id: 'Europe/Madrid',     label: 'Europe' },
 ];
 
 /** Single 24h day/night gradient — used as the background of the one strip. */

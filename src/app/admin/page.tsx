@@ -9,6 +9,7 @@ import { NavBar } from '@/components/NavBar';
 import { apiFetch } from '@/lib/api-fetch';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 import { ReportsPanel } from '@/components/admin/ReportsPanel';
+import { MarketplaceSubmissionsPanel } from '@/components/admin/MarketplaceSubmissionsPanel';
 
 interface Member {
   id: number;
@@ -70,7 +71,11 @@ function AdminPageInner() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = searchParams.get('tab') === 'reports' ? 'reports' : 'members';
+  const tabParam = searchParams.get('tab');
+  const tab: 'members' | 'reports' | 'marketplace' =
+    tabParam === 'reports' ? 'reports'
+    : tabParam === 'marketplace' ? 'marketplace'
+    : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
@@ -186,9 +191,25 @@ function AdminPageInner() {
           >
             Reports
           </Link>
+          <Link
+            href="/admin?tab=marketplace"
+            role="tab"
+            aria-selected={tab === 'marketplace'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'marketplace'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Marketplace
+          </Link>
         </nav>
 
-        {tab === 'reports' ? (
+        {tab === 'marketplace' ? (
+          <section role="tabpanel" aria-label="Marketplace submissions">
+            <MarketplaceSubmissionsPanel />
+          </section>
+        ) : tab === 'reports' ? (
           <section role="tabpanel" aria-label="Attendance reports">
             <ReportsPanel />
           </section>
