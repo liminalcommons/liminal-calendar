@@ -2,37 +2,61 @@
  * @jest-environment node
  */
 
+jest.mock('@/lib/events/visibility', () => ({
+  visibleEventsForUserCondition: jest.fn(() => ({ __vis: 'user' })),
+  publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
+}));
+
 import { GET } from '@/app/api/calendar/feed.ics/route';
 import type { NextRequest } from 'next/server';
 
 const mockEventA = { id: 1, title: 'EventA', startsAt: new Date('2026-06-01T10:00:00Z'), endsAt: null, location: null, description: null, timezone: 'UTC', creatorName: 'Alice', recurrenceRule: null };
 const mockEventB = { id: 2, title: 'EventB', startsAt: new Date('2026-06-02T10:00:00Z'), endsAt: null, location: null, description: null, timezone: 'UTC', creatorName: 'Bob', recurrenceRule: null };
 
-// Polymorphic where() chain — supports all three real call shapes:
-//   1. .where().limit()           → member lookup       → [{hyloId: 'u1'}]
-//   2. .where()  (await directly) → rsvps-eventIds      → [{eventId: 1}]  (only EventA RSVPed)
-//   3. .where().orderBy()         → events filtered by ids → [mockEventA]
-// The thenable `then` makes `await where(...)` resolve directly to the rsvps-eventIds array;
-// `.limit()` and `.orderBy()` are also available on the same object for chaining.
-const polymorphicWhere = {
-  limit: () => Promise.resolve([{ hyloId: 'u1' }]),
-  orderBy: () => Promise.resolve([mockEventA]),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  then: (resolve: any, reject: any) => Promise.resolve([{ eventId: 1 }]).then(resolve, reject),
-};
+// The DB mock must handle three call shapes that appear in different code paths:
+//   1. .where().limit()            → member-by-token lookup → [{hyloId: 'u1'}]
+//   2a. .where() thenable          → rsvps-eventIds → [{eventId: 1}]  (rsvps-only filter)
+//   2b. .where().orderBy()         → all events with visibility → [A, B]  (no filter)
+//   3. .where().orderBy()          → events by inArray+visibility → [A]   (after rsvps lookup)
+// Shapes 2b and 3 both use .where().orderBy() — we distinguish by call count.
+// A hybrid where() result supports both thenable (for rsvps) AND .orderBy() (for events).
+let _selectCallCount = 0;
 
 jest.mock('@/lib/db', () => ({
   db: {
-    select: () => ({
-      from: (_table: unknown) => ({
-        // member-by-token lookup, rsvps-eventIds, OR events-filtered all enter here
-        where: () => polymorphicWhere,
-        // unfiltered events path: select().from(events).orderBy()
-        orderBy: () => Promise.resolve([mockEventA, mockEventB]),
-      }),
-    }),
+    select: () => {
+      _selectCallCount++;
+      const call = _selectCallCount;
+      return {
+        from: () => ({
+          where: () => {
+            if (call === 1) {
+              // member lookup — need .limit(); also need .orderBy() for no-token path (call=1 there)
+              return {
+                limit: () => Promise.resolve([{ hyloId: 'u1' }]),
+                orderBy: () => Promise.resolve([mockEventA, mockEventB]),
+              };
+            }
+            if (call === 2) {
+              // rsvps lookup (thenable) OR all-events (orderBy) depending on filter
+              return {
+                orderBy: () => Promise.resolve([mockEventA, mockEventB]),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                then: (resolve: any, reject: any) => Promise.resolve([{ eventId: 1 }]).then(resolve, reject),
+              };
+            }
+            // call 3: events filtered by inArray + visibility (rsvps-only path)
+            return {
+              orderBy: () => Promise.resolve([mockEventA]),
+            };
+          },
+        }),
+      };
+    },
   },
 }));
+
+beforeEach(() => { _selectCallCount = 0; });
 
 function makeReq(qs: string) {
   return { nextUrl: new URL(`http://localhost/api/calendar/feed.ics?${qs}`) } as unknown as NextRequest;

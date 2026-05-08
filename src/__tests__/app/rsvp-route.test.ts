@@ -2,6 +2,13 @@
  * @jest-environment node
  */
 
+jest.mock('../../../auth', () => ({
+  auth: jest.fn(() => Promise.resolve(null)),
+}));
+jest.mock('@/lib/events/visibility', () => ({
+  visibleEventsForUserCondition: jest.fn(() => ({ __vis: 'user' })),
+  publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
+}));
 jest.mock('@/lib/auth/get-current-member', () => ({
   getCurrentMember: jest.fn(),
 }));

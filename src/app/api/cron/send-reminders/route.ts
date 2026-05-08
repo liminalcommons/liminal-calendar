@@ -76,6 +76,8 @@ export async function GET(request: Request) {
     const { windowStart, windowEnd } = computeReminderWindow(now, minMin, maxMin);
 
     // Find events in window with users opted-in via notification_preferences
+    // Visibility filter intentionally NOT applied — this endpoint serves
+    // reminder dispatch and must see all events regardless of visibility.
     const prefColumn = notificationPreferences[WINDOW_TO_COLUMN[type as NotificationChannelHorizon]];
     const dueEvents = await db
       .select({
@@ -202,6 +204,8 @@ export async function GET(request: Request) {
   for (const w of PUSH_WINDOWS) {
     const { windowStart, windowEnd } = computeReminderWindow(now, w.minMin, w.maxMin);
 
+    // Visibility filter intentionally NOT applied — this endpoint serves
+    // push reminder dispatch and must see all events regardless of visibility.
     const pushPrefColumn = notificationPreferences[WINDOW_TO_COLUMN[w.type as NotificationChannelHorizon]];
     const due = await db
       .select({
@@ -272,6 +276,8 @@ export async function GET(request: Request) {
     );
     const effectiveEnd = sql<Date>`COALESCE(${events.endsAt}, ${events.startsAt} + interval '60 minutes')`;
 
+    // Visibility filter intentionally NOT applied — this endpoint serves
+    // post-event attendance prompt dispatch and must see all events regardless of visibility.
     const due = await db
       .select({
         eventId: events.id,

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { upsertRsvp } from '@/lib/rsvp/upsert';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { addNewsletterSubscriber } from '@/lib/newsletter/add-subscriber';
+import { auth } from '../../../../../../auth';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -39,8 +41,12 @@ export async function POST(
     );
   }
 
-  // Verify event exists
-  const [event] = await db.select().from(events).where(eq(events.id, numId));
+  // Verify event exists and is visible to the caller
+  const postUserId = (member.hyloId ?? member.clerkId) as string | undefined;
+  const postVisibilityCond = postUserId
+    ? visibleEventsForUserCondition(postUserId)
+    : publicOnlyEventsCondition();
+  const [event] = await db.select().from(events).where(and(eq(events.id, numId), postVisibilityCond));
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
@@ -93,8 +99,15 @@ export async function GET(
   }
 
   try {
-    // Fetch event for creator info
-    const [event] = await db.select().from(events).where(eq(events.id, numId));
+    // Fetch event for creator info — apply visibility so private events are not
+    // accessible to unauthenticated callers or users without access.
+    const getSession = await auth();
+    const getUser = getSession?.user as ({ hyloId?: string; clerkId?: string }) | undefined;
+    const getUserId = (getUser?.hyloId ?? getUser?.clerkId) as string | undefined;
+    const getVisibilityCond = getUserId
+      ? visibleEventsForUserCondition(getUserId)
+      : publicOnlyEventsCondition();
+    const [event] = await db.select().from(events).where(and(eq(events.id, numId), getVisibilityCond));
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }

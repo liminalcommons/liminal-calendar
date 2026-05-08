@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { events, members, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { generateCalendarFeed, type ICSEvent } from '@/lib/ics-generator';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { and, asc, eq, inArray, not } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,12 @@ export async function GET(request: NextRequest) {
 
     const filter = request.nextUrl.searchParams.get('filter');
 
+    // Visibility: token-authenticated users see public + their own/invited/rsvp'd events;
+    // unauthenticated callers (no token or invalid token) see public events only.
+    const visibilityCond = _userId
+      ? visibleEventsForUserCondition(_userId)
+      : publicOnlyEventsCondition();
+
     let allEvents;
     if (filter === 'rsvps-only' && _userId) {
       // Subquery: event ids the user has RSVPed yes/interested to
@@ -42,9 +49,9 @@ export async function GET(request: NextRequest) {
       const ids = rsvpedEventIds.map((r) => r.eventId);
       allEvents = ids.length === 0
         ? []
-        : await db.select().from(events).where(inArray(events.id, ids)).orderBy(asc(events.startsAt));
+        : await db.select().from(events).where(and(inArray(events.id, ids), visibilityCond)).orderBy(asc(events.startsAt));
     } else {
-      allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
+      allEvents = await db.select().from(events).where(visibilityCond).orderBy(asc(events.startsAt));
     }
     const displayEvents = allEvents.map((e) => dbEventToDisplayEvent(e));
 

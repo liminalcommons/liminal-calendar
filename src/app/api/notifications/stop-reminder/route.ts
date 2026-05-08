@@ -27,6 +27,9 @@ export async function GET(request: NextRequest) {
     .set({ remindMe: false })
     .where(and(eq(rsvps.eventId, numEventId), eq(rsvps.userId, userId)));
 
+  // Visibility filter intentionally NOT applied — this endpoint serves
+  // a tokenized email unsubscribe action; the stop-token proves the caller
+  // was previously notified about this event and only fetches the title for display.
   const [event] = await db
     .select({ title: events.title })
     .from(events)

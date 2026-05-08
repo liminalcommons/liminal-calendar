@@ -3,6 +3,7 @@ import { auth } from '@/../auth';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { and, asc, eq, gte, inArray, not } from 'drizzle-orm';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function userIdFromSession(session: any): string {
@@ -24,10 +25,11 @@ export async function GET(_request: Request) {
   const ids = rsvpedIds.map((r) => r.eventId);
   if (ids.length === 0) return NextResponse.json({ events: [] });
 
+  const visibilityCond = userId ? visibleEventsForUserCondition(userId) : publicOnlyEventsCondition();
   const upcoming = await db
     .select({ id: events.id, title: events.title, starts_at: events.startsAt })
     .from(events)
-    .where(and(inArray(events.id, ids), gte(events.startsAt, new Date())))
+    .where(and(inArray(events.id, ids), gte(events.startsAt, new Date()), visibilityCond))
     .orderBy(asc(events.startsAt))
     .limit(limit);
 

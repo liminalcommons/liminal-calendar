@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -8,9 +8,15 @@ import {
   listComments,
   COMMENT_MAX_LENGTH,
 } from '@/lib/comments/repo';
+import { auth } from '../../../../../../auth';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 async function eventExists(numId: number): Promise<boolean> {
-  const rows = await db.select().from(events).where(eq(events.id, numId));
+  const session = await auth();
+  const userAny = session?.user as ({ hyloId?: string; clerkId?: string }) | undefined;
+  const userId = (userAny?.hyloId ?? userAny?.clerkId) as string | undefined;
+  const visibilityCond = userId ? visibleEventsForUserCondition(userId) : publicOnlyEventsCondition();
+  const rows = await db.select().from(events).where(and(eq(events.id, numId), visibilityCond));
   return rows.length > 0;
 }
 

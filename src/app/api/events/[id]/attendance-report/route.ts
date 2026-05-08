@@ -11,6 +11,10 @@ import {
 import { eventEndedAt, type EventTimeFields } from '@/lib/event-time';
 import { fanoutAttendanceNegative } from '@/lib/notifications/fanout';
 
+// Visibility filter intentionally NOT applied — this endpoint serves
+// post-event attendance reports filed by authenticated RSVP=yes attendees.
+// The action is already gated by auth + RSVP verification; bypassing visibility
+// allows reporters to submit reports on private events they legitimately attended.
 async function findEvent(numId: number): Promise<(EventTimeFields & Partial<Event>) | null> {
   const rows = await db.select().from(events).where(eq(events.id, numId));
   return (rows[0] as (EventTimeFields & Partial<Event>) | undefined) ?? null;
