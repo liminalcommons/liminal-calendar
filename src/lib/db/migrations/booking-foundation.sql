@@ -8,7 +8,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS source_event_type_id INTEGER;
 
 -- 2. Add handle to members (nullable, unique).
 ALTER TABLE members ADD COLUMN IF NOT EXISTS handle TEXT;
-CREATE UNIQUE INDEX IF NOT EXISTS members_handle_unique ON members(handle) WHERE handle IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS members_handle_idx ON members(handle) WHERE handle IS NOT NULL;
 
 -- 3. event_types — bookable templates (empty in this plan, populated in plan #3).
 CREATE TABLE IF NOT EXISTS event_types (
