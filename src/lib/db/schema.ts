@@ -51,6 +51,8 @@ export const events = pgTable('events', {
   creatorImage: text('creator_image'),
   hyloGroupId: text('hylo_group_id'),
   hyloPostId: text('hylo_post_id'),
+  visibility: text('visibility').notNull().default('public'),
+  sourceEventTypeId: integer('source_event_type_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -87,6 +89,7 @@ export const members = pgTable('members', {
   clerkId: text('clerk_id').unique(),
   name: text('name').notNull(),
   email: text('email'),
+  handle: text('handle').unique(),
   image: text('image'),
   role: text('role').notNull().default('member'), // 'member' | 'host' | 'admin'
   timezone: text('timezone').default('UTC'),
@@ -241,6 +244,53 @@ export type NotificationLogEntry = typeof notificationLog.$inferSelect;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
 export type NewNotificationPreferences = typeof notificationPreferences.$inferInsert;
+
+export const eventTypes = pgTable(
+  'event_types',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    slug: text('slug').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    durationMinutes: integer('duration_minutes').notNull(),
+    locationKind: text('location_kind').notNull(),
+    locationValue: text('location_value'),
+    bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+    bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
+    minNoticeMinutes: integer('min_notice_minutes').notNull().default(60),
+    maxDaysAhead: integer('max_days_ahead').notNull().default(30),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [unique('event_types_owner_slug_unique').on(table.ownerId, table.slug)],
+);
+
+export const bookableWindows = pgTable('bookable_windows', {
+  id: serial('id').primaryKey(),
+  ownerId: text('owner_id').notNull(),
+  dayOfWeek: integer('day_of_week').notNull(),
+  startMinute: integer('start_minute').notNull(),
+  endMinute: integer('end_minute').notNull(),
+  timezone: text('timezone').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export const eventInvitations = pgTable(
+  'event_invitations',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    inviteeUserId: text('invitee_user_id').notNull(),
+    inviteeName: text('invitee_name').notNull(),
+    inviteeImage: text('invitee_image'),
+    invitedAt: timestamp('invited_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [unique('event_invitations_event_invitee_unique').on(table.eventId, table.inviteeUserId)],
+);
 
 // Type helpers
 export type Event = typeof events.$inferSelect;
