@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events, type Event } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -10,13 +10,25 @@ import {
 } from '@/lib/attendance-reports/repo';
 import { eventEndedAt, type EventTimeFields } from '@/lib/event-time';
 import { fanoutAttendanceNegative } from '@/lib/notifications/fanout';
+import {
+  visibleEventsForUserCondition,
+  publicOnlyEventsCondition,
+} from '@/lib/events/visibility';
 
-// Visibility filter intentionally NOT applied — this endpoint serves
-// post-event attendance reports filed by authenticated RSVP=yes attendees.
-// The action is already gated by auth + RSVP verification; bypassing visibility
-// allows reporters to submit reports on private events they legitimately attended.
-async function findEvent(numId: number): Promise<(EventTimeFields & Partial<Event>) | null> {
-  const rows = await db.select().from(events).where(eq(events.id, numId));
+// Visibility filter applied — this route is post-event reporting and the
+// visibility predicate (which covers the RSVP'd-user case) is the correct
+// gate: a member who never engaged with the event cannot report on it.
+async function findEvent(
+  numId: number,
+  userId: string | undefined,
+): Promise<(EventTimeFields & Partial<Event>) | null> {
+  const visibilityCond = userId
+    ? visibleEventsForUserCondition(userId)
+    : publicOnlyEventsCondition();
+  const rows = await db
+    .select()
+    .from(events)
+    .where(and(eq(events.id, numId), visibilityCond));
   return (rows[0] as (EventTimeFields & Partial<Event>) | undefined) ?? null;
 }
 
@@ -79,7 +91,8 @@ export async function POST(
     normalizedNote = note;
   }
 
-  const event = await findEvent(numId);
+  const userId = member.hyloId ?? member.clerkId ?? undefined;
+  const event = await findEvent(numId, userId);
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }

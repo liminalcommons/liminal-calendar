@@ -18,6 +18,10 @@ jest.mock('@/lib/attendance-reports/repo', () => ({
   getAttendanceReportForUser: jest.fn(),
   REPORT_NOTE_MAX_LENGTH: 1000,
 }));
+jest.mock('@/lib/events/visibility', () => ({
+  visibleEventsForUserCondition: jest.fn(() => ({ __visibilityCond: 'user' })),
+  publicOnlyEventsCondition: jest.fn(() => ({ __visibilityCond: 'public' })),
+}));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import {
@@ -132,6 +136,55 @@ describe('POST /api/events/[id]/attendance-report', () => {
       eventParams,
     );
     expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when event is private and user has no RSVP (visibility filter)', async () => {
+    // Visibility predicate returns no rows — simulates a private event the user
+    // has no RSVP for (the DB would return empty from the AND condition).
+    mockGetCurrentMember.mockResolvedValue({
+      id: 3, hyloId: 'h-stranger', clerkId: null, name: 'Stranger', email: null, image: null, role: 'member',
+    });
+    setupEventMock([]); // DB returns empty because visibility filter excludes event
+    const res = await POST(
+      makeReq({ eventHappened: true, hostPresent: true }),
+      eventParams,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 200 when event is private but user has an RSVP (visibility allows)', async () => {
+    // Visibility predicate returns the event — simulates a private event the user RSVP'd to.
+    mockGetCurrentMember.mockResolvedValue({
+      id: 4, hyloId: 'h-attendee', clerkId: null, name: 'Attendee', email: null, image: null, role: 'member',
+    });
+    setupEventMock([{
+      id: 5,
+      visibility: 'private',
+      starts_at: yesterday.toISOString(),
+      ends_at: yesterday.toISOString(),
+    }]);
+    const res = await POST(
+      makeReq({ eventHappened: true, hostPresent: true }),
+      eventParams,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 200 when event is public (no RSVP required)', async () => {
+    mockGetCurrentMember.mockResolvedValue({
+      id: 5, hyloId: 'h-pub', clerkId: null, name: 'Anyone', email: null, image: null, role: 'member',
+    });
+    setupEventMock([{
+      id: 5,
+      visibility: 'public',
+      starts_at: yesterday.toISOString(),
+      ends_at: yesterday.toISOString(),
+    }]);
+    const res = await POST(
+      makeReq({ eventHappened: true, hostPresent: true }),
+      eventParams,
+    );
+    expect(res.status).toBe(200);
   });
 
   it('returns 400 when event has not yet ended (endsAt in the future)', async () => {
