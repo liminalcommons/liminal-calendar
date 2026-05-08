@@ -9,11 +9,22 @@ export async function getServerSession() {
 export function getUserRole(session: any): UserRole {
   const role = session?.user?.role;
   if (role === 'admin') return 'admin';
-  return 'host';
+  if (role === 'host') return 'host';
+  return 'member';
 }
 
-export function canCreateEvents(role: UserRole): boolean {
+export function canCreateEvents(_role: UserRole): boolean {
+  // Any authenticated user can create events. Tier check for public visibility
+  // moves to canCreatePublicEvent (called inside POST /api/events).
+  return true;
+}
+
+export function canCreatePublicEvent(role: UserRole): boolean {
   return role === 'host' || role === 'admin';
+}
+
+export function canPromoteMembers(role: UserRole): boolean {
+  return role === 'admin';
 }
 
 export function canEditEvent(role: UserRole, isCreator: boolean): boolean {

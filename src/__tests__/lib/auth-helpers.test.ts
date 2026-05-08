@@ -6,6 +6,8 @@ jest.mock('../../../auth', () => ({
 import {
   getUserRole,
   canCreateEvents,
+  canCreatePublicEvent,
+  canPromoteMembers,
   canEditEvent,
   canDeleteEvent,
   canEditAllEvents,
@@ -14,25 +16,37 @@ import {
 } from '../../lib/auth-helpers';
 
 describe('getUserRole', () => {
-  // Per commit 62ceabf ("default new members to host role"), getUserRole
-  // returns 'host' for any non-admin input — including null/undefined and
-  // explicit 'member'. The auth-layer guard (`session?.user` 401) catches
-  // truly unauthenticated requests before this is called, so the host-default
-  // applies only to authenticated sessions whose role hasn't been set yet.
-  // Tests below pin that policy.
-  it('returns host for null session (host-default policy)', () => {
-    expect(getUserRole(null)).toBe('host');
+  // Per booking-foundation Task 3: default is now 'member', not 'host'.
+  // Unauthenticated sessions are caught upstream; the member-default applies
+  // to authenticated sessions whose role claim hasn't been set yet.
+  it('returns member for null session (member-default policy)', () => {
+    expect(getUserRole(null)).toBe('member');
   });
 
-  it('returns host when role is undefined', () => {
-    expect(getUserRole({ user: {} })).toBe('host');
+  it('returns member when role is undefined', () => {
+    expect(getUserRole({ user: {} })).toBe('member');
   });
 
-  it('returns admin when role is admin; otherwise host', () => {
+  it('returns correct role for each explicit value', () => {
     expect(getUserRole({ user: { role: 'host' } })).toBe('host');
     expect(getUserRole({ user: { role: 'admin' } })).toBe('admin');
-    // Even an explicit 'member' is upgraded to host per the policy.
-    expect(getUserRole({ user: { role: 'member' } })).toBe('host');
+    expect(getUserRole({ user: { role: 'member' } })).toBe('member');
+  });
+});
+
+describe('getUserRole — member default', () => {
+  it('returns member when session has no role claim', () => {
+    const session = { user: { hyloId: '69147' } };
+    expect(getUserRole(session)).toBe('member');
+  });
+  it('returns member explicitly when role=member', () => {
+    expect(getUserRole({ user: { role: 'member' } })).toBe('member');
+  });
+  it('returns host when role=host', () => {
+    expect(getUserRole({ user: { role: 'host' } })).toBe('host');
+  });
+  it('returns admin when role=admin', () => {
+    expect(getUserRole({ user: { role: 'admin' } })).toBe('admin');
   });
 });
 
@@ -45,9 +59,35 @@ describe('canCreateEvents', () => {
     expect(canCreateEvents('admin')).toBe(true);
   });
 
-  it('member cannot create events', () => {
-    expect(canCreateEvents('member')).toBe(false);
+  it('member can create events', () => {
+    expect(canCreateEvents('member')).toBe(true);
   });
+});
+
+describe('canCreateEvents — members allowed', () => {
+  it('allows members', () => {
+    expect(canCreateEvents('member')).toBe(true);
+  });
+  it('allows hosts', () => {
+    expect(canCreateEvents('host')).toBe(true);
+  });
+  it('allows admins', () => {
+    expect(canCreateEvents('admin')).toBe(true);
+  });
+});
+
+describe('canCreatePublicEvent', () => {
+  it('rejects members', () => { expect(canCreatePublicEvent('member')).toBe(false); });
+  it('allows hosts', () => { expect(canCreatePublicEvent('host')).toBe(true); });
+  it('allows admins', () => { expect(canCreatePublicEvent('admin')).toBe(true); });
+});
+
+describe('canPromoteMembers', () => {
+  it('rejects members and hosts', () => {
+    expect(canPromoteMembers('member')).toBe(false);
+    expect(canPromoteMembers('host')).toBe(false);
+  });
+  it('allows admins', () => { expect(canPromoteMembers('admin')).toBe(true); });
 });
 
 describe('canEditEvent', () => {
