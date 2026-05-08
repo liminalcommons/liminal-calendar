@@ -4,12 +4,13 @@ import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   diffEventForNotification,
   fanoutEventChanged,
   fanoutEventCancelled,
 } from '@/lib/notifications/fanout';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 export async function GET(
   _request: NextRequest,
@@ -22,10 +23,16 @@ export async function GET(
   }
 
   try {
+    const session = await auth();
+    const userId = (session?.user?.hyloId ?? (session?.user as Record<string, unknown> | undefined)?.clerkId) as string | undefined;
+    const visibilityCond = userId
+      ? visibleEventsForUserCondition(userId)
+      : publicOnlyEventsCondition();
+
     const [event] = await db
       .select()
       .from(events)
-      .where(eq(events.id, numId));
+      .where(and(eq(events.id, numId), visibilityCond));
 
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -36,10 +43,7 @@ export async function GET(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    const session = await auth();
-    const currentUserId = session?.user?.hyloId as string | undefined;
-
-    return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, currentUserId));
+    return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, userId));
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });
