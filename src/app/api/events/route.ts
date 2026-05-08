@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { auth } from '../../../../auth';
-import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
+import { getUserRole, canCreateEvents, canCreatePublicEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { asc, inArray, gte, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,11 @@ export async function GET(request: NextRequest) {
     const to = url.searchParams.get('to');
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
+
+    // Resolve session once — used for both visibility filtering and myResponse.
+    const session = await auth();
+    const userAny = session?.user as ({ hyloId?: string; clerkId?: string }) | undefined;
+    const currentUserId = (userAny?.hyloId ?? userAny?.clerkId) as string | undefined;
 
     const conditions = [];
     if (from) {
@@ -26,10 +32,15 @@ export async function GET(request: NextRequest) {
       if (!isNaN(toDate.getTime())) conditions.push(lte(events.startsAt, toDate));
     }
 
+    // Visibility: authenticated users see public + their own/invited/rsvp'd events;
+    // unauthenticated users see public events only.
+    const visibilityCond = currentUserId
+      ? visibleEventsForUserCondition(currentUserId)
+      : publicOnlyEventsCondition();
+    conditions.push(visibilityCond);
+
     const query = db.select().from(events).orderBy(asc(events.startsAt)).limit(limit).offset(offset);
-    const allEvents = conditions.length > 0
-      ? await query.where(and(...conditions))
-      : await query;
+    const allEvents = await query.where(and(...conditions));
 
     // Fetch RSVPs only for the returned events
     const eventIds = allEvents.map((e) => e.id);
@@ -44,10 +55,6 @@ export async function GET(request: NextRequest) {
       list.push(rsvp);
       rsvpsByEvent.set(rsvp.eventId, list);
     }
-
-    // Get current user for myResponse
-    const session = await auth();
-    const currentUserId = session?.user?.hyloId as string | undefined;
 
     const displayEvents = allEvents.map((event) =>
       dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
@@ -87,6 +94,14 @@ export async function POST(request: NextRequest) {
   }
   const v = validation.value;
 
+  // Tier check: only hosts and admins may publish public events.
+  if (v.visibility === 'public' && !canCreatePublicEvent(role)) {
+    return NextResponse.json(
+      { error: 'Forbidden: only hosts and admins can create public events' },
+      { status: 403 },
+    );
+  }
+
   const user = session.user;
 
   try {
@@ -101,6 +116,7 @@ export async function POST(request: NextRequest) {
         location: v.location,
         imageUrl: v.imageUrl,
         recurrenceRule: v.recurrenceRule,
+        visibility: v.visibility,
         creatorId: user.hyloId ?? user.id ?? 'unknown',
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,

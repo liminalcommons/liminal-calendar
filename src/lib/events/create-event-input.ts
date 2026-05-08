@@ -4,6 +4,8 @@
  * shape the route uses to emit NextResponse.json(..., { status }).
  */
 
+export type EventVisibility = 'public' | 'private';
+
 export interface ValidatedCreateEventInput {
   title: string;
   description: string | null;
@@ -13,6 +15,7 @@ export interface ValidatedCreateEventInput {
   location: string | null;
   imageUrl: string | null;
   recurrenceRule: string | null;
+  visibility: EventVisibility;
 }
 
 export interface CreateEventInputError {
@@ -57,6 +60,12 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
     return { ok: false, error: { error: 'endTime is not a valid date', status: 400 } };
   }
 
+  const rawVisibility = str(b.visibility);
+  const visibility: EventVisibility =
+    rawVisibility === 'public' || rawVisibility === 'private'
+      ? rawVisibility
+      : 'private';
+
   return {
     ok: true,
     value: {
@@ -68,6 +77,7 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
       location: str(b.location),
       imageUrl: str(b.imageUrl),
       recurrenceRule: str(b.recurrenceRule),
+      visibility,
     },
   };
 }
