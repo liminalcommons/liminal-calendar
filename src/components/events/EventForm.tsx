@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useUser } from '@clerk/nextjs';
+import { useResolvedRole } from '@/lib/use-resolved-role';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -291,9 +292,13 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   }, [title, description, startTime, endTime, recurrence, imageUrl, meetingLink, onValuesChange])
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  // Hylo session carries role; Clerk users have role on members row only.
+  const { role: clerkAwareRole } = useResolvedRole();
   const userRole: string = useMemo(
-    () => (session?.user as { role?: string } | undefined)?.role || 'member',
-    [session],
+    () => clerkAwareRole
+      ?? (session?.user as { role?: string } | undefined)?.role
+      ?? 'member',
+    [session, clerkAwareRole],
   );
   const canCreatePublic = userRole === 'host' || userRole === 'admin';
   const inviteeCap = userRole === 'member' ? INVITEE_CAP_MEMBER : undefined;
