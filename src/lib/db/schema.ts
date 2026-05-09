@@ -24,6 +24,12 @@ export const members = pgTable('members', {
   // Clerk user id — nullable. Hylo-only Members have null clerkId.
   // S6 will allow same row to carry both (account linking).
   clerkId: text('clerk_id').unique(),
+  // Logto user id (subject claim from Castalia/Logto JWT). Nullable.
+  // First Logto signin attaches this to an existing row by email
+  // match, or creates a new Logto-only row. CHECK constraint
+  // `chk_members_identity` requires at least one of (hyloId, clerkId,
+  // logtoId) per row.
+  logtoId: text('logto_id').unique(),
   name: text('name').notNull(),
   email: text('email'),
   handle: text('handle').unique(),

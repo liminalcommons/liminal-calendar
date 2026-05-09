@@ -119,19 +119,34 @@ export async function runMigrations() {
   // hyloId; S3.2+ rows come through helpers that always set one or
   // both columns. Constraint addition will only fail if orphan rows
   // exist with both columns null — none should in normal flow.
+  // Logto column: third identity provider (Castalia is migrating to
+  // Logto as canonical signin). Additive — existing rows keep their
+  // hylo_id / clerk_id; first Logto signin attaches logto_id to the
+  // matching row by email.
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS logto_id TEXT`;
   await sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
-        WHERE conname = 'chk_members_identity'
+        WHERE conname = 'members_logto_id_unique'
           AND conrelid = 'members'::regclass
       ) THEN
         ALTER TABLE members
-          ADD CONSTRAINT chk_members_identity
-          CHECK (hylo_id IS NOT NULL OR clerk_id IS NOT NULL);
+          ADD CONSTRAINT members_logto_id_unique UNIQUE (logto_id);
       END IF;
     END $$
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_members_logto_id ON members(logto_id)`;
+
+  // Identity CHECK constraint — broadened to allow logto_id as the
+  // sole non-null identity. Drop+recreate so re-runs converge on the
+  // current 3-way predicate even if an older 2-way version exists.
+  await sql`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
+  await sql`
+    ALTER TABLE members
+      ADD CONSTRAINT chk_members_identity
+      CHECK (hylo_id IS NOT NULL OR clerk_id IS NOT NULL OR logto_id IS NOT NULL)
   `;
 
   // Create indexes for common queries
