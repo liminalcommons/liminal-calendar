@@ -42,32 +42,6 @@ export const members = pgTable('members', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
-export const marketplaceSubmissions = pgTable('marketplace_submissions', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email'),
-  phase: text('phase').notNull(), // 'idea' | 'practice'
-  title: text('title').notNull(),
-  pitch: text('pitch').notNull(),
-  // Dan-Koe-style framing fields, captured separately so admin sees the raw thinking
-  problem: text('problem'),
-  audience: text('audience'),
-  angle: text('angle'),
-  takeaway: text('takeaway'),
-  mvp: text('mvp'),
-  sharpenedPitch: text('sharpened_pitch'),
-  // Materials: either a URL (slides, demo, repo) or uploaded file refs
-  materialsUrl: text('materials_url'),
-  materialFiles: jsonb('material_files'), // [{url, name, type, size}]
-  imageUrl: text('image_url'),
-  links: text('links'),
-  targetSessionDate: date('target_session_date'),
-  submitterUserId: text('submitter_user_id'),
-  submitterMemberId: integer('submitter_member_id').references(() => members.id, { onDelete: 'set null' }),
-  status: text('status').notNull().default('pending'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-});
-
 export const events = pgTable('events', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
