@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   if (!validated) {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
   }
-  await insertPushSubscription(db, authed.id, validated);
+  await insertPushSubscription(db, authed.id, validated, authed.memberId);
   return NextResponse.json({ ok: true });
 }
 

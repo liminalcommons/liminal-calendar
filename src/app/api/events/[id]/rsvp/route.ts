@@ -63,6 +63,7 @@ export async function POST(
     await upsertRsvp(db, {
       eventId: numId,
       userId,
+      memberId: member.id,
       userName: member.name,
       userImage: member.image,
       status: response as string,

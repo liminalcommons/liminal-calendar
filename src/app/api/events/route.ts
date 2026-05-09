@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
         recurrenceRule: v.recurrenceRule,
         visibility: v.visibility,
         creatorId: user.hyloId ?? user.clerkId ?? user.id ?? 'unknown',
+        memberId: authed.memberId,
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,
       })

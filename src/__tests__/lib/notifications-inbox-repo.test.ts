@@ -104,6 +104,7 @@ describe('createNotification', () => {
     const { db, calls } = makeFakeDb([]);
     await createNotification(db, {
       userId: 'u-1',
+      memberId: null,
       type: 'reminder.1hr',
       eventId: 5,
       title: 'Coffee House — in 1 hour',
@@ -122,6 +123,7 @@ describe('createNotification', () => {
     const { db, calls } = makeFakeDb([]);
     await createNotification(db, {
       userId: 'u-1',
+      memberId: null,
       type: 'event.cancelled',
       title: 'X',
       url: '/x',
@@ -138,9 +140,11 @@ describe('createNotification', () => {
     const { db, calls } = makeFakeDb([]);
     await createNotification(db, {
       userId: 'u-1',
+      memberId: null,
       type: 'event.changed',
       eventId: 7,
       actorId: 'actor-x',
+      actorMemberId: null,
       actorName: 'Bob',
       title: 'Yoga — details updated',
       body: 'Time changed',

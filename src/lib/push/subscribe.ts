@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { pushSubscriptions } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export interface PushSubscriptionPayload {
   endpoint?: unknown;
@@ -23,10 +24,22 @@ export function validateSubscription(raw: unknown): ValidatedSubscription | null
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function insertPushSubscription(db: any, userId: string, sub: ValidatedSubscription) {
+export async function insertPushSubscription(
+  db: any,
+  userId: string,
+  sub: ValidatedSubscription,
+  memberId?: number | null,
+) {
+  const mid = memberId !== undefined ? memberId : await resolveMemberId(db, userId);
   await db
     .insert(pushSubscriptions)
-    .values({ userId, endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth })
+    .values({
+      userId,
+      memberId: mid,
+      endpoint: sub.endpoint,
+      p256dh: sub.p256dh,
+      auth: sub.auth,
+    })
     .onConflictDoNothing();
 }
 

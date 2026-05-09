@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { notificationPreferences, type NotificationPreferences } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export const WINDOW_TO_COLUMN = {
   'push-1hr': 'pushOneHour',
@@ -15,7 +16,11 @@ export type NotificationPreferenceColumn = (typeof WINDOW_TO_COLUMN)[Notificatio
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function ensurePreferences(db: any, userId: string): Promise<NotificationPreferences | null> {
-  await db.insert(notificationPreferences).values({ userId }).onConflictDoNothing();
+  const memberId = await resolveMemberId(db, userId);
+  await db
+    .insert(notificationPreferences)
+    .values({ userId, memberId })
+    .onConflictDoNothing();
   const rows = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
   return rows[0] ?? null;
 }

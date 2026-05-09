@@ -49,7 +49,7 @@ describe('ensurePreferences (fake db)', () => {
     (db as any).__setSelectResult([{ userId: 'u1', pushOneHour: true }]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await ensurePreferences(db as any, 'u1');
-    expect(inserts).toEqual([{ userId: 'u1' }]);
+    expect(inserts).toEqual([{ userId: 'u1', memberId: null }]);
     expect(result?.userId).toBe('u1');
   });
 });

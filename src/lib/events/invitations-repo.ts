@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { eventInvitations } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export const INVITEE_CAP_MEMBER = 10;
 
@@ -51,14 +52,22 @@ export async function setEventInvitations({
     throw new Error('INVITEE_CAP_EXCEEDED');
   }
 
+  // Resolve invitee memberIds in parallel BEFORE opening the transaction.
+  // Each call is one indexed SELECT — small fan-out, but doing them inside
+  // the tx would serialize them and lengthen the lock window.
+  const memberIds = await Promise.all(
+    deduped.map((inv) => resolveMemberId(db, inv.userId)),
+  );
+
   await db.transaction(async (tx) => {
     await tx.delete(eventInvitations).where(eq(eventInvitations.eventId, eventId));
 
     if (deduped.length > 0) {
       await tx.insert(eventInvitations).values(
-        deduped.map((inv) => ({
+        deduped.map((inv, i) => ({
           eventId,
           inviteeUserId: inv.userId,
+          memberId: memberIds[i],
           inviteeName: inv.name,
           inviteeImage: inv.image ?? null,
           invitedAt: new Date(),

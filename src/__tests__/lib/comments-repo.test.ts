@@ -112,6 +112,7 @@ describe('createComment', () => {
     const result = await createComment(db, {
       eventId: 42,
       authorId: 'u-1',
+      memberId: null,
       authorName: 'Alice',
       authorImage: 'avatar.png',
       body: 'looking forward to this',
@@ -121,6 +122,7 @@ describe('createComment', () => {
     expect(calls.insertValues[0]).toEqual({
       eventId: 42,
       authorId: 'u-1',
+      memberId: null,
       authorName: 'Alice',
       authorImage: 'avatar.png',
       body: 'looking forward to this',

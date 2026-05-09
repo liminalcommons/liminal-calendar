@@ -87,6 +87,7 @@ export async function POST(
     const comment = await createComment(db, {
       eventId: numId,
       authorId,
+      memberId: member.id,
       authorName: member.name,
       authorImage: member.image,
       body: trimmed,

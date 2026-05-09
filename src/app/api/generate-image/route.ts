@@ -29,10 +29,10 @@ async function checkRateLimit(userId: string): Promise<{ allowed: boolean; error
   return { allowed: true }
 }
 
-async function recordGeneration(userId: string) {
+async function recordGeneration(userId: string, memberId: number | null) {
   const db = getDb()
   await db.execute(sql`
-    INSERT INTO image_generations (user_id, created_at) VALUES (${userId}, NOW())
+    INSERT INTO image_generations (user_id, member_id, created_at) VALUES (${userId}, ${memberId}, NOW())
   `)
 }
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const key = `calendar/generated/${Date.now()}.${ext}`
     const permanentUrl = await uploadToR2(key, imageBuffer, contentType)
 
-    await recordGeneration(userId)
+    await recordGeneration(userId, authedUser.memberId)
 
     return NextResponse.json({ url: permanentUrl })
   } catch (error) {

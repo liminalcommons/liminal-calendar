@@ -1,9 +1,12 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { eventComments, type EventComment } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export interface CreateCommentParams {
   eventId: number;
   authorId: string;
+  /** Canonical member.id; resolved from authorId when omitted. */
+  memberId?: number | null;
   authorName: string;
   authorImage: string | null;
   body: string;
@@ -25,11 +28,14 @@ export async function createComment(
   if (trimmed.length > COMMENT_MAX_LENGTH) {
     throw new Error(`Comment body exceeds ${COMMENT_MAX_LENGTH} characters`);
   }
+  const memberId =
+    p.memberId !== undefined ? p.memberId : await resolveMemberId(db, p.authorId);
   const [row] = await db
     .insert(eventComments)
     .values({
       eventId: p.eventId,
       authorId: p.authorId,
+      memberId,
       authorName: p.authorName,
       authorImage: p.authorImage,
       body: trimmed,

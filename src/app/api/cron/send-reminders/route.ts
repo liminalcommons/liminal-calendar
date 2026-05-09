@@ -26,6 +26,7 @@ import {
   POST_EVENT_PUSH_WINDOW,
 } from '@/lib/notifications/reminder-dispatch';
 import { createNotification } from '@/lib/notifications/inbox/repo';
+import { resolveMemberIds } from '@/lib/auth/resolve-member-id';
 
 // Channel type → inbox type. Email uses bare horizon strings (24hr / 1hr /
 // 15min); push uses push-prefixed strings (push-1hr / push-15min /
@@ -173,11 +174,13 @@ export async function GET(request: Request) {
       const result = await sendEmail(member.email, subject, html);
 
       if (result.success) {
+        const memberIdMap = await resolveMemberIds(db, [due.userId]);
         await db
           .insert(notificationLog)
           .values({
             eventId: due.eventId,
             userId: due.userId,
+            memberId: memberIdMap.get(due.userId) ?? null,
             type,
           })
           .onConflictDoNothing();
@@ -245,9 +248,17 @@ export async function GET(request: Request) {
       pushSent += result.sent;
 
       if (result.sent > 0) {
+        const memberIdMap = await resolveMemberIds(db, info.userIds);
         await db
           .insert(notificationLog)
-          .values(info.userIds.map((uid) => ({ eventId, userId: uid, type: w.type })))
+          .values(
+            info.userIds.map((uid) => ({
+              eventId,
+              userId: uid,
+              memberId: memberIdMap.get(uid) ?? null,
+              type: w.type,
+            })),
+          )
           .onConflictDoNothing();
         for (const uid of info.userIds) {
           await safeCreateInboxRow(db, {
@@ -326,12 +337,14 @@ export async function GET(request: Request) {
         postEventSent += result.sent;
 
         if (result.sent > 0) {
+          const memberIdMap = await resolveMemberIds(db, info.userIds);
           await db
             .insert(notificationLog)
             .values(
               info.userIds.map((uid) => ({
                 eventId,
                 userId: uid,
+                memberId: memberIdMap.get(uid) ?? null,
                 type: POST_EVENT_PUSH_WINDOW.type,
               })),
             )

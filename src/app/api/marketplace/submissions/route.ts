@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { marketplaceSubmissions } from '@/lib/db/schema';
 import { desc } from 'drizzle-orm';
@@ -27,15 +27,12 @@ export async function POST(req: NextRequest) {
   const materialFiles = Array.isArray(body.materialFiles) ? body.materialFiles : null;
   const imageUrl = body.imageUrl ? String(body.imageUrl).trim() : null;
 
-  const session = await auth().catch(() => null);
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Sign in to submit an offer.' }, { status: 401 });
   }
-  const submitterUserId =
-    (session.user as { hyloId?: string; id?: string; email?: string }).hyloId ??
-    (session.user as { id?: string }).id ??
-    (session.user as { email?: string }).email ??
-    null;
+  const submitterUserId = authed.id;
+  const submitterMemberId = authed.memberId;
 
   if (!name || !title || !pitch || !PHASES.has(phase)) {
     return NextResponse.json(
@@ -67,6 +64,7 @@ export async function POST(req: NextRequest) {
       links,
       targetSessionDate,
       submitterUserId,
+      submitterMemberId,
     })
     .returning();
 
@@ -74,9 +72,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const session = await auth().catch(() => null);
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (role !== 'admin') {
+  const authed = await getAuthedUser();
+  if (authed?.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   const rows = await db

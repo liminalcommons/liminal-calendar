@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { notifications, type Notification } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 /**
  * Inbox-event repo. Pure CRUD over the `notifications` table; all triggers
@@ -14,9 +15,13 @@ import { notifications, type Notification } from '@/lib/db/schema';
 
 export interface CreateNotificationParams {
   userId: string;
+  /** Canonical recipient id; resolved from userId when omitted. */
+  memberId?: number | null;
   type: string;
   eventId?: number | null;
   actorId?: string | null;
+  /** Canonical actor id; resolved from actorId when omitted. */
+  actorMemberId?: number | null;
   actorName?: string | null;
   title: string;
   body?: string | null;
@@ -31,13 +36,24 @@ export async function createNotification(
   db: Db,
   p: CreateNotificationParams,
 ): Promise<Notification> {
+  const memberId =
+    p.memberId !== undefined ? p.memberId : await resolveMemberId(db, p.userId);
+  const actorMemberId =
+    p.actorMemberId !== undefined
+      ? p.actorMemberId
+      : p.actorId
+        ? await resolveMemberId(db, p.actorId)
+        : null;
+
   const [row] = await db
     .insert(notifications)
     .values({
       userId: p.userId,
+      memberId,
       type: p.type,
       eventId: p.eventId ?? null,
       actorId: p.actorId ?? null,
+      actorMemberId,
       actorName: p.actorName ?? null,
       title: p.title,
       body: p.body ?? null,

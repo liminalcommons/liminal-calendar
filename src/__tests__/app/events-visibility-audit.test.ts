@@ -213,21 +213,32 @@ describe('GET /api/preferences/notifications/rsvped-events — visibility filter
   function makeRsvpedEventsDbMock(rsvpIds: number[], eventRows: unknown[]) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
-    let callCount = 0;
+    let dataCallCount = 0;
     dbModule.db.select = jest.fn(() => ({
       from: () => ({
-        // first call: rsvps lookup (returns plain Promise — no orderBy needed)
+        // .where(...).limit(1) — getAuthedUser's memberId lookup. Return [] so
+        // the lookup yields null (works for both Hylo + Clerk paths) without
+        // disturbing the data-call counter.
         where: (cond: unknown) => {
-          callCount++;
-          if (callCount === 1) {
-            void cond;
-            return Promise.resolve(rsvpIds.map((id) => ({ eventId: id })));
-          }
-          // second call: events query — needs orderBy().limit() chain
+          // The members lookup chains .limit(); the rsvps query does not.
+          // Use a thenable wrapper so both shapes work: callers awaiting
+          // directly get the data array; callers chaining .limit() get
+          // an empty list (the auth side-channel).
+          const getRsvps = () => {
+            dataCallCount++;
+            if (dataCallCount === 1) {
+              void cond;
+              return rsvpIds.map((id) => ({ eventId: id }));
+            }
+            return eventRows;
+          };
           return {
-            orderBy: () => ({
-              limit: () => Promise.resolve(eventRows),
-            }),
+            // rsvps query — awaited directly without .limit()
+            then: (resolve: (v: unknown) => void) => resolve(getRsvps()),
+            // events query — chains .orderBy().limit()
+            orderBy: () => ({ limit: () => Promise.resolve(eventRows) }),
+            // getAuthedUser's members lookup — chains .limit()
+            limit: () => Promise.resolve([]),
           };
         },
         orderBy: () => ({

@@ -113,6 +113,7 @@ export async function POST(
     const result = await upsertAttendanceReport(db, {
       eventId: numId,
       reporterId,
+      memberId: member.id,
       reporterName: member.name,
       eventHappened,
       hostPresent,

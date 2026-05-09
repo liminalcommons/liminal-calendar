@@ -79,6 +79,7 @@ describe('upsertRsvp', () => {
     await upsertRsvp(db, {
       eventId: 42,
       userId: 'user-B',
+      memberId: null,
       userName: 'Bob',
       userImage: null,
       status: 'yes',
@@ -99,6 +100,7 @@ describe('upsertRsvp', () => {
     const result = await upsertRsvp(db, {
       eventId: 42,
       userId: 'user-B',
+      memberId: null,
       userName: 'Bob',
       userImage: null,
       status: 'yes',
@@ -110,6 +112,7 @@ describe('upsertRsvp', () => {
     expect(insertValues[0]).toEqual({
       eventId: 42,
       userId: 'user-B',
+      memberId: null,
       userName: 'Bob',
       userImage: null,
       status: 'yes',

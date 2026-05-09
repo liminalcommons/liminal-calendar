@@ -3,10 +3,13 @@ import {
   attendanceReports,
   type AttendanceReport,
 } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export interface UpsertReportParams {
   eventId: number;
   reporterId: string;
+  /** Canonical member.id; resolved from reporterId when omitted. */
+  memberId?: number | null;
   reporterName: string;
   eventHappened: boolean;
   hostPresent: boolean;
@@ -59,11 +62,15 @@ export async function upsertAttendanceReport(
     return { action: 'updated', reportId: row?.id ?? existing.id };
   }
 
+  const memberId =
+    p.memberId !== undefined ? p.memberId : await resolveMemberId(db, p.reporterId);
+
   const [row] = await db
     .insert(attendanceReports)
     .values({
       eventId: p.eventId,
       reporterId: p.reporterId,
+      memberId,
       reporterName: p.reporterName,
       eventHappened: p.eventHappened,
       hostPresent: p.hostPresent,

@@ -1,9 +1,14 @@
 import { and, eq } from 'drizzle-orm';
 import { rsvps } from '@/lib/db/schema';
+import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 
 export interface UpsertRsvpParams {
   eventId: number;
   userId: string;
+  // Optional memberId — callers that already know the canonical id (e.g.
+  // routes that have an `authed: AuthedUser` in scope) can pass it to
+  // skip the lookup. Anything else falls back to resolveMemberId.
+  memberId?: number | null;
   userName: string;
   userImage: string | null;
   status: string;
@@ -32,9 +37,13 @@ export async function upsertRsvp(db: any, p: UpsertRsvpParams): Promise<UpsertRs
     return { action: 'updated', rsvpId: existing.id };
   }
 
+  const memberId =
+    p.memberId !== undefined ? p.memberId : await resolveMemberId(db, p.userId);
+
   await db.insert(rsvps).values({
     eventId: p.eventId,
     userId: p.userId,
+    memberId,
     userName: p.userName,
     userImage: p.userImage,
     status: p.status,

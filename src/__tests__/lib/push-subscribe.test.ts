@@ -73,8 +73,8 @@ describe('insertPushSubscription', () => {
       endpoint: 'https://x',
       p256dh: 'K',
       auth: 'A',
-    });
-    expect(inserts).toEqual([{ userId: 'user-42', endpoint: 'https://x', p256dh: 'K', auth: 'A' }]);
+    }, null);
+    expect(inserts).toEqual([{ userId: 'user-42', memberId: null, endpoint: 'https://x', p256dh: 'K', auth: 'A' }]);
   });
 });
 

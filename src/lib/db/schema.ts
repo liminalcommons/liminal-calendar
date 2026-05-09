@@ -11,72 +11,9 @@ import {
   date,
 } from 'drizzle-orm/pg-core';
 
-export const marketplaceSubmissions = pgTable('marketplace_submissions', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email'),
-  phase: text('phase').notNull(), // 'idea' | 'practice'
-  title: text('title').notNull(),
-  pitch: text('pitch').notNull(),
-  // Dan-Koe-style framing fields, captured separately so admin sees the raw thinking
-  problem: text('problem'),
-  audience: text('audience'),
-  angle: text('angle'),
-  takeaway: text('takeaway'),
-  mvp: text('mvp'),
-  sharpenedPitch: text('sharpened_pitch'),
-  // Materials: either a URL (slides, demo, repo) or uploaded file refs
-  materialsUrl: text('materials_url'),
-  materialFiles: jsonb('material_files'), // [{url, name, type, size}]
-  imageUrl: text('image_url'),
-  links: text('links'),
-  targetSessionDate: date('target_session_date'),
-  submitterUserId: text('submitter_user_id'),
-  status: text('status').notNull().default('pending'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-});
-
-export const events = pgTable('events', {
-  id: serial('id').primaryKey(),
-  title: text('title').notNull(),
-  description: text('description'),
-  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
-  endsAt: timestamp('ends_at', { withTimezone: true }),
-  timezone: text('timezone').default('UTC'),
-  location: text('location'),
-  imageUrl: text('image_url'),
-  recurrenceRule: text('recurrence_rule'), // 'daily' | 'weekly' | 'fortnightly' | 'monthly' | null
-  creatorId: text('creator_id').notNull(), // Hylo user ID
-  creatorName: text('creator_name').notNull(),
-  creatorImage: text('creator_image'),
-  hyloGroupId: text('hylo_group_id'),
-  hyloPostId: text('hylo_post_id'),
-  visibility: text('visibility').notNull().default('public'),
-  sourceEventTypeId: integer('source_event_type_id'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
-});
-
-export const rsvps = pgTable(
-  'rsvps',
-  {
-    id: serial('id').primaryKey(),
-    eventId: integer('event_id')
-      .notNull()
-      .references(() => events.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull(), // Hylo user ID
-    userName: text('user_name').notNull(),
-    userImage: text('user_image'),
-    status: text('status').notNull(), // 'yes' | 'interested' | 'no'
-    // Vestigial as of the global-preferences slice (2026-05-02).
-    // Cron read-path no longer reads this column; defaulted TRUE on writes.
-    // Re-activated as a per-instance override hook when follow-up B ships.
-    remindMe: boolean('remind_me').default(false),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
-  },
-  (table) => [unique('rsvps_event_user_unique').on(table.eventId, table.userId)],
-);
-
+// `members` is declared first because every other person-bearing table
+// FK-references it via `member_id`. Putting it at the top eliminates the
+// forward-reference dance that Drizzle would otherwise require.
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
   // Hylo user id — now nullable. Clerk-only Members have null hyloId.
@@ -99,6 +36,78 @@ export const members = pgTable('members', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
+export const marketplaceSubmissions = pgTable('marketplace_submissions', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email'),
+  phase: text('phase').notNull(), // 'idea' | 'practice'
+  title: text('title').notNull(),
+  pitch: text('pitch').notNull(),
+  // Dan-Koe-style framing fields, captured separately so admin sees the raw thinking
+  problem: text('problem'),
+  audience: text('audience'),
+  angle: text('angle'),
+  takeaway: text('takeaway'),
+  mvp: text('mvp'),
+  sharpenedPitch: text('sharpened_pitch'),
+  // Materials: either a URL (slides, demo, repo) or uploaded file refs
+  materialsUrl: text('materials_url'),
+  materialFiles: jsonb('material_files'), // [{url, name, type, size}]
+  imageUrl: text('image_url'),
+  links: text('links'),
+  targetSessionDate: date('target_session_date'),
+  submitterUserId: text('submitter_user_id'),
+  submitterMemberId: integer('submitter_member_id').references(() => members.id, { onDelete: 'set null' }),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export const events = pgTable('events', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  timezone: text('timezone').default('UTC'),
+  location: text('location'),
+  imageUrl: text('image_url'),
+  recurrenceRule: text('recurrence_rule'), // 'daily' | 'weekly' | 'fortnightly' | 'monthly' | null
+  // Legacy provider-string id (hyloId or clerkId). Phase 4 will drop this.
+  creatorId: text('creator_id').notNull(),
+  // Canonical creator FK (Phase 1 backfilled, Phase 2 dual-writes,
+  // Phase 3 reads, Phase 4 makes notNull and drops creator_id).
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+  creatorName: text('creator_name').notNull(),
+  creatorImage: text('creator_image'),
+  hyloGroupId: text('hylo_group_id'),
+  hyloPostId: text('hylo_post_id'),
+  visibility: text('visibility').notNull().default('public'),
+  sourceEventTypeId: integer('source_event_type_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+export const rsvps = pgTable(
+  'rsvps',
+  {
+    id: serial('id').primaryKey(),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull(), // legacy: hyloId or clerkId
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+    userName: text('user_name').notNull(),
+    userImage: text('user_image'),
+    status: text('status').notNull(), // 'yes' | 'interested' | 'no'
+    // Vestigial as of the global-preferences slice (2026-05-02).
+    // Cron read-path no longer reads this column; defaulted TRUE on writes.
+    // Re-activated as a per-instance override hook when follow-up B ships.
+    remindMe: boolean('remind_me').default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [unique('rsvps_event_user_unique').on(table.eventId, table.userId)],
+);
+
 export const notificationLog = pgTable(
   'notification_log',
   {
@@ -107,6 +116,7 @@ export const notificationLog = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull(),
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
     type: text('type').notNull(), // '24hr' | '1hr' | '15min'
     sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow(),
   },
@@ -120,6 +130,7 @@ export const pushSubscriptions = pgTable(
   {
     id: serial('id').primaryKey(),
     userId: text('user_id').notNull(),
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
     endpoint: text('endpoint').notNull(),
     p256dh: text('p256dh').notNull(),
     auth: text('auth').notNull(),
@@ -136,6 +147,7 @@ export const pushSubscriptions = pgTable(
 export const notificationPreferences = pgTable('notification_preferences', {
   id: serial('id').primaryKey(),
   userId: text('user_id').notNull().unique(), // Hylo user id OR Clerk user id (matches rsvps.user_id pattern)
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
   pushOneHour: boolean('push_1h').notNull().default(true),
   pushFifteenMin: boolean('push_15min').notNull().default(true),
   pushAtStart: boolean('push_at_start').notNull().default(true),
@@ -169,6 +181,7 @@ export const eventComments = pgTable('event_comments', {
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
   authorId: text('author_id').notNull(), // hyloId or clerkId — same convention as rsvps.userId
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
   authorName: text('author_name').notNull(),
   authorImage: text('author_image'),
   body: text('body').notNull(),
@@ -186,6 +199,7 @@ export const attendanceReports = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
     reporterId: text('reporter_id').notNull(),
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
     reporterName: text('reporter_name').notNull(),
     eventHappened: boolean('event_happened').notNull(),
     hostPresent: boolean('host_present').notNull(),
@@ -221,9 +235,11 @@ export const notifications = pgTable(
   {
     id: serial('id').primaryKey(),
     userId: text('user_id').notNull(), // recipient (hyloId or clerkId)
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
     eventId: integer('event_id').references(() => events.id, { onDelete: 'cascade' }),
     actorId: text('actor_id'), // who caused it; null for cron/system triggers
+    actorMemberId: integer('actor_member_id').references(() => members.id, { onDelete: 'set null' }),
     actorName: text('actor_name'),
     title: text('title').notNull(), // ready-to-render headline
     body: text('body'), // optional secondary line
@@ -250,6 +266,7 @@ export const eventTypes = pgTable(
   {
     id: serial('id').primaryKey(),
     ownerId: text('owner_id').notNull(),
+    ownerMemberId: integer('owner_member_id').references(() => members.id, { onDelete: 'set null' }),
     slug: text('slug').notNull(),
     title: text('title').notNull(),
     description: text('description'),
@@ -270,6 +287,7 @@ export const eventTypes = pgTable(
 export const bookableWindows = pgTable('bookable_windows', {
   id: serial('id').primaryKey(),
   ownerId: text('owner_id').notNull(),
+  ownerMemberId: integer('owner_member_id').references(() => members.id, { onDelete: 'set null' }),
   dayOfWeek: integer('day_of_week').notNull(),
   startMinute: integer('start_minute').notNull(),
   endMinute: integer('end_minute').notNull(),
@@ -285,6 +303,7 @@ export const eventInvitations = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
     inviteeUserId: text('invitee_user_id').notNull(),
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
     inviteeName: text('invitee_name').notNull(),
     inviteeImage: text('invitee_image'),
     invitedAt: timestamp('invited_at', { withTimezone: true }).defaultNow(),
