@@ -8,6 +8,7 @@ import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { asc, inArray, gte, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -102,6 +103,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Extract optional invitees from body (not part of validateCreateEventInput)
+  const rawInvitees = (body as Record<string, unknown>).invitees;
+  const invitees: Invitee[] = Array.isArray(rawInvitees) ? (rawInvitees as Invitee[]) : [];
+
+  // Approach (b): validate cap BEFORE inserting the event row.
+  // This avoids orphan rows when the cap is exceeded.
+  let dedupedInvitees: Invitee[] = [];
+  if (invitees.length > 0) {
+    try {
+      dedupedInvitees = validateInviteeCap({ organizerRole: role, invitees });
+    } catch (err) {
+      if (err instanceof Error && err.message === 'INVITEE_CAP_EXCEEDED') {
+        return NextResponse.json(
+          { error: `Invitee cap exceeded: members may invite at most 10 people` },
+          { status: 400 },
+        );
+      }
+      throw err;
+    }
+  }
+
   const user = session.user;
 
   try {
@@ -122,6 +144,15 @@ export async function POST(request: NextRequest) {
         creatorImage: user.image ?? null,
       })
       .returning();
+
+    // Wire in invitations if provided (deduped list, cap already validated).
+    if (dedupedInvitees.length > 0) {
+      await setEventInvitations({
+        eventId: created.id,
+        organizerRole: role,
+        invitees: dedupedInvitees,
+      });
+    }
 
     // Invalidate Full Route Cache for views that list events so the freshly
     // created event appears on subsequent navigation without manual refresh.

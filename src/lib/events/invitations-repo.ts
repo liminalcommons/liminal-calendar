@@ -6,6 +6,31 @@ export const INVITEE_CAP_MEMBER = 10;
 
 export type Invitee = { userId: string; name: string; image?: string | null };
 
+/**
+ * Dedupes invitees by userId (last-wins) and throws INVITEE_CAP_EXCEEDED
+ * if a member organizer exceeds the cap. Returns the deduped list.
+ * Safe to call before the event row exists (no DB I/O).
+ */
+export function validateInviteeCap({
+  organizerRole,
+  invitees,
+}: {
+  organizerRole: 'member' | 'host' | 'admin';
+  invitees: Invitee[];
+}): Invitee[] {
+  const seen = new Map<string, Invitee>();
+  for (const inv of invitees) {
+    seen.set(inv.userId, inv);
+  }
+  const deduped = Array.from(seen.values());
+
+  if (organizerRole === 'member' && deduped.length > INVITEE_CAP_MEMBER) {
+    throw new Error('INVITEE_CAP_EXCEEDED');
+  }
+
+  return deduped;
+}
+
 export async function setEventInvitations({
   eventId,
   organizerRole,
