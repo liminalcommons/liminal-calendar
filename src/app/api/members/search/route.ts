@@ -1,0 +1,81 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '../../../../../auth';
+import { db } from '@/lib/db';
+import { members } from '@/lib/db/schema';
+import { ilike, or, and, not, eq } from 'drizzle-orm';
+
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const q = url.searchParams.get('q') ?? '';
+  const limitRaw = url.searchParams.get('limit');
+
+  // Validate q: 2..50 chars
+  if (q.length < 2 || q.length > 50) {
+    return NextResponse.json({ error: 'Bad request: q must be 2–50 characters' }, { status: 400 });
+  }
+
+  // Validate limit: 1..25, default 10
+  let limit = 10;
+  if (limitRaw !== null) {
+    const parsed = parseInt(limitRaw, 10);
+    if (isNaN(parsed) || parsed < 1 || parsed > 25) {
+      return NextResponse.json({ error: 'Bad request: limit must be 1–25' }, { status: 400 });
+    }
+    limit = parsed;
+  }
+
+  const userAny = session.user as { hyloId?: string; clerkId?: string };
+  const currentUserId = userAny.hyloId ?? userAny.clerkId ?? null;
+
+  try {
+    const likeQ = `%${q}%`;
+
+    const matchFilter = or(
+      ilike(members.name, likeQ),
+      ilike(members.handle, likeQ),
+      ilike(members.email, likeQ),
+    );
+
+    // Exclude requesting user: skip rows where hyloId or clerkId equals currentUserId
+    const excludeFilter =
+      currentUserId !== null
+        ? not(
+            or(
+              eq(members.hyloId, currentUserId),
+              eq(members.clerkId, currentUserId),
+            )!,
+          )
+        : undefined;
+
+    const whereClause = excludeFilter ? and(matchFilter, excludeFilter) : matchFilter;
+
+    const rows = await db
+      .select({
+        hyloId: members.hyloId,
+        clerkId: members.clerkId,
+        name: members.name,
+        handle: members.handle,
+        image: members.image,
+      })
+      .from(members)
+      .where(whereClause)
+      .limit(limit);
+
+    const result = rows.map((r) => ({
+      userId: r.hyloId ?? r.clerkId ?? '',
+      name: r.name,
+      handle: r.handle,
+      image: r.image,
+    }));
+
+    return NextResponse.json({ members: result });
+  } catch (err) {
+    console.error('[GET /api/members/search]', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
