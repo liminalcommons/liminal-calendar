@@ -36,6 +36,20 @@ function NewEventPageInner() {
 
   const [externalValues, setExternalValues] = useState<Partial<EventFormValues>>(initialFromUrl)
 
+  // Read the QuickCreatePopover handoff (if any) and seed the form. The
+  // handoff key is consumed once so a refresh on /events/new starts clean.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('calendar-quick-create-handoff')
+      if (!raw) return
+      localStorage.removeItem('calendar-quick-create-handoff')
+      const draft = JSON.parse(raw) as Partial<EventFormValues>
+      if (draft && typeof draft === 'object') {
+        setExternalValues(prev => ({ ...prev, ...draft }))
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') router.back()

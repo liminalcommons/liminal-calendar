@@ -127,58 +127,29 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     }));
   }, [day, hour, durationMinutes]);
 
-  const handleCreate = useCallback(async () => {
+  // Hand off the popover's draft state to the full editor and navigate.
+  // The user reviews the form there and clicks Create — the popover no
+  // longer creates events directly. The handoff key is read once by
+  // /events/new, which seeds externalValues and clears the key.
+  const handleContinue = useCallback(() => {
     const trimmed = (formValues.title || '').trim();
     if (!trimmed) {
-      setError('Tell the assistant what the event is about, then click Create.');
+      setError('Tell the assistant what the event is about first.');
       return;
     }
-
-    setIsCreating(true);
-    setError(null);
-
     const startTime = buildStartTime(day, hour);
     const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
-
-    const body: Record<string, unknown> = {
+    const handoff = {
+      ...formValues,
       title: trimmed,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
+      date: format(day, 'yyyy-MM-dd'),
+      startTime: format(startTime, 'HH:mm'),
+      endTime: format(endTime, 'HH:mm'),
     };
-
-    if (formValues.description?.trim()) body.details = formValues.description.trim();
-    if (formValues.meetingLink?.trim()) body.location = formValues.meetingLink.trim();
-    if (formValues.recurrence && formValues.recurrence !== 'none') {
-      body.recurrenceRule = formValues.recurrence;
-    }
-    if (formValues.imageUrl) body.imageUrl = formValues.imageUrl;
-
-    try {
-      const res = await apiFetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || `Error ${res.status}`);
-        return;
-      }
-
-      const created: DisplayEvent = await res.json();
-      calendarSFX.play('spawn');
-      onCreated?.(created);
-      // Clear chat history for next time
-      try { localStorage.removeItem('calendar-chat-quick-create'); } catch { /* ignore quota / disabled storage */ }
-      onClose();
-      router.refresh();
-    } catch {
-      setError('Network error — please try again');
-    } finally {
-      setIsCreating(false);
-    }
-  }, [formValues, durationMinutes, day, hour, onCreated, onClose, router]);
+    try { localStorage.setItem('calendar-quick-create-handoff', JSON.stringify(handoff)); } catch { /* ignore */ }
+    onClose();
+    router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+  }, [formValues, durationMinutes, day, hour, onClose, router]);
 
   if (!canCreateEvents(role)) return null;
 
@@ -285,13 +256,13 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
           Cancel
         </button>
         <button
-          onClick={handleCreate}
-          disabled={isCreating || !formValues.title?.trim()}
+          onClick={handleContinue}
+          disabled={!formValues.title?.trim()}
           className="text-xs py-1.5 px-4 rounded-md bg-grove-accent text-grove-surface font-medium
                      hover:bg-grove-accent/90 transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isCreating ? 'Creating…' : 'Create'}
+          Continue
         </button>
       </div>
     </div>
