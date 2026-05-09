@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -10,8 +10,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -21,14 +21,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const userId = (
-    session.user?.hyloId ??
-    (session.user as Record<string, unknown> | undefined)?.clerkId
-  ) as string | undefined;
-
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const userId = authed.id;
 
   try {
     const visibilityCond = visibleEventsForUserCondition(userId);

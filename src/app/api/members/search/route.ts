@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { ilike, or, and, not, eq } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -29,8 +29,7 @@ export async function GET(request: NextRequest) {
     limit = parsed;
   }
 
-  const userAny = session.user as { hyloId?: string; clerkId?: string };
-  const currentUserId = userAny.hyloId ?? userAny.clerkId ?? null;
+  const currentUserId = authed.id ?? null;
 
   try {
     const likeQ = `%${q}%`;

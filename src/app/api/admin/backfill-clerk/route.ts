@@ -22,8 +22,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
-import { getUserRole } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { findMemberByClerkId } from '@/lib/auth/find-member-by-clerk-id';
@@ -42,11 +41,11 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (getUserRole(session) !== 'admin') {
+  if (authed.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

@@ -4,8 +4,8 @@ import { events, rsvps } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { upsertRsvp } from '@/lib/rsvp/upsert';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { addNewsletterSubscriber } from '@/lib/newsletter/add-subscriber';
-import { auth } from '../../../../../../auth';
 import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
@@ -99,11 +99,10 @@ export async function GET(
   }
 
   try {
-    // Fetch event for creator info — apply visibility so private events are not
-    // accessible to unauthenticated callers or users without access.
-    const getSession = await auth();
-    const getUser = getSession?.user as ({ hyloId?: string; clerkId?: string }) | undefined;
-    const getUserId = (getUser?.hyloId ?? getUser?.clerkId) as string | undefined;
+    // Apply visibility so private events are not accessible to unauthenticated
+    // callers or users without access.
+    const authed = await getAuthedUser();
+    const getUserId = authed?.id;
     const getVisibilityCond = getUserId
       ? visibleEventsForUserCondition(getUserId)
       : publicOnlyEventsCondition();

@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { ensurePreferences, updatePreferences, type PreferencesUpdate } from '@/lib/notifications/preferences';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function userIdFromSession(session: any): string {
-  return session.user.hyloId || session.user.id;
-}
 
 const ALLOWED_KEYS = [
   'pushOneHour', 'pushFifteenMin', 'pushAtStart',
@@ -15,15 +10,15 @@ const ALLOWED_KEYS = [
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const prefs = await ensurePreferences(db, userIdFromSession(session));
+  const authed = await getAuthedUser();
+  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const prefs = await ensurePreferences(db, authed.id);
   return NextResponse.json(prefs);
 }
 
 export async function PUT(request: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authed = await getAuthedUser();
+  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = (await request.json()) as Record<string, unknown>;
   const update: PreferencesUpdate = {};
@@ -36,6 +31,6 @@ export async function PUT(request: Request) {
       (update as Record<string, boolean>)[key] = value;
     }
   }
-  await updatePreferences(db, userIdFromSession(session), update);
+  await updatePreferences(db, authed.id, update);
   return NextResponse.json({ ok: true });
 }

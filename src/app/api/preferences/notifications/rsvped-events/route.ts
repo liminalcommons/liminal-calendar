@@ -1,20 +1,15 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { and, asc, eq, gte, inArray, not } from 'drizzle-orm';
 import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function userIdFromSession(session: any): string {
-  return session.user.hyloId || session.user.id;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const userId = userIdFromSession(session);
+  const authed = await getAuthedUser();
+  if (!authed) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const userId = authed.id;
   const url = new URL(_request.url);
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '5', 10), 50);
 

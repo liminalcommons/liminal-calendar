@@ -16,8 +16,7 @@
 
 import { NextResponse } from 'next/server';
 import { count, isNotNull } from 'drizzle-orm';
-import { auth } from '../../../../../auth';
-import { getUserRole } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
@@ -25,11 +24,11 @@ import { members } from '@/lib/db/schema';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (getUserRole(session) !== 'admin') {
+  if (authed.role !== 'admin') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
