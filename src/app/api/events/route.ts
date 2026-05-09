@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { auth } from '../../../../auth';
-import { getUserRole, canCreateEvents, canCreatePublicEvent } from '@/lib/auth-helpers';
+import { getUserRole, canCreateEvents, canCreatePublicEvent, type UserRole } from '@/lib/auth-helpers';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
@@ -71,11 +72,27 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Hylo session takes precedence; fall through to Clerk via getCurrentMember.
+  let role: UserRole;
+  let user: { hyloId?: string; clerkId?: string; id?: string; name?: string | null; image?: string | null };
+  if (session?.user) {
+    role = getUserRole(session);
+    user = session.user as typeof user;
+  } else {
+    const member = await getCurrentMember(db);
+    if (!member) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    role = (member.role === 'admin' || member.role === 'host') ? member.role : 'member';
+    user = {
+      clerkId: member.clerkId ?? undefined,
+      hyloId: member.hyloId ?? undefined,
+      id: member.clerkId ?? member.hyloId ?? String(member.id),
+      name: member.name,
+      image: member.image,
+    };
   }
 
-  const role = getUserRole(session);
   if (!canCreateEvents(role)) {
     return NextResponse.json(
       { error: 'Forbidden: only hosts and admins can create events' },
@@ -125,8 +142,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const user = session.user;
-
   try {
     const [created] = await db
       .insert(events)
@@ -140,7 +155,7 @@ export async function POST(request: NextRequest) {
         imageUrl: v.imageUrl,
         recurrenceRule: v.recurrenceRule,
         visibility: v.visibility,
-        creatorId: user.hyloId ?? user.id ?? 'unknown',
+        creatorId: user.hyloId ?? user.clerkId ?? user.id ?? 'unknown',
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,
       })
