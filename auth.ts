@@ -45,8 +45,39 @@ const ADMIN_HYLO_IDS_FROM_ENV = (process.env.ADMIN_HYLO_IDS ?? '')
   .filter(Boolean);
 const ADMIN_HYLO_IDS = ADMIN_HYLO_IDS_FROM_ENV.length > 0 ? ADMIN_HYLO_IDS_FROM_ENV : DEFAULT_ADMIN_HYLO_IDS;
 
+// Castalia identity provider — self-hosted Logto at id.castalia.one.
+// Lets users who already have a Castalia identity (auto-enrolled when they
+// sign into castalia.one) sign in to liminalcalendar.com without a separate
+// account.
+const LOGTO_ISSUER = process.env.LOGTO_ISSUER?.trim() || 'https://id.castalia.one/oidc';
+
+interface LogtoOidcProfile {
+  sub: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
+    {
+      id: 'logto',
+      name: 'Castalia',
+      type: 'oidc',
+      issuer: LOGTO_ISSUER,
+      authorization: { params: { scope: 'openid email profile' } },
+      checks: ['pkce', 'state'],
+      clientId: process.env.LOGTO_CLIENT_ID?.trim(),
+      clientSecret: process.env.LOGTO_CLIENT_SECRET?.trim(),
+      profile(profile: LogtoOidcProfile) {
+        return {
+          id: profile.sub,
+          name: profile.name ?? null,
+          email: profile.email ?? null,
+          image: profile.picture ?? null,
+        };
+      },
+    },
     {
       id: 'hylo',
       name: 'Hylo',
@@ -200,6 +231,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ? account.expires_at * 1000
           : Date.now() + (account.expires_in as number ?? 3600) * 1000;
       }
+
+      // Logto-provider sign-in: Castalia identity, no Hylo membership data.
+      // Default to 'member' role; admin allowlist still applies if a Logto
+      // user happens to share an email with a Hylo admin (future hardening).
+      if (account?.provider === 'logto' && profile) {
+        const p = profile as LogtoOidcProfile;
+        token.logtoUserId = p.sub;
+        token.picture = p.picture ?? token.picture;
+        if (p.email) token.email = p.email;
+        if (p.name) token.name = p.name;
+        token.role = 'member';
+        return token;
+      }
+
       if (profile) {
         const p = profile as HyloProfile & {
           memberships?: HyloMembership[];
@@ -241,6 +286,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       const user = session.user as unknown as Record<string, unknown>;
       if (token.hyloId) user.hyloId = token.hyloId;
+      if (token.logtoUserId) user.logtoUserId = token.logtoUserId;
       if (token.picture) user.image = token.picture;
 
       const hyloId = token.hyloId as string | undefined;

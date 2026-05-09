@@ -212,7 +212,11 @@ export async function PATCH(
     return NextResponse.json(dbEventToDisplayEvent(updated, eventRsvps, authed.id));
   } catch (err) {
     console.error('[PATCH /api/events/[id]] update', err);
-    return NextResponse.json({ error: 'Failed to update event' }, { status: 500 });
+    // TEMP diagnostics — phase 3 deploy: return the actual error string so we
+    // can pinpoint which call in the update path is throwing. Revert once
+    // the failure mode is identified.
+    const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    return NextResponse.json({ error: 'Failed to update event', detail: message }, { status: 500 });
   }
 }
 
