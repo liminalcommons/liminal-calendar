@@ -69,6 +69,8 @@ export default function AdminPage() {
 
 function AdminPageInner() {
   const { data: session, status } = useSession();
+  const [resolvedRole, setResolvedRole] = useState<string | null>(null);
+  const [roleResolved, setRoleResolved] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -84,11 +86,22 @@ function AdminPageInner() {
   const [updating, setUpdating] = useState<number | null>(null);
   const [expandedMember, setExpandedMember] = useState<number | null>(null);
 
-  const userRole = session?.user?.role;
+  // Resolve the caller's role from /api/profile so the gate works for both
+  // Hylo (role on session) and Clerk (role on members row, no Hylo session).
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/profile')
+      .then(r => r.ok ? r.json() : null)
+      .then(p => { if (!cancelled) { setResolvedRole(p?.role ?? null); setRoleResolved(true); } })
+      .catch(() => { if (!cancelled) { setResolvedRole(null); setRoleResolved(true); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const userRole = resolvedRole;
 
   useEffect(() => {
-    if (status === 'loading') return;
-    if (status === 'unauthenticated' || userRole !== 'admin') {
+    if (status === 'loading' || !roleResolved) return;
+    if (userRole !== 'admin') {
       router.replace('/');
       return;
     }
@@ -105,7 +118,7 @@ function AdminPageInner() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [status, userRole, router]);
+  }, [status, roleResolved, userRole, router]);
 
   const handleRoleChange = async (member: Member, newRole: string) => {
     setUpdating(member.id);
@@ -137,7 +150,7 @@ function AdminPageInner() {
     }
   };
 
-  if (status === 'loading' || (status === 'authenticated' && userRole !== 'admin')) {
+  if (status === 'loading' || !roleResolved || userRole !== 'admin') {
     return (
       <div className="min-h-screen bg-grove-bg">
         <NavBar />

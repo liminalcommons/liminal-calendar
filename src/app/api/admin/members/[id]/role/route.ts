@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../../../auth';
-import { getUserRole, canPromoteMembers } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { canPromoteMembers } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -11,11 +11,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const role = getUserRole(session);
-  if (!canPromoteMembers(role)) {
+  const caller = await getAuthedUser();
+  if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!canPromoteMembers(caller.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -44,8 +42,6 @@ export async function POST(
 
   if (!updated) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
 
-  const callerId = (session.user as Record<string, unknown>)?.hyloId
-    ?? (session.user as Record<string, unknown>)?.clerkId;
-  console.info('[admin/role] caller=%s target=%d role=%s', callerId, memberId, body.role);
+  console.info('[admin/role] caller=%s target=%d role=%s', caller.id, memberId, body.role);
   return NextResponse.json({ id: updated.id, role: updated.role });
 }

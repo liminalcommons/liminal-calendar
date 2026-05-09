@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
-import { getUserRole } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
+async function requireAdmin() {
+  const user = await getAuthedUser();
+  if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  return { user };
+}
+
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (getUserRole(session) !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const gate = await requireAdmin();
+  if (gate.error) return gate.error;
 
   try {
     const allMembers = await db.select().from(members);
@@ -24,13 +25,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (getUserRole(session) !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const gate = await requireAdmin();
+  if (gate.error) return gate.error;
 
   let body: unknown;
   try {
@@ -79,13 +75,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (getUserRole(session) !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const gate = await requireAdmin();
+  if (gate.error) return gate.error;
 
   let body: unknown;
   try {
