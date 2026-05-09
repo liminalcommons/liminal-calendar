@@ -1,141 +1,165 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { X, Search } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
-import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 
-export interface PickedMember {
-  hyloId: string;
+export interface Invitee {
+  userId: string;
   name: string;
-  image: string | null;
-  availability?: number[];
-  timezone?: string;
+  handle?: string;
+  image?: string | null;
 }
 
 interface InviteePickerProps {
-  selected: PickedMember[];
-  onChange: (members: PickedMember[]) => void;
+  value: Invitee[];
+  onChange: (next: Invitee[]) => void;
+  cap?: number;
   disabled?: boolean;
 }
 
-export function InviteePicker({ selected, onChange, disabled }: InviteePickerProps) {
+export function InviteePicker({ value, onChange, cap, disabled }: InviteePickerProps) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<PickedMember[]>([]);
+  const [results, setResults] = useState<Invitee[]>([]);
   const [searching, setSearching] = useState(false);
-  const [allMembers, setAllMembers] = useState<any[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>(null);
-  const fetched = useRef(false);
 
-  // Fetch all members once (includes availability + timezone)
-  useEffect(() => {
-    if (fetched.current) return;
-    fetched.current = true;
-    apiFetch('/api/admin/members')
-      .then(r => r.ok ? r.json() : [])
-      .then(data => { if (Array.isArray(data)) setAllMembers(data); })
-      .catch(() => {});
-  }, []);
+  const atCap = cap !== undefined && value.length >= cap;
 
   const handleSearch = useCallback((q: string) => {
     setQuery(q);
     if (timer.current) clearTimeout(timer.current);
     if (q.trim().length < 2) { setResults([]); return; }
     setSearching(true);
-    timer.current = setTimeout(() => {
-      const selectedIds = new Set(selected.map(s => s.hyloId));
-      const filtered = allMembers
-        .filter(m => m.name.toLowerCase().includes(q.toLowerCase()) && !selectedIds.has(m.hyloId))
-        .slice(0, 8)
-        .map(m => ({
-          hyloId: m.hyloId,
-          name: m.name,
-          image: m.image,
-          availability: JSON.parse(m.availability ?? '[]'),
-          timezone: m.timezone ?? 'UTC',
-        }));
-      setResults(filtered);
-      setSearching(false);
-    }, 150);
-  }, [selected, allMembers]);
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/members/search?q=${encodeURIComponent(q)}&limit=10`);
+        if (!res.ok) { setResults([]); return; }
+        const data = await res.json();
+        const selectedIds = new Set(value.map((s) => s.userId));
+        const filtered: Invitee[] = (data.members ?? [])
+          .filter((m: Invitee) => !selectedIds.has(m.userId))
+          .map((m: { userId: string; name: string; handle?: string; image?: string | null }) => ({
+            userId: m.userId,
+            name: m.name,
+            handle: m.handle,
+            image: m.image,
+          }));
+        setResults(filtered);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+  }, [value]);
 
-  const add = (member: PickedMember) => {
-    onChange([...selected, member]);
-    setResults(prev => prev.filter(r => r.hyloId !== member.hyloId));
+  const add = (invitee: Invitee) => {
+    if (atCap) return;
+    // dedupe by userId
+    if (value.some((v) => v.userId === invitee.userId)) return;
+    onChange([...value, invitee]);
+    setResults((prev) => prev.filter((r) => r.userId !== invitee.userId));
     setQuery('');
   };
 
-  const remove = (hyloId: string) => {
-    onChange(selected.filter(s => s.hyloId !== hyloId));
+  const remove = (userId: string) => {
+    onChange(value.filter((v) => v.userId !== userId));
   };
 
   return (
     <div>
+      {/* Search input */}
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-grove-text-muted" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-grove-text-muted" aria-hidden />
         <input
           type="text"
-          placeholder="Search members to invite..."
+          aria-label="Search members to invite"
+          placeholder={value.length === 0 ? 'Type a name to invite registered users.' : 'Search members to invite…'}
           value={query}
-          onChange={e => handleSearch(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
           disabled={disabled}
           className="w-full pl-9 pr-4 py-2 text-sm bg-grove-surface border border-grove-border rounded-lg
                      text-grove-text placeholder:text-grove-text-dim
                      focus:outline-none focus:ring-1 focus:ring-grove-accent disabled:opacity-50"
         />
-        {searching && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-grove-text-muted">...</span>}
+        {searching && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-grove-text-muted">
+            …
+          </span>
+        )}
       </div>
 
+      {/* Results dropdown */}
       {results.length > 0 && (
-        <div className="mt-1 bg-grove-surface border border-grove-border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-          {results.map(r => (
-            <button
-              key={r.hyloId}
-              onClick={() => add(r)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-grove-border/20 transition-colors"
-            >
-              {r.image ? (
-                <img src={r.image} alt="" className="w-6 h-6 rounded-full object-cover" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-grove-accent/20 flex items-center justify-center text-[9px] font-semibold text-grove-accent-deep">
-                  {r.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-              <span className="text-grove-text">{r.name}</span>
-              {r.availability && r.availability.length > 0 && (
-                <span className="text-[9px] text-grove-green ml-auto">has availability</span>
-              )}
-            </button>
+        <ul
+          role="listbox"
+          aria-label="Member search results"
+          className="mt-1 bg-grove-surface border border-grove-border rounded-lg overflow-hidden max-h-48 overflow-y-auto"
+        >
+          {atCap && (
+            <li className="px-3 py-2 text-xs text-amber-700 bg-amber-50 border-b border-grove-border">
+              {cap}/{cap} reached — remove someone first
+            </li>
+          )}
+          {results.map((r) => (
+            <li key={r.userId} role="option" aria-selected={false}>
+              <button
+                type="button"
+                onClick={() => add(r)}
+                disabled={atCap || disabled}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-grove-border/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {r.image ? (
+                  <img src={r.image} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-grove-accent/20 flex items-center justify-center text-[9px] font-semibold text-grove-accent-deep flex-shrink-0">
+                    {r.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-grove-text">{r.name}</span>
+                {r.handle && (
+                  <span className="text-grove-text-muted text-xs ml-1">@{r.handle}</span>
+                )}
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {/* Selected invitees with availability timelines */}
-      {selected.length > 0 && (
-        <div className="mt-3 space-y-2">
-          {selected.map(s => (
-            <div key={s.hyloId} className="bg-grove-bg border border-grove-border/50 rounded-lg p-2.5">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  {s.image ? (
-                    <img src={s.image} alt="" className="w-5 h-5 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-grove-accent/20 flex items-center justify-center text-[8px] font-semibold text-grove-accent-deep">
-                      {s.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="text-xs font-medium text-grove-text">{s.name}</span>
-                </div>
-                <button onClick={() => remove(s.hyloId)} className="p-0.5 text-grove-text-muted hover:text-red-400 transition-colors">
-                  <X size={12} />
-                </button>
-              </div>
-              <AvailabilityTimeline
-                slots={s.availability ?? []}
-                timezone={s.timezone ?? 'UTC'}
-                compact
-              />
-            </div>
+      {/* Empty state */}
+      {query.trim().length === 0 && value.length === 0 && (
+        <p className="mt-1.5 text-xs text-grove-text-muted">
+          Type a name to invite registered users.
+        </p>
+      )}
+
+      {/* Selected chips */}
+      {value.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {value.map((inv) => (
+            <span
+              key={inv.userId}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-grove-accent/10 border border-grove-accent/20 text-xs text-grove-accent-deep"
+            >
+              {inv.image ? (
+                <img src={inv.image} alt="" className="w-4 h-4 rounded-full object-cover" />
+              ) : (
+                <span className="w-4 h-4 rounded-full bg-grove-accent/30 flex items-center justify-center text-[8px] font-bold">
+                  {inv.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              {inv.name}
+              <button
+                type="button"
+                onClick={() => remove(inv.userId)}
+                disabled={disabled}
+                aria-label={`Remove ${inv.name}`}
+                className="ml-0.5 text-grove-text-muted hover:text-red-500 transition-colors disabled:opacity-50"
+              >
+                <X size={10} />
+              </button>
+            </span>
           ))}
         </div>
       )}

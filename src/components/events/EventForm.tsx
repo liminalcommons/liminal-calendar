@@ -6,7 +6,9 @@ import { useSession } from 'next-auth/react';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
 import { ImageUpload } from '@/components/ImageUpload';
+import { InviteePicker, type Invitee } from './InviteePicker';
 import { apiFetch } from '@/lib/api-fetch';
+import { INVITEE_CAP_MEMBER } from '@/lib/events/invitations-repo';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -235,6 +237,10 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   // Image
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
+  // Visibility + invitees
+  const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  const [invitees, setInvitees] = useState<Invitee[]>([]);
+
   // UI state
   const [timezone, setTimezone] = useState('UTC');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -283,6 +289,13 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   }, [title, description, startTime, endTime, recurrence, imageUrl, meetingLink, onValuesChange])
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  const userRole: string = useMemo(
+    () => (session?.user as { role?: string } | undefined)?.role || 'member',
+    [session],
+  );
+  const canCreatePublic = userRole === 'host' || userRole === 'admin';
+  const inviteeCap = userRole === 'member' ? INVITEE_CAP_MEMBER : undefined;
+
   const weekDays = useMemo(() => getWeekDays(currentWeekStart), [currentWeekStart]);
 
   const today = useMemo(() => {
@@ -545,6 +558,8 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
         recurrenceEndCount: recurrence !== 'none' && recurrenceEndType === 'after_count' ? recurrenceEndCount : undefined,
         imageUrl: imageUrl || undefined,
+        visibility,
+        invitees: invitees.map(({ userId, name, image }) => ({ userId, name, image })),
       };
 
       if (mode === 'create') {
@@ -828,6 +843,44 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
             )}
           </>
         )}
+      </div>
+
+      {/* Visibility */}
+      <div>
+        <label className="block text-sm font-medium text-grove-text mb-1">
+          Visibility
+        </label>
+        {canCreatePublic ? (
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
+            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+          >
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+        ) : (
+          <p className="text-sm text-grove-text-muted">
+            Private (members can only create private events)
+          </p>
+        )}
+      </div>
+
+      {/* Invite members */}
+      <div>
+        <label className="block text-sm font-medium text-grove-text mb-1">
+          Invite members
+          {inviteeCap !== undefined && (
+            <span className="text-grove-text-muted font-normal ml-1 text-xs">
+              (up to {inviteeCap})
+            </span>
+          )}
+        </label>
+        <InviteePicker
+          value={invitees}
+          onChange={setInvitees}
+          cap={inviteeCap}
+        />
       </div>
 
       {/* Image upload */}
