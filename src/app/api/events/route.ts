@@ -9,6 +9,7 @@ import { asc, inArray, gte, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
+import { fanoutInvitationReceived } from '@/lib/notifications/fanout';
 
 export async function GET(request: NextRequest) {
   try {
@@ -152,6 +153,21 @@ export async function POST(request: NextRequest) {
         organizerRole: role,
         invitees: dedupedInvitees,
       });
+
+      // A5 fan-out: one invitation.received notification per invitee.
+      // Best-effort; never fails the POST response.
+      try {
+        const actorId = (user as Record<string, unknown>).hyloId as string ?? user.id ?? null;
+        const actorName = (user.name as string | undefined) ?? null;
+        await fanoutInvitationReceived(
+          db,
+          created,
+          dedupedInvitees.map((inv) => ({ userId: inv.userId, name: inv.name })),
+          { id: actorId, name: actorName },
+        );
+      } catch (fanoutErr) {
+        console.error('[POST /api/events] invitation fanout failed', fanoutErr);
+      }
     }
 
     // Invalidate Full Route Cache for views that list events so the freshly

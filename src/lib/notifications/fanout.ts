@@ -1,5 +1,5 @@
 import { and, eq, inArray, ne } from 'drizzle-orm';
-import { rsvps, events, type Event } from '@/lib/db/schema';
+import { rsvps, events, eventInvitations, type Event } from '@/lib/db/schema';
 import { createNotification } from '@/lib/notifications/inbox/repo';
 import { sendPushToUsers } from '@/lib/notifications/push';
 
@@ -120,6 +120,35 @@ async function listRecipients(db: Db, eventId: number, excludeUserId: string | n
   return [...new Set((rows as { userId: string }[]).map((r) => r.userId))];
 }
 
+/**
+ * Look up invitee userIds for an event (from event_invitations), excluding
+ * the actor. Returns empty array if none.
+ */
+async function listInviteeIds(db: Db, eventId: number, excludeUserId: string | null): Promise<string[]> {
+  const rows = await db
+    .select({ inviteeUserId: eventInvitations.inviteeUserId })
+    .from(eventInvitations)
+    .where(eq(eventInvitations.eventId, eventId));
+  const ids = (rows as { inviteeUserId: string }[]).map((r) => r.inviteeUserId);
+  return excludeUserId ? ids.filter((id) => id !== excludeUserId) : ids;
+}
+
+/**
+ * Union of RSVP recipients + invitees, deduped by userId, excluding actor.
+ * Used for event.changed and event.cancelled so both sets are notified.
+ */
+async function listRecipientsWithInvitees(
+  db: Db,
+  eventId: number,
+  excludeUserId: string | null,
+): Promise<string[]> {
+  const [rsvpIds, inviteeIds] = await Promise.all([
+    listRecipients(db, eventId, excludeUserId),
+    listInviteeIds(db, eventId, excludeUserId),
+  ]);
+  return [...new Set([...rsvpIds, ...inviteeIds])];
+}
+
 async function fanoutToRecipients(
   db: Db,
   recipients: string[],
@@ -163,7 +192,7 @@ async function fanoutToRecipients(
   return { inboxCreated, pushSent, pushFailed };
 }
 
-/** A3 — host edited the event. Notify RSVP=yes/interested users (not the host). */
+/** A3 — host edited the event. Notify RSVP=yes/interested users + invitees (not the host). */
 export async function fanoutEventChanged(
   db: Db,
   event: EventLite & { creatorId?: string },
@@ -171,7 +200,7 @@ export async function fanoutEventChanged(
   actor: Actor,
   baseUrl = 'https://calendar.castalia.one',
 ): Promise<FanoutResult> {
-  const recipients = await listRecipients(db, event.id, actor.id);
+  const recipients = await listRecipientsWithInvitees(db, event.id, actor.id);
   return fanoutToRecipients(
     db,
     recipients,
@@ -194,14 +223,14 @@ export async function fanoutEventChanged(
   );
 }
 
-/** A4 — host cancelled (deleted) the event. Notify all RSVP=yes/interested. */
+/** A4 — host cancelled (deleted) the event. Notify RSVP=yes/interested users + invitees. */
 export async function fanoutEventCancelled(
   db: Db,
   event: EventLite & { creatorId?: string },
   actor: Actor,
   baseUrl = 'https://calendar.castalia.one',
 ): Promise<FanoutResult> {
-  const recipients = await listRecipients(db, event.id, actor.id);
+  const recipients = await listRecipientsWithInvitees(db, event.id, actor.id);
   // event_id deliberately null — cascade delete on the events row would
   // otherwise wipe the notification immediately. Cancellation is the one
   // type where the inbox row needs to outlive its event. Source-of-truth
@@ -272,6 +301,62 @@ export async function fanoutAttendanceNegative(
       url: `${baseUrl}/events/${event.id}#attendance-report`,
       tag: `attendance-negative-${event.id}-${reporter.id ?? 'anon'}`,
     },
+  );
+}
+
+export interface InvitedUser {
+  userId: string;
+  name?: string | null;
+}
+
+/**
+ * A5 — new event created with invitees. Fire one `invitation.received`
+ * notification per invitee. Actor = organizer (creatorId).
+ * Best-effort: partial failures are logged but don't throw.
+ */
+export async function fanoutInvitationReceived(
+  db: Db,
+  event: EventLite & { id: number },
+  invitees: InvitedUser[],
+  actor: Actor,
+  baseUrl = 'https://calendar.castalia.one',
+): Promise<FanoutResult> {
+  if (invitees.length === 0) return ZERO;
+
+  // Exclude actor from self-notification (organizer inviting themselves).
+  const recipients = actor.id
+    ? invitees.filter((inv) => inv.userId !== actor.id)
+    : invitees;
+
+  if (recipients.length === 0) return ZERO;
+
+  const inboxRow = {
+    type: 'invitation.received',
+    eventId: event.id,
+    actorId: actor.id,
+    actorName: actor.name,
+    title: `You're invited: ${event.title}`,
+    body: actor.name ? `Invited by ${actor.name}` : null,
+    url: `/events/${event.id}`,
+    payload: {
+      eventTitle: event.title,
+      eventStartsAt: event.startsAt instanceof Date ? event.startsAt.toISOString() : event.startsAt,
+      organizerName: actor.name,
+    } as Record<string, unknown>,
+  };
+
+  const pushPayload = {
+    title: `You're invited: ${event.title}`,
+    body: actor.name ? `Invited by ${actor.name}` : 'You have a new invitation',
+    url: `${baseUrl}/events/${event.id}`,
+    tag: `invitation-${event.id}`,
+  };
+
+  return fanoutToRecipients(
+    db,
+    recipients.map((inv) => inv.userId),
+    inboxRow,
+    pushPayload,
   );
 }
 
