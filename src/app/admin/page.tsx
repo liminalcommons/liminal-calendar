@@ -9,7 +9,6 @@ import { NavBar } from '@/components/NavBar';
 import { apiFetch } from '@/lib/api-fetch';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 import { ReportsPanel } from '@/components/admin/ReportsPanel';
-import { MarketplaceSubmissionsPanel } from '@/components/admin/MarketplaceSubmissionsPanel';
 
 interface Member {
   id: number;
@@ -17,6 +16,7 @@ interface Member {
   // The DB CHECK constraint guarantees at least one is non-null per row.
   hyloId: string | null;
   clerkId: string | null;
+  logtoId: string | null;
   name: string;
   email: string | null;
   image: string | null;
@@ -36,11 +36,35 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 function ProviderBadge({ member }: { member: Member }) {
+  // Castalia (Logto) is the canonical identity once provisioned. Hylo/Clerk
+  // are kept visible as origin hints in case an admin needs to know where
+  // the row first came from, but the primary "this user can sign in via
+  // Castalia magic-link" signal is the gold Castalia chip.
+  const hasLogto = Boolean(member.logtoId);
   const hasHylo = Boolean(member.hyloId);
   const hasClerk = Boolean(member.clerkId);
+  const origins = [hasHylo && 'Hylo', hasClerk && 'Clerk'].filter(Boolean) as string[];
+
+  if (hasLogto) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-accent/30 text-grove-accent-deep border border-grove-accent/50 font-medium">
+          Castalia
+        </span>
+        {origins.length > 0 && (
+          <span className="text-[9px] uppercase tracking-wide text-grove-text-dim">
+            ({origins.join(' + ')})
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  // Legacy fallback for rows that haven't been provisioned in Logto yet
+  // (e.g. Hylo-only members with no email — see migrate-members-to-logto.mjs).
   if (hasHylo && hasClerk) {
     return (
-      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-accent/20 text-grove-accent-deep border border-grove-accent/30">
+      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-border/30 text-grove-text-muted border border-grove-border/50">
         Hylo + Clerk
       </span>
     );
@@ -74,10 +98,7 @@ function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: 'members' | 'reports' | 'marketplace' =
-    tabParam === 'reports' ? 'reports'
-    : tabParam === 'marketplace' ? 'marketplace'
-    : 'members';
+  const tab: 'members' | 'reports' = tabParam === 'reports' ? 'reports' : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
@@ -204,25 +225,9 @@ function AdminPageInner() {
           >
             Reports
           </Link>
-          <Link
-            href="/admin?tab=marketplace"
-            role="tab"
-            aria-selected={tab === 'marketplace'}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === 'marketplace'
-                ? 'border-grove-accent text-grove-text'
-                : 'border-transparent text-grove-text-muted hover:text-grove-text'
-            }`}
-          >
-            Marketplace
-          </Link>
         </nav>
 
-        {tab === 'marketplace' ? (
-          <section role="tabpanel" aria-label="Marketplace submissions">
-            <MarketplaceSubmissionsPanel />
-          </section>
-        ) : tab === 'reports' ? (
+        {tab === 'reports' ? (
           <section role="tabpanel" aria-label="Attendance reports">
             <ReportsPanel />
           </section>
