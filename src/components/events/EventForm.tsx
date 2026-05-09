@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useUser } from '@clerk/nextjs';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -199,6 +200,7 @@ interface EventFormProps {
 export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuccess }: EventFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
+  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
 
   // ── Form state ────────────────────────────────────────────────────────────
   // Default to Custom mode with a Castalia URL pre-filled — a soft nudge
@@ -467,14 +469,15 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
     fetchEvent();
   }, [mode, eventId]);
 
-  // ── Role guard ────────────────────────────────────────────────────────────
+  // ── Auth guard: any signed-in user (Hylo or Clerk) can create events.
+  // Redirect only when neither session is present.
   useEffect(() => {
-    const user = session?.user;
-    const role: string = user?.role || 'member';
-    if (session !== undefined && role === 'member') {
+    if (session === undefined || !clerkLoaded) return; // still resolving
+    const hyloSignedIn = !!session?.user;
+    if (!hyloSignedIn && !clerkSignedIn) {
       router.replace('/');
     }
-  }, [session, router]);
+  }, [session, clerkLoaded, clerkSignedIn, router]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const goToPrevWeek = () => {

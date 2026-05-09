@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
-import { auth } from '../../../../auth'
+import { getAuthedUser } from '@/lib/auth/get-authed-user'
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session?.user) {
+  const user = await getAuthedUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

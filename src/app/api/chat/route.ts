@@ -1,4 +1,4 @@
-import { auth } from '../../../../auth'
+import { getAuthedUser } from '@/lib/auth/get-authed-user'
 import { EVENT_TOOLS, buildSystemPrompt } from '@/lib/chat-tools'
 import type { EventFormValues } from '@/lib/chat-tools'
 
@@ -6,8 +6,8 @@ const LITELLM_BASE_URL = process.env.LITELLM_BASE_URL || 'https://llm.castalia.o
 const LITELLM_API_KEY = process.env.LITELLM_API_KEY || ''
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session?.user) {
+  const user = await getAuthedUser()
+  if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
   }
 

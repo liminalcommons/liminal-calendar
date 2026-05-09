@@ -2,7 +2,7 @@ export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 import { uploadToR2 } from '@/lib/r2'
-import { auth } from '../../../../auth'
+import { getAuthedUser } from '@/lib/auth/get-authed-user'
 
 import { getDb } from '@/lib/db'
 import { sql } from 'drizzle-orm'
@@ -37,12 +37,12 @@ async function recordGeneration(userId: string) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session?.user) {
+  const authedUser = await getAuthedUser()
+  if (!authedUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userId = session.user.id || session.user.hyloId || session.user.email || 'unknown'
+  const userId = authedUser.id || authedUser.email || 'unknown'
   const rateCheck = await checkRateLimit(userId)
   if (!rateCheck.allowed) {
     return NextResponse.json({ error: rateCheck.error }, { status: 429 })
