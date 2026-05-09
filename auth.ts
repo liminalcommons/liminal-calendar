@@ -232,16 +232,45 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           : Date.now() + (account.expires_in as number ?? 3600) * 1000;
       }
 
-      // Logto-provider sign-in: Castalia identity, no Hylo membership data.
-      // Default to 'member' role; admin allowlist still applies if a Logto
-      // user happens to share an email with a Hylo admin (future hardening).
+      // Logto-provider sign-in: Castalia identity. Email-based account
+      // linking — if an existing `members` row matches the Logto userinfo
+      // email, carry its hyloId/role/name into the token so the user's
+      // existing Hylo identity (admin, host, etc.) survives the Logto
+      // sign-in. Persist logtoId on the linked row for future signins.
       if (account?.provider === 'logto' && profile) {
         const p = profile as LogtoOidcProfile;
         token.logtoUserId = p.sub;
         token.picture = p.picture ?? token.picture;
         if (p.email) token.email = p.email;
-        if (p.name) token.name = p.name;
-        token.role = 'member';
+
+        let linkedName: string | null = null;
+        if (p.email) {
+          try {
+            const [existing] = await db
+              .select()
+              .from(members)
+              .where(eq(members.email, p.email))
+              .limit(1);
+            if (existing) {
+              if (existing.hyloId) token.hyloId = existing.hyloId;
+              if (existing.role) token.role = existing.role;
+              linkedName = existing.name ?? null;
+              if (!existing.logtoId) {
+                await db
+                  .update(members)
+                  .set({ logtoId: p.sub, updatedAt: new Date() })
+                  .where(eq(members.id, existing.id));
+              }
+            }
+          } catch {
+            // DB unavailable — fall through with logto-only identity.
+          }
+        }
+
+        // Name precedence: Logto profile > linked member row > email local part
+        const emailLocal = p.email ? p.email.split('@')[0] : null;
+        token.name = p.name || linkedName || emailLocal;
+        if (!token.role) token.role = 'member';
         return token;
       }
 
