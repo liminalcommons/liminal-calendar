@@ -14,9 +14,11 @@ export async function GET() {
   try {
     return NextResponse.json({
       hyloId: member.hyloId,
+      clerkId: member.clerkId,
       name: member.name,
       email: member.email,
       image: member.image,
+      role: member.role,
       timezone: member.timezone ?? 'UTC',
       availability: JSON.parse(member.availability ?? '[]'),
     });

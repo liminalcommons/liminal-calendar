@@ -13,10 +13,11 @@ export function getUserRole(session: any): UserRole {
   return 'member';
 }
 
-export function canCreateEvents(_role: UserRole): boolean {
-  // Any authenticated user can create events. Tier check for public visibility
-  // moves to canCreatePublicEvent (called inside POST /api/events).
-  return true;
+export function canCreateEvents(role: UserRole): boolean {
+  // Only hosts and admins can create events. Members can RSVP and comment
+  // but cannot host. Tier check for public-visibility events is in
+  // canCreatePublicEvent (called inside POST /api/events).
+  return role === 'host' || role === 'admin';
 }
 
 export function canCreatePublicEvent(role: UserRole): boolean {

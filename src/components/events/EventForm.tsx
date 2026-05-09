@@ -469,14 +469,34 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
     fetchEvent();
   }, [mode, eventId]);
 
-  // ── Auth guard: any signed-in user (Hylo or Clerk) can create events.
-  // Redirect only when neither session is present.
+  // ── Role guard: only hosts and admins can host events.
+  // Resolves role from /api/profile so the gate works for both Hylo (role on
+  // session) and Clerk users (role on members row, not on session).
   useEffect(() => {
     if (session === undefined || !clerkLoaded) return; // still resolving
     const hyloSignedIn = !!session?.user;
     if (!hyloSignedIn && !clerkSignedIn) {
       router.replace('/');
+      return;
     }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/profile');
+        if (cancelled) return;
+        if (!res.ok) {
+          router.replace('/');
+          return;
+        }
+        const profile = await res.json();
+        if (profile.role !== 'host' && profile.role !== 'admin') {
+          router.replace('/');
+        }
+      } catch {
+        if (!cancelled) router.replace('/');
+      }
+    })();
+    return () => { cancelled = true; };
   }, [session, clerkLoaded, clerkSignedIn, router]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
