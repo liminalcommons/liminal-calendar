@@ -11,6 +11,11 @@ import {
   fanoutEventCancelled,
 } from '@/lib/notifications/fanout';
 import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import {
+  validateInviteeCap,
+  setEventInvitations,
+  type Invitee,
+} from '@/lib/events/invitations-repo';
 
 export async function GET(
   _request: NextRequest,
@@ -78,21 +83,48 @@ export async function PATCH(
   }
 
   const isCreator = event.creatorId === session.user?.hyloId;
-  if (!canEditEvent(role, isCreator)) {
+
+  // Parse body once
+  let bodyRaw: Record<string, unknown>;
+  try {
+    bodyRaw = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const wantsInvitationEdit = Object.prototype.hasOwnProperty.call(bodyRaw, 'invitees');
+
+  // For invitation edits: creator (any role) or admin may edit invitations.
+  // For field edits: existing canEditEvent gate applies (creator who is host/admin).
+  const hasFieldUpdates = Object.keys(bodyRaw).some((k) =>
+    ['title', 'details', 'startTime', 'endTime', 'timezone', 'location', 'imageUrl', 'recurrenceRule', 'scope'].includes(k),
+  );
+
+  if (hasFieldUpdates && !canEditEvent(role, isCreator)) {
     return NextResponse.json(
       { error: 'Forbidden: insufficient permissions to edit this event' },
       { status: 403 },
     );
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  if (wantsInvitationEdit && !isCreator && role !== 'admin') {
+    return NextResponse.json(
+      { error: 'Forbidden: only the event creator or an admin can edit invitations' },
+      { status: 403 },
+    );
   }
 
-  const updates = body as Record<string, unknown>;
+  if (!hasFieldUpdates && !wantsInvitationEdit) {
+    // Empty body with no recognized fields — fall through to no-op update.
+    // Auth: if user is neither a field editor nor an invitation editor, reject.
+    if (!canEditEvent(role, isCreator) && !isCreator && role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden: insufficient permissions to edit this event' },
+        { status: 403 },
+      );
+    }
+  }
+
+  const updates = bodyRaw;
 
   // Drag-to-reschedule sends `scope` to express the user's choice from the
   // RecurrenceMoveModal. Only `'all'` (or omitted = legacy edit-form) is
@@ -128,12 +160,38 @@ export async function PATCH(
   if (typeof updates.imageUrl === 'string') setValues.imageUrl = updates.imageUrl;
   if (typeof updates.recurrenceRule === 'string') setValues.recurrenceRule = updates.recurrenceRule;
 
+  // Invitees cap validation (pure, before any DB write)
+  let dedupedInvitees: Invitee[] | null = null;
+  if (wantsInvitationEdit) {
+    const rawInvitees = updates.invitees as Invitee[];
+    try {
+      dedupedInvitees = validateInviteeCap({ organizerRole: role, invitees: rawInvitees });
+    } catch (capErr) {
+      if ((capErr as Error).message === 'INVITEE_CAP_EXCEEDED') {
+        return NextResponse.json(
+          { error: 'Invitee cap exceeded: members may invite at most 10 people' },
+          { status: 400 },
+        );
+      }
+      throw capErr;
+    }
+  }
+
   try {
     const [updated] = await db
       .update(events)
       .set(setValues)
       .where(eq(events.id, numId))
       .returning();
+
+    // Apply invitation replace-set if requested
+    if (wantsInvitationEdit && dedupedInvitees !== null) {
+      await setEventInvitations({
+        eventId: numId,
+        organizerRole: role,
+        invitees: dedupedInvitees,
+      });
+    }
 
     // A3 fan-out: diff what materially changed and notify RSVPers (yes /
     // interested), excluding the editor themselves. Best-effort; never
