@@ -92,6 +92,20 @@ export const EVENT_TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'set_meeting_link',
+      description: 'Set the meeting URL or physical location for the event (e.g. https://meet.liminalcommons.com, a Zoom link, or an address).',
+      parameters: {
+        type: 'object',
+        properties: {
+          link: { type: 'string', description: 'A meeting URL or location string. Empty string clears it.' },
+        },
+        required: ['link'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'generate_image',
       description: 'Generate a banner image for the event based on a visual description',
       parameters: {
@@ -181,7 +195,7 @@ Copy principles:
 
 TOOL USAGE
 
-- CRITICAL: When the user provides ANY event details (topic, day, time, frequency), ALWAYS call ALL corresponding tools immediately. If they mention a topic, call set_title. If they mention a day, call set_time with a date. If they say weekly, call set_recurrence. Fill everything you can in ONE response. Fill first, refine through dialogue.
+- CRITICAL: When the user provides ANY event details (topic, day, time, frequency, link), ALWAYS call ALL corresponding tools immediately. If they mention a topic, call set_title. If they mention a day, call set_time with a date. If they say weekly, call set_recurrence. If they paste or describe a meeting URL or physical location, call set_meeting_link. Fill everything you can in ONE response. Fill first, refine through dialogue.
 - CRITICAL: Always include a brief conversational response text alongside tool calls. Never respond with only tool calls and no text content.
 - When the host gives enough context, fill multiple fields at once
 - Generate a banner image when you understand the event's essence — use a vivid, abstract visual prompt with no text in images
@@ -242,6 +256,8 @@ export function applyToolCall(toolCall: ToolCall): Partial<EventFormValues> | nu
       return null // side-effect, handled server-side
     case 'set_hylo_groups':
       return { hyloGroupNames: args.groupNames }
+    case 'set_meeting_link':
+      return { meetingLink: args.link }
     default:
       return null
   }
@@ -257,6 +273,7 @@ export function toolCallLabel(name: string): string {
     case 'generate_image': return 'Generating image...'
     case 'suggest_times': return 'Finding best times...'
     case 'set_hylo_groups': return 'Set Hylo groups'
+    case 'set_meeting_link': return 'Set meeting link'
     default: return name
   }
 }
