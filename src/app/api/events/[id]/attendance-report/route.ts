@@ -11,7 +11,7 @@ import {
 import { eventEndedAt, type EventTimeFields } from '@/lib/event-time';
 import { fanoutAttendanceNegative } from '@/lib/notifications/fanout';
 import {
-  visibleEventsForUserCondition,
+  visibleEventsForMemberCondition,
   publicOnlyEventsCondition,
 } from '@/lib/events/visibility';
 
@@ -20,10 +20,10 @@ import {
 // gate: a member who never engaged with the event cannot report on it.
 async function findEvent(
   numId: number,
-  userId: string | undefined,
+  memberId: number | undefined,
 ): Promise<(EventTimeFields & Partial<Event>) | null> {
-  const visibilityCond = userId
-    ? visibleEventsForUserCondition(userId)
+  const visibilityCond = memberId
+    ? visibleEventsForMemberCondition(memberId)
     : publicOnlyEventsCondition();
   const rows = await db
     .select()
@@ -91,8 +91,7 @@ export async function POST(
     normalizedNote = note;
   }
 
-  const userId = member.hyloId ?? member.clerkId ?? undefined;
-  const event = await findEvent(numId, userId);
+  const event = await findEvent(numId, member.id);
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }

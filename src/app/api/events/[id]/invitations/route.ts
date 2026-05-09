@@ -3,7 +3,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { visibleEventsForUserCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { listEventInvitations } from '@/lib/events/invitations-repo';
 
 export async function GET(
@@ -21,10 +21,10 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const userId = authed.id;
-
   try {
-    const visibilityCond = visibleEventsForUserCondition(userId);
+    const visibilityCond = authed.memberId
+      ? visibleEventsForMemberCondition(authed.memberId)
+      : publicOnlyEventsCondition();
 
     const [event] = await db
       .select()

@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { events, members, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { generateCalendarFeed, type ICSEvent } from '@/lib/ics-generator';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { and, asc, eq, inArray, not } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
@@ -17,16 +17,21 @@ export async function GET(request: NextRequest) {
   try {
     const token = request.nextUrl.searchParams.get('token');
 
-    // Look up user by feed token (if provided)
+    // Look up user by feed token (if provided). The token resolves to the
+    // canonical members.id (Phase 3 — visibility predicate is integer-keyed)
+    // and to the legacy provider-string id (still used by rsvps.user_id
+    // until Phase 4 drops the column).
     let _userId: string | null = null;
+    let _memberId: number | null = null;
     if (token) {
       const [member] = await db
-        .select({ hyloId: members.hyloId })
+        .select({ id: members.id, hyloId: members.hyloId, clerkId: members.clerkId })
         .from(members)
         .where(eq(members.feedToken, token))
         .limit(1);
       if (member) {
-        _userId = member.hyloId;
+        _memberId = member.id;
+        _userId = member.hyloId ?? member.clerkId;
       }
       // Invalid token: fall through to universal feed (backward compatible)
     }
@@ -35,8 +40,8 @@ export async function GET(request: NextRequest) {
 
     // Visibility: token-authenticated users see public + their own/invited/rsvp'd events;
     // unauthenticated callers (no token or invalid token) see public events only.
-    const visibilityCond = _userId
-      ? visibleEventsForUserCondition(_userId)
+    const visibilityCond = _memberId
+      ? visibleEventsForMemberCondition(_memberId)
       : publicOnlyEventsCondition();
 
     let allEvents;

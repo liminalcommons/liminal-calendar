@@ -9,12 +9,13 @@ import {
   COMMENT_MAX_LENGTH,
 } from '@/lib/comments/repo';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 async function eventExists(numId: number): Promise<boolean> {
   const authed = await getAuthedUser();
-  const userId = authed?.id;
-  const visibilityCond = userId ? visibleEventsForUserCondition(userId) : publicOnlyEventsCondition();
+  const visibilityCond = authed?.memberId
+    ? visibleEventsForMemberCondition(authed.memberId)
+    : publicOnlyEventsCondition();
   const rows = await db.select().from(events).where(and(eq(events.id, numId), visibilityCond));
   return rows.length > 0;
 }

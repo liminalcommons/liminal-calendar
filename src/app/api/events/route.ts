@@ -7,7 +7,7 @@ import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { asc, inArray, gte, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
 import { fanoutInvitationReceived } from '@/lib/notifications/fanout';
 
@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
 
     // Visibility: authenticated users see public + their own/invited/rsvp'd events;
     // unauthenticated users see public events only.
-    const visibilityCond = currentUserId
-      ? visibleEventsForUserCondition(currentUserId)
+    const visibilityCond = authed?.memberId
+      ? visibleEventsForMemberCondition(authed.memberId)
       : publicOnlyEventsCondition();
     conditions.push(visibilityCond);
 

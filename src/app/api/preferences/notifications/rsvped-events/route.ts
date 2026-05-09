@@ -3,7 +3,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { and, asc, eq, gte, inArray, not } from 'drizzle-orm';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: Request) {
@@ -20,7 +20,7 @@ export async function GET(_request: Request) {
   const ids = rsvpedIds.map((r) => r.eventId);
   if (ids.length === 0) return NextResponse.json({ events: [] });
 
-  const visibilityCond = userId ? visibleEventsForUserCondition(userId) : publicOnlyEventsCondition();
+  const visibilityCond = authed.memberId ? visibleEventsForMemberCondition(authed.memberId) : publicOnlyEventsCondition();
   const upcoming = await db
     .select({ id: events.id, title: events.title, starts_at: events.startsAt })
     .from(events)

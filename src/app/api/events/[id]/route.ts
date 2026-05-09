@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
@@ -11,7 +10,7 @@ import {
   fanoutEventChanged,
   fanoutEventCancelled,
 } from '@/lib/notifications/fanout';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import {
   validateInviteeCap,
   setEventInvitations,
@@ -30,9 +29,8 @@ export async function GET(
 
   try {
     const authed = await getAuthedUser();
-    const userId = authed?.id;
-    const visibilityCond = userId
-      ? visibleEventsForUserCondition(userId)
+    const visibilityCond = authed?.memberId
+      ? visibleEventsForMemberCondition(authed.memberId)
       : publicOnlyEventsCondition();
 
     const [event] = await db
@@ -49,7 +47,7 @@ export async function GET(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, userId));
+    return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, authed?.id));
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });
@@ -83,11 +81,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = !!(
-    event.creatorId === authed.id
-    || (authed.hyloId && event.creatorId === authed.hyloId)
-    || (authed.clerkId && event.creatorId === authed.clerkId)
-  );
+  const isCreator = event.memberId !== null && event.memberId === authed.memberId;
 
   // Parse body once
   let bodyRaw: Record<string, unknown>;
@@ -249,11 +243,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = !!(
-    event.creatorId === authed.id
-    || (authed.hyloId && event.creatorId === authed.hyloId)
-    || (authed.clerkId && event.creatorId === authed.clerkId)
-  );
+  const isCreator = event.memberId !== null && event.memberId === authed.memberId;
   if (!canDeleteEvent(role, isCreator)) {
     return NextResponse.json(
       { error: 'Forbidden: insufficient permissions to delete this event' },

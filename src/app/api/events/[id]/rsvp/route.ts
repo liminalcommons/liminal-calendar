@@ -6,7 +6,7 @@ import { upsertRsvp } from '@/lib/rsvp/upsert';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { addNewsletterSubscriber } from '@/lib/newsletter/add-subscriber';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 
 const VALID_RESPONSES = ['yes', 'interested', 'no'] as const;
 type ValidResponse = (typeof VALID_RESPONSES)[number];
@@ -42,10 +42,7 @@ export async function POST(
   }
 
   // Verify event exists and is visible to the caller
-  const postUserId = (member.hyloId ?? member.clerkId) as string | undefined;
-  const postVisibilityCond = postUserId
-    ? visibleEventsForUserCondition(postUserId)
-    : publicOnlyEventsCondition();
+  const postVisibilityCond = visibleEventsForMemberCondition(member.id);
   const [event] = await db.select().from(events).where(and(eq(events.id, numId), postVisibilityCond));
   if (!event) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -103,9 +100,8 @@ export async function GET(
     // Apply visibility so private events are not accessible to unauthenticated
     // callers or users without access.
     const authed = await getAuthedUser();
-    const getUserId = authed?.id;
-    const getVisibilityCond = getUserId
-      ? visibleEventsForUserCondition(getUserId)
+    const getVisibilityCond = authed?.memberId
+      ? visibleEventsForMemberCondition(authed.memberId)
       : publicOnlyEventsCondition();
     const [event] = await db.select().from(events).where(and(eq(events.id, numId), getVisibilityCond));
     if (!event) {

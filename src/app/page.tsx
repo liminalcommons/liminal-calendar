@@ -9,7 +9,7 @@ import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import type { DisplayEvent } from '@/lib/display-event';
 
 export const dynamic = 'force-dynamic';
@@ -21,8 +21,8 @@ export default async function HomePage() {
   let displayEvents: DisplayEvent[] = [];
 
   try {
-    const visibilityCond = currentUserId
-      ? visibleEventsForUserCondition(currentUserId)
+    const visibilityCond = authed?.memberId
+      ? visibleEventsForMemberCondition(authed.memberId)
       : publicOnlyEventsCondition();
     const allEvents = await db.select().from(events).where(visibilityCond).orderBy(asc(events.startsAt));
 
