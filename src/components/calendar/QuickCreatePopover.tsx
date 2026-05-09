@@ -5,91 +5,69 @@ import { X, Sparkles } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import type { DisplayEvent } from '@/lib/display-event';
 import type { EventFormValues } from '@/lib/chat-tools';
-import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
 import { useResolvedRole } from '@/lib/use-resolved-role';
-import { apiFetch } from '@/lib/api-fetch';
-import { ChatPanel } from '@/components/chat/ChatPanel';
 
 interface QuickCreatePopoverProps {
   day: Date;
   hour: number;
   anchorRect: DOMRect;
   onClose: () => void;
+  // Kept for the WeeklyGrid's existing prop contract; unused now that the
+  // popover only collects the title and hands off to /events/new.
   onCreated?: (event: DisplayEvent) => void;
 }
 
-const POPOVER_WIDTH = 420;
-const POPOVER_APPROX_HEIGHT = 600;
+const POPOVER_WIDTH = 360;
+const POPOVER_APPROX_HEIGHT = 180;
 
 function computePosition(anchorRect: DOMRect): { top: number; left: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  const margin = 8;
 
-  let left = anchorRect.right + 8;
+  let left = anchorRect.right + margin;
+  if (left + POPOVER_WIDTH > vw - margin) {
+    left = anchorRect.left - POPOVER_WIDTH - margin;
+  }
+  if (left < margin) left = margin;
+
   let top = anchorRect.top;
-
-  if (left + POPOVER_WIDTH > vw - 8) {
-    left = anchorRect.left - POPOVER_WIDTH - 8;
+  if (top + POPOVER_APPROX_HEIGHT > vh - margin) {
+    top = vh - POPOVER_APPROX_HEIGHT - margin;
   }
-  left = Math.max(8, left);
-
-  if (top + POPOVER_APPROX_HEIGHT > vh - 8) {
-    top = Math.max(8, vh - POPOVER_APPROX_HEIGHT - 8);
-  }
-  top = Math.max(8, top);
-
+  if (top < margin) top = margin;
   return { top, left };
 }
 
-function buildStartTime(day: Date, slot: number): Date {
-  const d = new Date(day);
-  d.setHours(Math.floor(slot / 2), (slot % 2) * 30, 0, 0);
-  return d;
+function buildStartTime(day: Date, halfHourSlot: number): Date {
+  const h = Math.floor(halfHourSlot / 2);
+  const m = (halfHourSlot % 2) * 30;
+  const start = new Date(day);
+  start.setHours(h, m, 0, 0);
+  return start;
 }
 
-function formatDateTimeLabel(day: Date, hour: number): string {
-  const d = buildStartTime(day, hour);
-  return format(d, 'EEE MMM d, h:mm aa');
+function formatDateTimeLabel(day: Date, halfHourSlot: number): string {
+  const start = buildStartTime(day, halfHourSlot);
+  return format(start, "EEE MMM d, h:mm a");
 }
 
-const DURATION_OPTIONS = [
-  { label: '30 min', minutes: 30 },
-  { label: '1 hour', minutes: 60 },
-  { label: '1.5 hours', minutes: 90 },
-  { label: '2 hours', minutes: 120 },
-  { label: '3 hours', minutes: 180 },
-];
+const DEFAULT_DURATION_MIN = 60;
 
-export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }: QuickCreatePopoverProps) {
+export function QuickCreatePopover({ day, hour, anchorRect, onClose }: QuickCreatePopoverProps) {
   const { data: session } = useSession();
   const popoverRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
-  const [durationMinutes, setDurationMinutes] = useState(60);
-  const [isCreating, setIsCreating] = useState(false);
+  const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // EventFormValues holds everything the chat assistant fills in via tool
-  // calls. We pre-seed date/start/end from the clicked cell so the AI doesn't
-  // have to ask "when?" — it can focus on what the event is about.
-  const [formValues, setFormValues] = useState<EventFormValues>(() => {
-    const start = buildStartTime(day, hour);
-    const end = new Date(start.getTime() + 60 * 60_000);
-    return {
-      date: format(start, 'yyyy-MM-dd'),
-      startTime: format(start, 'HH:mm'),
-      endTime: format(end, 'HH:mm'),
-      meetingLink: 'https://castalia.one',
-    };
-  });
-
-  // Hylo users carry role on the session; Clerk users on the members row.
   const { role: resolvedRole } = useResolvedRole();
   const role = resolvedRole ?? getUserRole(session);
-  const router = useRouter();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -109,47 +87,30 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     return () => document.removeEventListener('mousedown', handler);
   }, [onClose]);
 
-  const handleFormUpdate = useCallback((updates: Partial<EventFormValues>) => {
-    setFormValues(prev => ({ ...prev, ...updates }));
+  useEffect(() => {
+    inputRef.current?.focus();
   }, []);
 
-  // Keep formValues.startTime/endTime in sync with the duration picker — the
-  // duration UI is the canonical source for end time inside the popover, so
-  // the chat assistant gets a coherent end whenever the user adjusts it.
-  useEffect(() => {
-    const start = buildStartTime(day, hour);
-    const end = new Date(start.getTime() + durationMinutes * 60_000);
-    setFormValues(prev => ({
-      ...prev,
-      date: format(start, 'yyyy-MM-dd'),
-      startTime: format(start, 'HH:mm'),
-      endTime: format(end, 'HH:mm'),
-    }));
-  }, [day, hour, durationMinutes]);
-
-  // Hand off the popover's draft state to the full editor and navigate.
-  // The user reviews the form there and clicks Create — the popover no
-  // longer creates events directly. The handoff key is read once by
-  // /events/new, which seeds externalValues and clears the key.
   const handleContinue = useCallback(() => {
-    const trimmed = (formValues.title || '').trim();
+    const trimmed = title.trim();
     if (!trimmed) {
-      setError('Tell the assistant what the event is about first.');
+      setError("Give it a working title — you can refine it with the assistant.");
+      inputRef.current?.focus();
       return;
     }
     const startTime = buildStartTime(day, hour);
-    const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
-    const handoff = {
-      ...formValues,
+    const endTime = new Date(startTime.getTime() + DEFAULT_DURATION_MIN * 60_000);
+    const handoff: Partial<EventFormValues> = {
       title: trimmed,
       date: format(day, 'yyyy-MM-dd'),
       startTime: format(startTime, 'HH:mm'),
       endTime: format(endTime, 'HH:mm'),
+      meetingLink: 'https://castalia.one',
     };
     try { localStorage.setItem('calendar-quick-create-handoff', JSON.stringify(handoff)); } catch { /* ignore */ }
     onClose();
     router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
-  }, [formValues, durationMinutes, day, hour, onClose, router]);
+  }, [title, day, hour, onClose, router]);
 
   if (!canCreateEvents(role)) return null;
 
@@ -160,18 +121,11 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     <div
       ref={popoverRef}
       className="fixed z-50 bg-grove-surface rounded-xl shadow-lg border border-grove-border flex flex-col"
-      style={{
-        top: pos.top,
-        left: pos.left,
-        width: POPOVER_WIDTH,
-        maxHeight: 'calc(100vh - 16px)',
-        height: POPOVER_APPROX_HEIGHT,
-      }}
+      style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
       role="dialog"
       aria-label="Quick create event"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-grove-text uppercase tracking-wider">
           <Sparkles size={12} className="text-grove-accent" />
           New Event
@@ -185,79 +139,41 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
         </button>
       </div>
 
-      {/* Time controls + strip — pre-seeded from the clicked cell */}
-      <div className="px-4 pb-2 space-y-2 shrink-0">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-grove-text">{dateTimeLabel}</span>
-          <select
-            value={durationMinutes}
-            onChange={e => setDurationMinutes(Number(e.target.value))}
-            className="text-xs bg-grove-border/20 border border-grove-border rounded-md px-2 py-1
-                       text-grove-text focus:outline-none focus:ring-1 focus:ring-grove-accent"
-            disabled={isCreating}
-          >
-            {DURATION_OPTIONS.map(d => (
-              <option key={d.minutes} value={d.minutes} className="bg-grove-surface text-grove-text">{d.label}</option>
-            ))}
-          </select>
-        </div>
+      <div className="px-4 pb-1">
+        <span className="text-xs text-grove-text-muted">{dateTimeLabel}</span>
       </div>
 
-      {/* Captured fields summary (chips) — shows what the assistant has set */}
-      {(formValues.title || formValues.description || formValues.recurrence) && (
-        <div className="px-4 pb-2 flex flex-wrap gap-1 shrink-0">
-          {formValues.title && (
-            <span className="text-[10px] bg-grove-accent/15 text-grove-text border border-grove-accent/40 rounded-full px-2 py-0.5">
-              Title: {formValues.title}
-            </span>
-          )}
-          {formValues.recurrence && formValues.recurrence !== 'none' && (
-            <span className="text-[10px] bg-grove-border/30 text-grove-text-muted border border-grove-border rounded-full px-2 py-0.5">
-              Repeats: {formValues.recurrence}
-            </span>
-          )}
-          {formValues.description && (
-            <span className="text-[10px] bg-grove-border/30 text-grove-text-muted border border-grove-border rounded-full px-2 py-0.5 max-w-[220px] truncate">
-              Desc: {formValues.description}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Chat — fills remaining vertical space */}
-      <div className="flex-1 min-h-0 px-1 pb-1">
-        <ChatPanel
-          formValues={formValues}
-          onFormUpdate={handleFormUpdate}
-          storageKey="calendar-chat-quick-create"
+      <div className="px-4 pb-3">
+        <label className="block text-xs font-medium text-grove-text mb-1.5">
+          What's this event about?
+        </label>
+        <input
+          ref={inputRef}
+          type="text"
+          value={title}
+          onChange={(e) => { setTitle(e.target.value); if (error) setError(null); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleContinue(); } }}
+          placeholder="e.g. Friendship Circle"
+          className="w-full text-sm px-3 py-2 rounded-md border border-grove-border bg-grove-bg text-grove-text
+                     focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent"
+          maxLength={140}
         />
+        {error && (
+          <p className="mt-1.5 text-xs text-red-400">{error}</p>
+        )}
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="px-4 py-1 text-xs text-red-400 shrink-0">{error}</div>
-      )}
-
-      {/* Footer actions */}
-      <div className="px-4 pb-3 pt-1 flex items-center gap-2 shrink-0 border-t border-grove-border/40">
-        <Link
-          href={`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`}
-          className="text-[11px] text-grove-accent-deep hover:text-grove-accent transition-colors mr-auto"
-          onClick={onClose}
-        >
-          Open full editor →
-        </Link>
+      <div className="px-4 pb-3 flex items-center justify-end gap-2 border-t border-grove-border/40 pt-2">
         <button
           onClick={onClose}
           className="text-xs py-1.5 px-3 rounded-md border border-grove-border text-grove-text-muted
                      hover:text-grove-text transition-colors"
-          disabled={isCreating}
         >
           Cancel
         </button>
         <button
           onClick={handleContinue}
-          disabled={!formValues.title?.trim()}
+          disabled={!title.trim()}
           className="text-xs py-1.5 px-4 rounded-md bg-grove-accent text-grove-surface font-medium
                      hover:bg-grove-accent/90 transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
