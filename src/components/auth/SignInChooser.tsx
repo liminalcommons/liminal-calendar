@@ -32,19 +32,24 @@ export function SignInChooser() {
       <p className="text-sm text-grove-text-muted">
         Choose how you&apos;d like to continue.
       </p>
-      <button
-        type="button"
-        onClick={handleCastaliaSignIn}
-        className="block w-full rounded-md bg-grove-accent text-grove-surface py-2.5 px-4 text-sm font-medium hover:opacity-90 transition-opacity"
-      >
-        Sign in with Castalia
-      </button>
+      <div>
+        <button
+          type="button"
+          onClick={handleCastaliaSignIn}
+          className="block w-full rounded-md bg-grove-accent text-grove-surface py-2.5 px-4 text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          Sign in with Castalia
+        </button>
+        <p className="text-[11px] text-grove-text-muted mt-1.5 px-1">
+          Recommended — use the same email you&apos;ve always used. Your roles, RSVPs and history carry over.
+        </p>
+      </div>
       <button
         type="button"
         onClick={handleHyloSignIn}
-        className="block w-full rounded-md bg-grove-accent-deep text-grove-surface py-2.5 px-4 text-sm font-medium hover:opacity-90 transition-opacity"
+        className="block w-full rounded-md bg-grove-accent-deep/70 text-grove-surface py-2.5 px-4 text-sm font-medium hover:opacity-90 transition-opacity"
       >
-        Continue with Liminal Commons (Hylo)
+        Continue with Liminal Commons (Hylo) — legacy
       </button>
       <Link
         href="/sign-in"
