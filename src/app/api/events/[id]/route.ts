@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '../../../../../auth';
-import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
@@ -28,8 +29,8 @@ export async function GET(
   }
 
   try {
-    const session = await auth();
-    const userId = (session?.user?.hyloId ?? (session?.user as Record<string, unknown> | undefined)?.clerkId) as string | undefined;
+    const authed = await getAuthedUser();
+    const userId = authed?.id;
     const visibilityCond = userId
       ? visibleEventsForUserCondition(userId)
       : publicOnlyEventsCondition();
@@ -59,8 +60,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -70,7 +71,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const role = getUserRole(session);
+  const role = authed.role;
 
   // Fetch event to check ownership
   const [event] = await db
@@ -82,7 +83,11 @@ export async function PATCH(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = event.creatorId === session.user?.hyloId;
+  const isCreator = !!(
+    event.creatorId === authed.id
+    || (authed.hyloId && event.creatorId === authed.hyloId)
+    || (authed.clerkId && event.creatorId === authed.clerkId)
+  );
 
   // Parse body once
   let bodyRaw: Record<string, unknown>;
@@ -199,9 +204,7 @@ export async function PATCH(
     try {
       const diff = diffEventForNotification(event, updated);
       if (diff) {
-        const actorId = (session.user?.hyloId as string | undefined) ?? null;
-        const actorName = (session.user?.name as string | undefined) ?? null;
-        await fanoutEventChanged(db, updated, diff, { id: actorId, name: actorName });
+        await fanoutEventChanged(db, updated, diff, { id: authed.id, name: authed.name });
       }
     } catch (fanoutErr) {
       console.error('[PATCH /api/events/[id]] fanout failed', fanoutErr);
@@ -212,8 +215,7 @@ export async function PATCH(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    const currentUserId = session.user?.hyloId as string | undefined;
-    return NextResponse.json(dbEventToDisplayEvent(updated, eventRsvps, currentUserId));
+    return NextResponse.json(dbEventToDisplayEvent(updated, eventRsvps, authed.id));
   } catch (err) {
     console.error('[PATCH /api/events/[id]] update', err);
     return NextResponse.json({ error: 'Failed to update event' }, { status: 500 });
@@ -224,8 +226,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -235,7 +237,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const role = getUserRole(session);
+  const role = authed.role;
 
   // Fetch event to check ownership
   const [event] = await db
@@ -247,7 +249,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const isCreator = event.creatorId === session.user?.hyloId;
+  const isCreator = !!(
+    event.creatorId === authed.id
+    || (authed.hyloId && event.creatorId === authed.hyloId)
+    || (authed.clerkId && event.creatorId === authed.clerkId)
+  );
   if (!canDeleteEvent(role, isCreator)) {
     return NextResponse.json(
       { error: 'Forbidden: insufficient permissions to delete this event' },
@@ -256,13 +262,8 @@ export async function DELETE(
   }
 
   try {
-    // A4 fan-out FIRST — recipient list comes from rsvps which cascade-deletes
-    // when the event row goes away. Best-effort; if fanout throws, still
-    // delete the event but log the failure.
     try {
-      const actorId = (session.user?.hyloId as string | undefined) ?? null;
-      const actorName = (session.user?.name as string | undefined) ?? null;
-      await fanoutEventCancelled(db, event, { id: actorId, name: actorName });
+      await fanoutEventCancelled(db, event, { id: authed.id, name: authed.name });
     } catch (fanoutErr) {
       console.error('[DELETE /api/events/[id]] fanout failed', fanoutErr);
     }
