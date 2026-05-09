@@ -145,7 +145,7 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose }: QuickCrea
 
       <div className="px-4 pb-3">
         <label className="block text-xs font-medium text-grove-text mb-1.5">
-          What's this event about?
+          What&apos;s this event about?
         </label>
         <input
           ref={inputRef}
