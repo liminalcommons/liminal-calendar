@@ -52,29 +52,32 @@ export async function setEventInvitations({
     throw new Error('INVITEE_CAP_EXCEEDED');
   }
 
-  // Resolve invitee memberIds in parallel BEFORE opening the transaction.
-  // Each call is one indexed SELECT — small fan-out, but doing them inside
-  // the tx would serialize them and lengthen the lock window.
+  // Resolve invitee memberIds in parallel.
   const memberIds = await Promise.all(
     deduped.map((inv) => resolveMemberId(db, inv.userId)),
   );
 
-  await db.transaction(async (tx) => {
-    await tx.delete(eventInvitations).where(eq(eventInvitations.eventId, eventId));
+  // Replace-set: delete existing rows, then insert the new set. The Neon HTTP
+  // driver does NOT support db.transaction() (it batches but won't roll back),
+  // so this runs as two sequential statements. The window between them is
+  // tiny and a concurrent reader of event_invitations would see an empty
+  // set briefly — acceptable: invitations are eventually-consistent for
+  // the UI, and the unique (event_id, invitee_user_id) constraint still
+  // prevents duplicate inserts within a single call.
+  await db.delete(eventInvitations).where(eq(eventInvitations.eventId, eventId));
 
-    if (deduped.length > 0) {
-      await tx.insert(eventInvitations).values(
-        deduped.map((inv, i) => ({
-          eventId,
-          inviteeUserId: inv.userId,
-          memberId: memberIds[i],
-          inviteeName: inv.name,
-          inviteeImage: inv.image ?? null,
-          invitedAt: new Date(),
-        })),
-      );
-    }
-  });
+  if (deduped.length > 0) {
+    await db.insert(eventInvitations).values(
+      deduped.map((inv, i) => ({
+        eventId,
+        inviteeUserId: inv.userId,
+        memberId: memberIds[i],
+        inviteeName: inv.name,
+        inviteeImage: inv.image ?? null,
+        invitedAt: new Date(),
+      })),
+    );
+  }
 }
 
 export async function listEventInvitations(
