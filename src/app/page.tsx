@@ -1,4 +1,4 @@
-import { auth } from '../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
@@ -9,18 +9,22 @@ import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
+import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import type { DisplayEvent } from '@/lib/display-event';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const session = await auth();
-  const currentUserId = session?.user?.hyloId as string | undefined;
+  const authed = await getAuthedUser();
+  const currentUserId = authed?.id;
 
   let displayEvents: DisplayEvent[] = [];
 
   try {
-    const allEvents = await db.select().from(events).orderBy(asc(events.startsAt));
+    const visibilityCond = currentUserId
+      ? visibleEventsForUserCondition(currentUserId)
+      : publicOnlyEventsCondition();
+    const allEvents = await db.select().from(events).where(visibilityCond).orderBy(asc(events.startsAt));
 
     // Fetch all RSVPs in one query
     const allRsvps = allEvents.length > 0

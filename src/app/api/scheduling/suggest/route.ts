@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../../../../auth';
-import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
+import { canCreateEvents } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { inArray } from 'drizzle-orm';
 import { findBestTimes } from '@/lib/scheduling';
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
+  const authed = await getAuthedUser();
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (!canCreateEvents(getUserRole(session))) {
+  if (!canCreateEvents(authed.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

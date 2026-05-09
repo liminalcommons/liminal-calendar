@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useResolvedRole } from '@/lib/use-resolved-role'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { EventCard } from '@/components/events/EventCard'
@@ -14,7 +15,8 @@ export default function ListPage() {
   const { data: session } = useSession()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const userRole = session?.user?.role
+  const { role: clerkAwareRole } = useResolvedRole()
+  const userRole = clerkAwareRole ?? session?.user?.role
 
   useEffect(() => {
     const now = new Date()

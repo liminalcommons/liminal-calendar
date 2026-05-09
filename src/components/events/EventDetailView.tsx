@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { useResolvedProfile } from '@/lib/use-resolved-role';
 import type { DisplayEvent } from '@/lib/display-event';
 import {
   getUserTimezone,
@@ -104,11 +105,18 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     }
   };
 
-  const isLoaded = status !== 'loading';
-  const hyloId = user?.hyloId || user?.id;
-  const role = user?.role || 'member';
-  const isOwner = isLoaded && user && event && String(hyloId) === String(event.creator_id);
-  const isAdmin = isLoaded && user && role === 'admin';
+  const { profile, resolved: profileResolved } = useResolvedProfile();
+  const isLoaded = status !== 'loading' && profileResolved;
+  // Role + identity must come from /api/profile for Clerk parity.
+  const role = profile?.role ?? user?.role ?? 'member';
+  const isOwner = isLoaded && event && (
+    (profile?.hyloId && String(profile.hyloId) === String(event.creator_id))
+    || (profile?.clerkId && String(profile.clerkId) === String(event.creator_id))
+    || (profile?.userId && String(profile.userId) === String(event.creator_id))
+    // Legacy Hylo-only fallback for sessions where /api/profile fails.
+    || (!profile && user && String(user.hyloId || user.id) === String(event.creator_id))
+  );
+  const isAdmin = isLoaded && role === 'admin';
   const canEdit = isOwner;
   const canDelete = isOwner || isAdmin;
 

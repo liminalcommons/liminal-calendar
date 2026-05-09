@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useResolvedProfile } from '@/lib/use-resolved-role';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
@@ -55,8 +56,14 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const { submit: submitRsvp, pending: rsvpLoading } = useRsvpMutation(event.id);
   const [closing, setClosing] = useState(false);
 
-  const role = getUserRole(session);
-  const isCreator = session?.user?.id === event.creator_id || session?.user?.hyloId === event.creator_id;
+  const { profile } = useResolvedProfile();
+  const role = profile?.role ?? getUserRole(session);
+  const isCreator = !!(
+    (profile?.hyloId && profile.hyloId === event.creator_id)
+    || (profile?.clerkId && profile.clerkId === event.creator_id)
+    || session?.user?.id === event.creator_id
+    || session?.user?.hyloId === event.creator_id
+  );
   const canEdit = canEditEvent(role, isCreator);
   const canDelete = canDeleteEvent(role, isCreator);
 

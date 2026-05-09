@@ -42,8 +42,21 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   // creator_id to decide drag affordance. Hylo ID is the canonical identity
   // (matches event.creator_id); falls back to user.id (NextAuth user id) if
   // the session shape varies. `null` = unauthenticated → no drag anywhere.
-  const sessionUser = session?.user as { hyloId?: string; id?: string } | undefined;
-  const currentUserId = sessionUser?.hyloId ?? sessionUser?.id ?? null;
+  const sessionUser = session?.user as { hyloId?: string; clerkId?: string; id?: string } | undefined;
+  // Clerk users carry their identity on members.clerkId, not the NextAuth
+  // session. WeeklyGrid receives events with creator_id = whichever provider
+  // id was used at creation; useResolvedRole's profile fetch already runs,
+  // so we hit the same /api/profile here for the canonical identifier.
+  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/api/profile').then(r => r.ok ? r.json() : null).then(p => {
+      if (cancelled || !p) return;
+      setResolvedUserId(p.hyloId ?? p.clerkId ?? null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const currentUserId = resolvedUserId ?? sessionUser?.hyloId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { auth } from '../../../../auth';
-import { getUserRole, canCreateEvents, canCreatePublicEvent, type UserRole } from '@/lib/auth-helpers';
-import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { canCreateEvents, canCreatePublicEvent } from '@/lib/auth-helpers';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
@@ -20,10 +19,11 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
 
-    // Resolve session once — used for both visibility filtering and myResponse.
-    const session = await auth();
-    const userAny = session?.user as ({ hyloId?: string; clerkId?: string }) | undefined;
-    const currentUserId = (userAny?.hyloId ?? userAny?.clerkId) as string | undefined;
+    // Resolve identity once — used for both visibility filtering and myResponse.
+    // getAuthedUser handles Hylo + Clerk; for Clerk-only users it reads role
+    // and identifiers from the members row.
+    const authed = await getAuthedUser();
+    const currentUserId = authed?.id;
 
     const conditions = [];
     if (from) {
@@ -71,27 +71,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  // Hylo session takes precedence; fall through to Clerk via getCurrentMember.
-  let role: UserRole;
-  let user: { hyloId?: string; clerkId?: string; id?: string; name?: string | null; image?: string | null };
-  if (session?.user) {
-    role = getUserRole(session);
-    user = session.user as typeof user;
-  } else {
-    const member = await getCurrentMember(db);
-    if (!member) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    role = (member.role === 'admin' || member.role === 'host') ? member.role : 'member';
-    user = {
-      clerkId: member.clerkId ?? undefined,
-      hyloId: member.hyloId ?? undefined,
-      id: member.clerkId ?? member.hyloId ?? String(member.id),
-      name: member.name,
-      image: member.image,
-    };
+  const authed = await getAuthedUser();
+  if (!authed) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const role = authed.role;
+  const user = {
+    hyloId: authed.hyloId,
+    clerkId: authed.clerkId,
+    id: authed.id,
+    name: authed.name,
+    image: authed.image,
+  };
 
   if (!canCreateEvents(role)) {
     return NextResponse.json(
