@@ -10,6 +10,7 @@ import type { DisplayEvent } from '@/lib/display-event';
 import type { EventFormValues } from '@/lib/chat-tools';
 import { calendarSFX } from '@/lib/sound-manager';
 import { getUserRole, canCreateEvents } from '@/lib/auth-helpers';
+import { useResolvedRole } from '@/lib/use-resolved-role';
 import { apiFetch } from '@/lib/api-fetch';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 
@@ -85,7 +86,9 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, onCreated }
     };
   });
 
-  const role = getUserRole(session);
+  // Hylo users carry role on the session; Clerk users on the members row.
+  const { role: resolvedRole } = useResolvedRole();
+  const role = resolvedRole ?? getUserRole(session);
   const router = useRouter();
 
   useEffect(() => {

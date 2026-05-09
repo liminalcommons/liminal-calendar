@@ -12,6 +12,7 @@ import { calendarSFX } from '@/lib/sound-manager';
 import { useEvents } from '@/lib/use-events';
 import { computeHourHeights, computeFisheyeHeights, computeHourOffsets } from '@/lib/golden-hours';
 import { canCreateEvents } from '@/lib/auth-helpers';
+import { useResolvedRole } from '@/lib/use-resolved-role';
 import { computeCrossDayDropTimes } from '@/lib/drag-reschedule';
 import { DragFloat } from './DragFloat';
 import { DragEdgeIndicator } from './DragEdgeIndicator';
@@ -31,7 +32,10 @@ interface WeeklyGridProps {
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const { data: session } = useSession();
-  const userRole = session?.user?.role || 'member';
+  // Role lives on the Hylo session for Hylo users, but on the members row
+  // for Clerk users. useResolvedRole hits /api/profile, which handles both.
+  const { role: resolvedRole } = useResolvedRole();
+  const userRole = resolvedRole ?? (session?.user?.role as 'member'|'host'|'admin' | undefined) ?? 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
   // Identify the viewing user — DayColumn compares this against each event's
