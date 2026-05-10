@@ -20,32 +20,11 @@ import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { RESERVED_HANDLES } from '@/lib/booking/reserved-handles';
+
+export { RESERVED_HANDLES };
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
-
-// Top-level Next.js routes under src/app — handles must not shadow them
-// or `/book/:handle` would never match (and `/:handle` profile pages
-// later in the plan would conflict). Keep in sync with src/app/ dirs.
-const RESERVED = new Set([
-  'admin',
-  'api',
-  'book',
-  'booking',
-  'events',
-  'list',
-  'login',
-  'logout',
-  'marketplace',
-  'month',
-  'profile',
-  'settings',
-  'show-and-tell',
-  'sign-in',
-  'sign-up',
-  'start-hylo-signin',
-  'topics',
-  'welcome',
-]);
 
 export async function PUT(request: NextRequest) {
   const member = await getCurrentMember(db);
@@ -81,7 +60,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  if (RESERVED.has(handle)) {
+  if (RESERVED_HANDLES.has(handle)) {
     return NextResponse.json({ error: 'handle is reserved' }, { status: 400 });
   }
 
