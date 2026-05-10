@@ -1,0 +1,254 @@
+/**
+ * POST /api/booking/[handle]/[slug]/book — Task 6 of Plan 3 (1:1 Booking).
+ *
+ * The booking endpoint. Atomic-ish across:
+ *   1. events row (visibility=private, sourceEventTypeId set)
+ *   2. 2 rsvps rows (owner=yes, booker=yes) — dual-write
+ *   3. 2 booking.confirmed notifications (owner + booker)
+ *
+ * neon-http has no `db.transaction()`. Inserts are sequential. If a later
+ * insert fails, earlier rows persist (a known project-wide constraint).
+ *
+ * Slot re-validation: we re-run `computeSlots(...)` with the exact same
+ * inputs the slots-endpoint uses, and require the requested startsAt to
+ * match one of the engine's outputs (millisecond-precise). This is the
+ * race-safety check — between the GET /slots and the POST /book, the
+ * owner may have created a conflicting event.
+ *
+ * Auth: `getCurrentMember(db)`. Self-booking (booker === owner) is 400.
+ *
+ * Next.js 15: `params` is async; await it.
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { and, eq, gte, lte } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { events, rsvps, members } from '@/lib/db/schema';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
+import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
+import { listMyWindows } from '@/lib/booking/windows-repo';
+import { computeSlots } from '@/lib/booking/slots';
+import { mintCastaliaRoomUrl } from '@/lib/booking/castalia-room';
+import { createNotification } from '@/lib/notifications/inbox/repo';
+
+const MS_PER_DAY = 86_400_000;
+
+const BookInput = z.object({
+  startsAt: z.string().datetime(),
+});
+
+/** Resolve a Member to a legacy provider-string id (logto > clerk > hylo > fallback). */
+function legacyIdFor(m: {
+  id: number;
+  logtoId: string | null;
+  clerkId: string | null;
+  hyloId: string | null;
+}): string {
+  return m.logtoId ?? m.clerkId ?? m.hyloId ?? String(m.id);
+}
+
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ handle: string; slug: string }> },
+) {
+  const bookerMember = await getCurrentMember(db);
+  if (!bookerMember) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const parsed = BookInput.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid body: startsAt must be ISO datetime' }, { status: 400 });
+  }
+  const requestedStart = new Date(parsed.data.startsAt);
+
+  const { handle, slug } = await context.params;
+
+  const ownerMemberId = await resolveHandleToMemberId(handle);
+  if (ownerMemberId === null) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  if (ownerMemberId === bookerMember.id) {
+    return NextResponse.json({ error: 'Cannot book yourself' }, { status: 400 });
+  }
+
+  const et = await getEventTypeBySlug(ownerMemberId, slug);
+  if (!et) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Slot re-validation. Same query shape as GET /slots — keep these in sync.
+  const windows = await listMyWindows(ownerMemberId);
+  const now = new Date();
+  const horizon = new Date(now.getTime() + et.maxDaysAhead * MS_PER_DAY);
+  const blockingRows = await db
+    .select({ startsAt: events.startsAt, endsAt: events.endsAt })
+    .from(events)
+    .where(
+      and(
+        eq(events.memberId, ownerMemberId),
+        gte(events.startsAt, now),
+        lte(events.startsAt, horizon),
+      ),
+    );
+
+  const computed = computeSlots({
+    now,
+    eventType: {
+      durationMinutes: et.durationMinutes,
+      bufferBeforeMinutes: et.bufferBeforeMinutes ?? 0,
+      bufferAfterMinutes: et.bufferAfterMinutes ?? 0,
+      minNoticeMinutes: et.minNoticeMinutes ?? 0,
+      maxDaysAhead: et.maxDaysAhead,
+    },
+    windows: windows.map((w) => ({
+      dayOfWeek: w.dayOfWeek,
+      startMinute: w.startMinute,
+      endMinute: w.endMinute,
+      timezone: w.timezone ?? 'UTC',
+    })),
+    blockingEvents: (blockingRows as Array<{ startsAt: Date | string; endsAt: Date | string | null }>).map(
+      (r) => ({
+        startsAt: r.startsAt instanceof Date ? r.startsAt : new Date(r.startsAt),
+        endsAt: r.endsAt ? (r.endsAt instanceof Date ? r.endsAt : new Date(r.endsAt)) : null,
+      }),
+    ),
+  });
+
+  const requestedMs = requestedStart.getTime();
+  const matched = computed.find((s) => s.startsAt.getTime() === requestedMs);
+  if (!matched) {
+    return NextResponse.json(
+      { error: 'Requested slot is no longer available' },
+      { status: 409 },
+    );
+  }
+
+  // Owner Member lookup — need name/image for denormalized event columns.
+  const [ownerMember] = await db
+    .select()
+    .from(members)
+    .where(eq(members.id, ownerMemberId))
+    .limit(1);
+  if (!ownerMember) {
+    return NextResponse.json({ error: 'Owner not found' }, { status: 404 });
+  }
+
+  // Location resolution.
+  let location: string | null;
+  if (et.locationKind === 'castalia') {
+    location = await mintCastaliaRoomUrl({
+      ownerId: ownerMember.id,
+      bookerId: bookerMember.id,
+    });
+  } else {
+    location = et.locationValue ?? null;
+  }
+
+  const endsAt = new Date(requestedMs + et.durationMinutes * 60_000);
+  const ownerLegacyId = legacyIdFor(ownerMember);
+  const bookerLegacyId = legacyIdFor(bookerMember);
+
+  // 1. Insert event row.
+  const [createdEvent] = await db
+    .insert(events)
+    .values({
+      title: et.title,
+      description: et.description ?? null,
+      startsAt: requestedStart,
+      endsAt,
+      timezone: 'UTC',
+      location,
+      creatorId: ownerLegacyId,
+      memberId: ownerMember.id,
+      creatorName: ownerMember.name ?? 'Unknown',
+      creatorImage: ownerMember.image ?? null,
+      visibility: 'private',
+      sourceEventTypeId: et.id,
+    })
+    .returning();
+
+  const eventId = createdEvent.id;
+
+  // 2. Insert RSVPs (owner + booker, both = yes). Best-effort sequential.
+  await db.insert(rsvps).values({
+    eventId,
+    userId: ownerLegacyId,
+    memberId: ownerMember.id,
+    userName: ownerMember.name ?? 'Unknown',
+    userImage: ownerMember.image ?? null,
+    status: 'yes',
+  });
+
+  await db.insert(rsvps).values({
+    eventId,
+    userId: bookerLegacyId,
+    memberId: bookerMember.id,
+    userName: bookerMember.name ?? 'Unknown',
+    userImage: bookerMember.image ?? null,
+    status: 'yes',
+  });
+
+  // 3. Booking-confirmed inbox notifications (owner + booker).
+  // Best-effort: log but don't fail the response if fan-out misfires.
+  const startsAtIso = requestedStart.toISOString();
+  const payload = { startsAt: startsAtIso, location };
+  const ownerTitle = `${et.title} booked by ${bookerMember.name ?? 'Someone'}`;
+  const bookerTitle = `${et.title} booked with ${ownerMember.name ?? 'host'}`;
+  const url = `/events/${eventId}`;
+
+  try {
+    await createNotification(db, {
+      userId: ownerLegacyId,
+      memberId: ownerMember.id,
+      type: 'booking.confirmed',
+      eventId,
+      actorId: bookerLegacyId,
+      actorMemberId: bookerMember.id,
+      actorName: bookerMember.name ?? null,
+      title: ownerTitle,
+      url,
+      payload,
+    });
+  } catch (err) {
+    console.error('[POST /api/booking/book] owner notification failed', err);
+  }
+
+  try {
+    await createNotification(db, {
+      userId: bookerLegacyId,
+      memberId: bookerMember.id,
+      type: 'booking.confirmed',
+      eventId,
+      actorId: ownerLegacyId,
+      actorMemberId: ownerMember.id,
+      actorName: ownerMember.name ?? null,
+      title: bookerTitle,
+      url,
+      payload,
+    });
+  } catch (err) {
+    console.error('[POST /api/booking/book] booker notification failed', err);
+  }
+
+  return NextResponse.json(
+    {
+      id: eventId,
+      startsAt: startsAtIso,
+      endsAt: endsAt.toISOString(),
+      location,
+      title: et.title,
+    },
+    { status: 201 },
+  );
+}
