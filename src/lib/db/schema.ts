@@ -291,6 +291,33 @@ export const eventInvitations = pgTable(
   (table) => [unique('event_invitations_event_invitee_unique').on(table.eventId, table.inviteeUserId)],
 );
 
+// Show & Tell Topic submissions. A Topic is a TED-style 10-minute presentation
+// for the biweekly Show & Tell hour. Submitters propose; host triages.
+// `targetSessionDate` is set by the host when scheduled into a specific session.
+export const topicSubmissions = pgTable('topic_submissions', {
+  id: serial('id').primaryKey(),
+  submitterId: text('submitter_id').notNull(), // hyloId | clerkId | logtoId
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+  submitterName: text('submitter_name').notNull(),
+  submitterEmail: text('submitter_email'),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  formatHint: text('format_hint'), // 'demo' | 'insight' | 'question' | 'other' | null
+  materialsUrl: text('materials_url'),
+  imageUrl: text('image_url'),
+  // Internal scaffolding from the AI host conversation — kept for triage context.
+  hook: text('hook'),
+  audience: text('audience'),
+  takeaway: text('takeaway'),
+  status: text('status').notNull().default('submitted'), // 'submitted' | 'accepted' | 'declined'
+  targetSessionDate: date('target_session_date'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type TopicSubmission = typeof topicSubmissions.$inferSelect;
+export type NewTopicSubmission = typeof topicSubmissions.$inferInsert;
+
 // Type helpers
 export type Event = typeof events.$inferSelect;
 export type NewEvent = typeof events.$inferInsert;

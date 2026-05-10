@@ -212,5 +212,31 @@ export async function runMigrations() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS notifications_user_recent_idx ON notifications(user_id, created_at DESC)`;
 
+  // Show & Tell Topic submissions — TED-style 10-min presentations submitted
+  // for the biweekly hour. Host triages via /admin?tab=topics. See
+  // src/lib/db/schema.ts for the canonical Drizzle definition.
+  await sql`
+    CREATE TABLE IF NOT EXISTS topic_submissions (
+      id SERIAL PRIMARY KEY,
+      submitter_id TEXT NOT NULL,
+      member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      submitter_name TEXT NOT NULL,
+      submitter_email TEXT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      format_hint TEXT,
+      materials_url TEXT,
+      image_url TEXT,
+      hook TEXT,
+      audience TEXT,
+      takeaway TEXT,
+      status TEXT NOT NULL DEFAULT 'submitted',
+      target_session_date DATE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS topic_submissions_status_created_idx ON topic_submissions(status, created_at DESC)`;
+
   return { success: true, message: 'Migrations complete' };
 }

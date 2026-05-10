@@ -9,6 +9,7 @@ import { NavBar } from '@/components/NavBar';
 import { apiFetch } from '@/lib/api-fetch';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 import { ReportsPanel } from '@/components/admin/ReportsPanel';
+import { TopicSubmissionsPanel } from '@/components/admin/TopicSubmissionsPanel';
 
 interface Member {
   id: number;
@@ -98,7 +99,8 @@ function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: 'members' | 'reports' = tabParam === 'reports' ? 'reports' : 'members';
+  const tab: 'members' | 'reports' | 'topics' =
+    tabParam === 'reports' ? 'reports' : tabParam === 'topics' ? 'topics' : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
@@ -225,11 +227,27 @@ function AdminPageInner() {
           >
             Reports
           </Link>
+          <Link
+            href="/admin?tab=topics"
+            role="tab"
+            aria-selected={tab === 'topics'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'topics'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Topics
+          </Link>
         </nav>
 
         {tab === 'reports' ? (
           <section role="tabpanel" aria-label="Attendance reports">
             <ReportsPanel />
+          </section>
+        ) : tab === 'topics' ? (
+          <section role="tabpanel" aria-label="Show & Tell Topic submissions">
+            <TopicSubmissionsPanel />
           </section>
         ) : (
           <section role="tabpanel" aria-label="Member directory" className="mb-2">
