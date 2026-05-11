@@ -160,23 +160,43 @@ export async function POST(
   const bookerLegacyId = legacyIdFor(bookerMember);
 
   // 1. Insert event row.
-  const [createdEvent] = await db
-    .insert(events)
-    .values({
-      title: et.title,
-      description: et.description ?? null,
-      startsAt: requestedStart,
-      endsAt,
-      timezone: 'UTC',
-      location,
-      creatorId: ownerLegacyId,
-      memberId: ownerMember.id,
-      creatorName: ownerMember.name ?? 'Unknown',
-      creatorImage: ownerMember.image ?? null,
-      visibility: 'private',
-      sourceEventTypeId: et.id,
-    })
-    .returning();
+  // Race-safety: a partial unique index `events_booking_owner_starts_unique`
+  // on (member_id, starts_at) WHERE source_event_type_id IS NOT NULL turns
+  // a concurrent double-book into a Postgres unique violation (SQLSTATE
+  // 23505). We catch it and return 409, mirroring the slot-already-taken
+  // path above. Without this, two simultaneous bookers can both pass
+  // computeSlots() (since neither has inserted yet) and create duplicate
+  // events for the same owner+time.
+  let createdEvent: { id: number };
+  try {
+    [createdEvent] = await db
+      .insert(events)
+      .values({
+        title: et.title,
+        description: et.description ?? null,
+        startsAt: requestedStart,
+        endsAt,
+        timezone: 'UTC',
+        location,
+        creatorId: ownerLegacyId,
+        memberId: ownerMember.id,
+        creatorName: ownerMember.name ?? 'Unknown',
+        creatorImage: ownerMember.image ?? null,
+        visibility: 'private',
+        sourceEventTypeId: et.id,
+      })
+      .returning();
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    const msg = String((err as { message?: string } | null)?.message ?? '');
+    if (code === '23505' || msg.includes('events_booking_owner_starts_unique')) {
+      return NextResponse.json(
+        { error: 'Requested slot is no longer available' },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 
   const eventId = createdEvent.id;
 

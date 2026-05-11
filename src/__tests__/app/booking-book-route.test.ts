@@ -389,4 +389,59 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     expect(bookerNotif.memberId).toBe(BOOKER_MEMBER_ID);
     expect(bookerNotif.eventId).toBe(999);
   });
+
+  // Race-safety regression: a partial unique index
+  // `events_booking_owner_starts_unique` on (member_id, starts_at) WHERE
+  // source_event_type_id IS NOT NULL guards against two concurrent bookers
+  // both passing computeSlots() and inserting duplicate events at the same
+  // owner+time. When PG raises 23505, the route must return 409, not 500.
+  it('409 when concurrent booker wins the unique index (PG 23505)', async () => {
+    mockGetCurrentMember.mockResolvedValue(bookerMember);
+    mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
+    mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
+    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
+
+    // select chain: 1st returns blocking events ([]), 2nd returns owner row.
+    let selectCallIdx = 0;
+    dbModule.db.select = jest.fn(() => {
+      const idx = selectCallIdx++;
+      return {
+        from: jest.fn(() => ({
+          where: jest.fn(() => {
+            if (idx === 0) return Promise.resolve([]);
+            return { limit: jest.fn(() => Promise.resolve([ownerMember])) };
+          }),
+        })),
+      };
+    });
+
+    // insert chain: throws a PG-shaped unique violation on .returning().
+    const uniqueErr = Object.assign(
+      new Error(
+        'duplicate key value violates unique constraint "events_booking_owner_starts_unique"',
+      ),
+      { code: '23505' },
+    );
+    dbModule.db.insert = jest.fn(() => ({
+      values: jest.fn(() => ({
+        returning: jest.fn(() => Promise.reject(uniqueErr)),
+      })),
+    }));
+
+    const res = await POST(
+      makeReq({ startsAt: '2026-05-12T12:00:00.000Z' }),
+      paramsOf('alice', 'coffee-30'),
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/no longer available/i);
+
+    // No RSVPs or notifications attempted after the event-insert failure.
+    expect(mockCreateNotification).not.toHaveBeenCalled();
+  });
 });
