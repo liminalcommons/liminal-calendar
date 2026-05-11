@@ -14,10 +14,15 @@ export function getUserRole(session: any): UserRole {
 }
 
 export function canCreateEvents(role: UserRole): boolean {
-  // Only hosts and admins can create events. Members can RSVP and comment
-  // but cannot host. Tier check for public-visibility events is in
-  // canCreatePublicEvent (called inside POST /api/events).
-  return role === 'host' || role === 'admin';
+  // All authenticated tiers may create events. Members are restricted to
+  // private + ≤10 invitees, per Plan 2's capability matrix
+  // (docs/superpowers/specs/2026-05-08-calendly-style-booking-design.md §2).
+  // Two downstream gates enforce that: canCreatePublicEvent (rejects
+  // public visibility for non-host/admin) and validateInviteeCap (rejects
+  // members with >10 invitees, called inside POST /api/events before the
+  // INSERT). Edit + delete of member-created events remain restricted
+  // until UX for those flows is finalized.
+  return role === 'member' || role === 'host' || role === 'admin';
 }
 
 export function canCreatePublicEvent(role: UserRole): boolean {
