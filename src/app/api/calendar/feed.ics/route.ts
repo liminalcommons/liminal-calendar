@@ -74,12 +74,23 @@ export async function GET(request: NextRequest) {
 
     const icsContent = generateCalendarFeed(icsEvents);
 
+    // Cache-Control: a token-authenticated feed body may contain private
+    // events. `public` would allow intermediate proxies (corporate CDNs,
+    // even some calendar clients' fetchers) to cache and serve that body
+    // to other identities sharing the proxy. Use `private` whenever a
+    // token was supplied — even an invalid token, so a guessable token
+    // can't be probed via a public cache. Unauthed (public-only) feeds
+    // stay `public` for edge cacheability.
+    const cacheControl = token
+      ? 'private, max-age=900'
+      : 'public, max-age=900, s-maxage=900';
+
     return new NextResponse(icsContent, {
       status: 200,
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': 'inline; filename="liminal-commons.ics"',
-        'Cache-Control': 'public, max-age=900, s-maxage=900',
+        'Cache-Control': cacheControl,
         'Access-Control-Allow-Origin': '*',
       },
     });
