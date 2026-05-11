@@ -87,8 +87,18 @@ export async function PATCH(
       .returning();
     return NextResponse.json(updated);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/event_types_owner_slug_unique/.test(msg)) {
+    // Mirror the POST handler: PG SQLSTATE 23505 takes priority; constraint
+    // name may live in `.message` or `.cause.message` depending on driver.
+    const code = (e as { code?: string } | null)?.code;
+    const msg = String((e as { message?: string } | null)?.message ?? '');
+    const causeMsg = String(
+      ((e as { cause?: { message?: string } } | null)?.cause?.message) ?? '',
+    );
+    if (
+      code === '23505' ||
+      /event_types_owner_slug_unique/.test(msg) ||
+      /event_types_owner_slug_unique/.test(causeMsg)
+    ) {
       return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
     }
     console.error('[PATCH /api/booking/event-types/[id]]', e);

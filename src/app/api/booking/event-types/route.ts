@@ -72,8 +72,21 @@ export async function POST(request: NextRequest) {
       .returning();
     return NextResponse.json(created, { status: 201 });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/event_types_owner_slug_unique/.test(msg)) {
+    // Postgres SQLSTATE 23505 = unique_violation. neon-http surfaces the code
+    // on the error object; the constraint name shows up either in `.message`
+    // or in `.cause.message`. Cover all three to avoid the regex-vs-format
+    // brittleness that surfaced on prod (the message-only match leaked the
+    // 23505 to 500 here, found by negativa-6 E2E on 2026-05-11).
+    const code = (e as { code?: string } | null)?.code;
+    const msg = String((e as { message?: string } | null)?.message ?? '');
+    const causeMsg = String(
+      ((e as { cause?: { message?: string } } | null)?.cause?.message) ?? '',
+    );
+    if (
+      code === '23505' ||
+      /event_types_owner_slug_unique/.test(msg) ||
+      /event_types_owner_slug_unique/.test(causeMsg)
+    ) {
       return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
     }
     console.error('[POST /api/booking/event-types]', e);
