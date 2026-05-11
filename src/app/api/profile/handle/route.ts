@@ -22,8 +22,6 @@ import { eq, sql } from 'drizzle-orm';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { RESERVED_HANDLES } from '@/lib/booking/reserved-handles';
 
-export { RESERVED_HANDLES };
-
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
 
 export async function PUT(request: NextRequest) {
