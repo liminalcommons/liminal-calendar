@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat } from 'lucide-react';
+import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat, Bell, BellOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useResolvedProfile } from '@/lib/use-resolved-role';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -55,6 +55,42 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { submit: submitRsvp, pending: rsvpLoading } = useRsvpMutation(event.id);
   const [closing, setClosing] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [muteLoading, setMuteLoading] = useState(false);
+
+  const baseEventId = parseInt(event.id.replace(/-\d{8}$/, ''), 10);
+
+  useEffect(() => {
+    if (!session?.user || isNaN(baseEventId)) return;
+    let cancelled = false;
+    fetch('/api/preferences/notifications/muted', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { muted: [] })
+      .then((j: { muted?: { eventId: number }[] }) => {
+        if (!cancelled) setMuted((j.muted ?? []).some(m => m.eventId === baseEventId));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session?.user, baseEventId]);
+
+  const toggleMute = useCallback(async () => {
+    if (muteLoading || isNaN(baseEventId)) return;
+    setMuteLoading(true);
+    const next = !muted;
+    setMuted(next);
+    try {
+      const res = await fetch(`/api/events/${baseEventId}/mute`, {
+        method: next ? 'POST' : 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: next ? '{}' : undefined,
+      });
+      if (!res.ok) setMuted(!next);
+    } catch {
+      setMuted(!next);
+    } finally {
+      setMuteLoading(false);
+    }
+  }, [muted, muteLoading, baseEventId]);
 
   const { profile } = useResolvedProfile();
   const role = profile?.role ?? getUserRole(session);
@@ -366,6 +402,17 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
         </Link>
 
         <div className="flex items-center gap-1">
+          {session?.user && !isNaN(baseEventId) && (
+            <button
+              onClick={toggleMute}
+              disabled={muteLoading}
+              className="p-1.5 rounded-md text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors disabled:opacity-50"
+              aria-label={muted ? 'Unmute notifications for this series' : 'Mute notifications for this series'}
+              title={muted ? 'Unmute notifications' : 'Mute notifications'}
+            >
+              {muted ? <BellOff size={14} /> : <Bell size={14} />}
+            </button>
+          )}
           {canEdit && (
             <Link
               href={`/events/${event.id}/edit`}
