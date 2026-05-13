@@ -51,6 +51,8 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [timezone, setTimezone] = useState('UTC');
+  const [muted, setMuted] = useState(false);
+  const [muteLoading, setMuteLoading] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,6 +74,17 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         if (res.ok && (data.id || data.event?.id)) {
           // API returns the event directly (not nested under .event)
           setEvent(data.id ? data : data.event);
+          // Fetch initial mute state from preferences
+          try {
+            const prefsRes = await apiFetch('/api/preferences/notifications/muted');
+            if (prefsRes.ok) {
+              const j = await prefsRes.json();
+              const numId = Number(data.id ?? data.event?.id);
+              setMuted(Array.isArray(j.muted) && j.muted.some((m: { eventId: number }) => m.eventId === numId));
+            }
+          } catch {
+            // mute state unavailable — leave as false
+          }
         } else {
           setError(data.error || 'Event not found');
         }
@@ -84,6 +97,23 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     }
     fetchEvent();
   }, [eventId]);
+
+  async function toggleMute() {
+    if (!event) return;
+    setMuteLoading(true);
+    try {
+      const res = await apiFetch(`/api/events/${event.id}/mute`, {
+        method: muted ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setMuted(!!j.muted);
+      }
+    } finally {
+      setMuteLoading(false);
+    }
+  }
 
   const handleDelete = async () => {
     if (!event) return;
@@ -280,6 +310,19 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         >
           Add to Calendar (.ics)
         </button>
+
+        {/* Mute toggle — authenticated users only */}
+        {status === 'authenticated' && (
+          <button
+            type="button"
+            onClick={toggleMute}
+            disabled={muteLoading}
+            aria-label={muted ? 'Unmute notifications for this series' : 'Mute notifications for this series'}
+            className="rounded-lg border border-grove-border px-3 py-2 text-sm text-grove-text hover:bg-grove-border/20 disabled:opacity-50"
+          >
+            {muted ? '🔔 Unmute' : '🔕 Mute notifications'}
+          </button>
+        )}
 
         {/* Attendance report — shown only for events that have ended */}
         <AttendanceReportSection

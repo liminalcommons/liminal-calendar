@@ -62,6 +62,7 @@ function PrefRow({ row, value, onToggle }: { row: Row; value: boolean; onToggle:
 export function NotificationPreferences() {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState<Array<{ eventId: number; title: string; startsAt: string }>>([]);
 
   useEffect(() => {
     fetch('/api/preferences/notifications')
@@ -69,6 +70,18 @@ export function NotificationPreferences() {
       .then(setPrefs)
       .catch((e) => setError(e.message));
   }, []);
+
+  useEffect(() => {
+    fetch('/api/preferences/notifications/muted', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { muted: [] })
+      .then(j => setMuted(j.muted || []))
+      .catch(() => {});
+  }, []);
+
+  async function unmute(eventId: number) {
+    const res = await fetch(`/api/events/${eventId}/mute`, { method: 'DELETE', credentials: 'include' });
+    if (res.ok) setMuted(prev => prev.filter(m => m.eventId !== eventId));
+  }
 
   async function toggle(name: keyof Prefs) {
     if (!prefs) return;
@@ -90,30 +103,50 @@ export function NotificationPreferences() {
   if (!prefs) return <div className="text-grove-text-muted text-sm">Loading…</div>;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <fieldset className="rounded-lg border border-grove-border/40 bg-grove-surface/40 p-4">
-        <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-grove-text">
-          <Bell size={14} />
-          Push
-        </legend>
-        <div className="divide-y divide-grove-border/30">
-          {PUSH_ROWS.map((row) => (
-            <PrefRow key={row.name} row={row} value={prefs[row.name]} onToggle={() => toggle(row.name)} />
-          ))}
-        </div>
-      </fieldset>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <fieldset className="rounded-lg border border-grove-border/40 bg-grove-surface/40 p-4">
+          <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-grove-text">
+            <Bell size={14} />
+            Push
+          </legend>
+          <div className="divide-y divide-grove-border/30">
+            {PUSH_ROWS.map((row) => (
+              <PrefRow key={row.name} row={row} value={prefs[row.name]} onToggle={() => toggle(row.name)} />
+            ))}
+          </div>
+        </fieldset>
 
-      <fieldset className="rounded-lg border border-grove-border/40 bg-grove-surface/40 p-4">
-        <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-grove-text">
-          <Mail size={14} />
-          Email
-        </legend>
-        <div className="divide-y divide-grove-border/30">
-          {EMAIL_ROWS.map((row) => (
-            <PrefRow key={row.name} row={row} value={prefs[row.name]} onToggle={() => toggle(row.name)} />
-          ))}
-        </div>
-      </fieldset>
+        <fieldset className="rounded-lg border border-grove-border/40 bg-grove-surface/40 p-4">
+          <legend className="flex items-center gap-2 px-2 text-sm font-semibold text-grove-text">
+            <Mail size={14} />
+            Email
+          </legend>
+          <div className="divide-y divide-grove-border/30">
+            {EMAIL_ROWS.map((row) => (
+              <PrefRow key={row.name} row={row} value={prefs[row.name]} onToggle={() => toggle(row.name)} />
+            ))}
+          </div>
+        </fieldset>
+      </div>
+
+      <section className="mt-6">
+        <h3 className="text-sm font-semibold text-grove-text">Muted series</h3>
+        {muted.length === 0 ? (
+          <p className="text-xs text-grove-text-muted mt-1">No muted events.</p>
+        ) : (
+          <ul className="mt-2 space-y-1">
+            {muted.map(m => (
+              <li key={m.eventId} className="flex items-center justify-between rounded border border-grove-border/30 px-2 py-1 text-sm">
+                <span className="text-grove-text">{m.title}</span>
+                <button onClick={() => unmute(m.eventId)} className="text-xs text-grove-accent hover:underline">
+                  Unmute
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

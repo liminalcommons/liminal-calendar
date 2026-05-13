@@ -41,6 +41,9 @@ interface DayColumnProps {
   dayIndex?: number;
   snapTopPx?: number;
   snapHeightPx?: number;
+  /** Set of numeric event series IDs the current user has muted. Used to
+   *  render the 🔕 indicator on EventBlock. Derived once in WeeklyGrid. */
+  mutedSeriesIds?: Set<number>;
 }
 
 const DayColumn = React.memo(function DayColumn({
@@ -61,6 +64,7 @@ const DayColumn = React.memo(function DayColumn({
   dayIndex,
   snapTopPx,
   snapHeightPx,
+  mutedSeriesIds,
 }: DayColumnProps) {
   // Mount gate — events position using browser-local TZ via getHours(), which
   // returns UTC during SSR (Vercel's Node runs UTC). Without this gate the
@@ -109,6 +113,11 @@ const DayColumn = React.memo(function DayColumn({
         const overlap = overlapMap.get(event.id) ?? { colIndex: 0, colTotal: 1 };
         const isOwner = currentUserId != null
           && String(event.creator_id) === String(currentUserId);
+        // Derive base numeric ID so recurring instances (e.g., "10-20260412")
+        // match the muted series ID ("10" → 10) from the preferences endpoint.
+        const baseNumericId = parseInt(event.id.replace(/-\d{8}$/, ''), 10);
+        const isMuted = mutedSeriesIds != null && !isNaN(baseNumericId)
+          && mutedSeriesIds.has(baseNumericId);
         return (
           <EventBlock
             key={event.id}
@@ -123,6 +132,7 @@ const DayColumn = React.memo(function DayColumn({
             isOwner={isOwner}
             onDragStart={onEventDragStart}
             isDragging={draggingEventId === event.id}
+            isMuted={isMuted}
           />
         );
       })}

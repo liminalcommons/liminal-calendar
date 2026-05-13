@@ -325,3 +325,19 @@ export type Rsvp = typeof rsvps.$inferSelect;
 export type NewRsvp = typeof rsvps.$inferInsert;
 export type Member = typeof members.$inferSelect;
 export type NewMember = typeof members.$inferInsert;
+
+export const eventMutes = pgTable(
+  'event_mutes',
+  {
+    id: serial('id').primaryKey(),
+    memberId: integer('member_id')
+      .notNull()
+      .references(() => members.id, { onDelete: 'cascade' }),
+    eventId: integer('event_id')
+      .notNull()
+      .references(() => events.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  },
+  (table) => [unique('event_mutes_member_event_unique').on(table.memberId, table.eventId)],
+);
+export type EventMute = typeof eventMutes.$inferSelect;

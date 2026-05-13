@@ -56,6 +56,16 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  const [mutedSeriesIds, setMutedSeriesIds] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    fetch('/api/preferences/notifications/muted', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { muted: [] })
+      .then((j: { muted?: { eventId: number }[] }) =>
+        setMutedSeriesIds(new Set((j.muted ?? []).map(m => m.eventId)))
+      )
+      .catch(() => {});
+  }, []);
   const currentUserId = resolvedUserId ?? sessionUser?.hyloId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();
 
@@ -757,6 +767,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
                     snapTargetDayIndex={dragLive?.snapTarget?.dayIndex}
                     snapTopPx={dragLive?.snapTarget?.topPx}
                     snapHeightPx={dragLive?.snapTarget?.heightPx}
+                    mutedSeriesIds={mutedSeriesIds}
                   />
                 ))}
               </div>
