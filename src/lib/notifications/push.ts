@@ -32,6 +32,10 @@ interface PushPayload {
   body: string;
   url: string;
   tag: string;
+  // When set, the service worker renders a "🔕 Mute series" action button
+  // and POSTs `/api/events/${eventId}/mute` on tap. Base (non-instance)
+  // event id — the same one the mute API expects.
+  eventId?: number;
 }
 
 export async function sendPushToUsers(

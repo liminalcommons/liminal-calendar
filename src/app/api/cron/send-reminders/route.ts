@@ -245,6 +245,7 @@ export async function GET(request: Request) {
         body: w.body,
         url,
         tag: `event-${eventId}-${w.type}`,
+        eventId,
       });
       pushSent += result.sent;
 
@@ -307,6 +308,7 @@ export async function GET(request: Request) {
           body: `${ev.title} is starting now`,
           url,
           tag: `broadcast-start-${ev.id}`,
+          eventId: ev.id,
         });
         pushSent += result.sent;
 
