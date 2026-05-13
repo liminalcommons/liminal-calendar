@@ -22,9 +22,11 @@ export default clerkMiddleware((_auth, request) => {
 
 export const config = {
   // Clerk-recommended matcher: skips Next internals + all common static asset
-  // extensions; explicitly includes API routes.
+  // extensions; explicitly includes API routes — EXCEPT /api/cron/*, which
+  // uses CRON_SECRET Bearer auth that Clerk would otherwise reject as
+  // a malformed JWT before the route handler runs.
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
+    '/((?!_next|api/cron/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api(?!/cron)|trpc)(.*)',
   ],
 };
