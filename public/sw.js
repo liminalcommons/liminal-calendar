@@ -36,20 +36,73 @@ self.addEventListener('push', (event) => {
   }
 });
 
-// Handle notification click — open the event/meeting link, or mute the series
+function broadcastMuteChange(eventId, muted) {
+  try {
+    const ch = new BroadcastChannel('liminal-mute');
+    ch.postMessage({ eventId, muted });
+    ch.close();
+  } catch {
+    // BroadcastChannel unsupported — no-op
+  }
+}
+
+async function handleMuteAction(eventId) {
+  try {
+    const res = await fetch(`/api/events/${eventId}/mute`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (res.ok) {
+      broadcastMuteChange(eventId, true);
+      await self.registration.showNotification('Series muted', {
+        body: 'You won’t get reminders for this series. Unmute anytime in Settings → Notifications.',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `mute-confirm-${eventId}`,
+        data: { url: '/settings', eventId, unmuteAction: true },
+        actions: [{ action: 'unmute', title: '↩ Undo' }],
+      });
+    }
+  } catch {
+    // network blip — silent
+  }
+}
+
+async function handleUnmuteAction(eventId) {
+  try {
+    const res = await fetch(`/api/events/${eventId}/mute`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    if (res.ok) {
+      broadcastMuteChange(eventId, false);
+      await self.registration.showNotification('Unmuted', {
+        body: 'Reminders restored for this series.',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `unmute-confirm-${eventId}`,
+        data: { url: '/' },
+      });
+    }
+  } catch {
+    // silent
+  }
+}
+
+// Handle notification click — open the event/meeting link, mute, or unmute
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
 
   if (event.action === 'mute' && data.eventId) {
-    event.waitUntil(
-      fetch(`/api/events/${data.eventId}/mute`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      }).catch(() => {})
-    );
+    event.waitUntil(handleMuteAction(data.eventId));
+    return;
+  }
+
+  if (event.action === 'unmute' && data.eventId) {
+    event.waitUntil(handleUnmuteAction(data.eventId));
     return;
   }
 

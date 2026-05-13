@@ -59,12 +59,32 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
 
   const [mutedSeriesIds, setMutedSeriesIds] = useState<Set<number>>(new Set());
   useEffect(() => {
-    fetch('/api/preferences/notifications/muted', { credentials: 'include' })
+    const refresh = () => fetch('/api/preferences/notifications/muted', { credentials: 'include' })
       .then(r => r.ok ? r.json() : { muted: [] })
       .then((j: { muted?: { eventId: number }[] }) =>
         setMutedSeriesIds(new Set((j.muted ?? []).map(m => m.eventId)))
       )
       .catch(() => {});
+    refresh();
+
+    // Service worker fires this when the user taps "🔕 Mute series" on a
+    // push notification — keeps the grid's 🔕 indicators + dim styling in
+    // sync without requiring a full page reload.
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('liminal-mute');
+      channel.onmessage = (e: MessageEvent<{ eventId: number; muted: boolean }>) => {
+        setMutedSeriesIds(prev => {
+          const next = new Set(prev);
+          if (e.data.muted) next.add(e.data.eventId);
+          else next.delete(e.data.eventId);
+          return next;
+        });
+      };
+    } catch {
+      // BroadcastChannel unsupported — silent
+    }
+    return () => { channel?.close(); };
   }, []);
   const currentUserId = resolvedUserId ?? sessionUser?.hyloId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();

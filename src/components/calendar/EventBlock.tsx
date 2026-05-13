@@ -168,7 +168,8 @@ const EventBlock = React.memo(function EventBlock({
         width: `calc(${widthPct}% - 2px)`,
         background: hasImage ? undefined : bgGradient,
         transition: transitionStyle,
-        opacity: isDragging ? 0.30 : undefined,
+        opacity: isDragging ? 0.30 : isMuted ? 0.45 : undefined,
+        filter: isMuted ? 'grayscale(0.6)' : undefined,
         // Disable native scroll/zoom gestures on owner blocks so a finger drag
         // never pages the grid instead of moving the event.
         touchAction: isOwner ? 'none' : undefined,
