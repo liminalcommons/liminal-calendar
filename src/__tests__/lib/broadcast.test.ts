@@ -41,10 +41,12 @@ describe('computeBroadcastRecipients', () => {
     const prev = process.env.BROADCAST_ENABLED;
     process.env.BROADCAST_ENABLED = 'true';
     jest.resetModules();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fresh = require('@/lib/notifications/broadcast') as typeof import('@/lib/notifications/broadcast');
     expect(fresh.BROADCAST_ENABLED).toBe(true);
     process.env.BROADCAST_ENABLED = 'false';
     jest.resetModules();
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fresh2 = require('@/lib/notifications/broadcast') as typeof import('@/lib/notifications/broadcast');
     expect(fresh2.BROADCAST_ENABLED).toBe(false);
     process.env.BROADCAST_ENABLED = prev;
