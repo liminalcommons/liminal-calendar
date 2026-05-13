@@ -25,9 +25,7 @@ const clerk = clerkMiddleware((_auth, request) => {
 // so we gate at runtime instead.
 export default function middleware(req: NextRequest, ev: unknown) {
   if (req.nextUrl.pathname.startsWith('/api/cron/')) {
-    const res = NextResponse.next();
-    res.headers.set('x-mw-marker', 'cron-bypass-v3');
-    return res;
+    return NextResponse.next();
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (clerk as any)(req, ev);

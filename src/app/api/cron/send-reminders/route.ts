@@ -64,20 +64,7 @@ export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    // TEMP DIAG — remove after CRON_SECRET pipeline is confirmed working
-    return NextResponse.json({
-      error: 'Unauthorized',
-      diag: {
-        envSecretPresent: !!cronSecret,
-        envSecretLen: cronSecret?.length ?? 0,
-        envSecretHead: cronSecret?.slice(0, 4) ?? null,
-        envSecretTail: cronSecret?.slice(-4) ?? null,
-        envHasWhitespace: cronSecret ? /^\s|\s$/.test(cronSecret) : null,
-        authHeaderPresent: !!authHeader,
-        authHeaderLen: authHeader?.length ?? 0,
-        authHeaderHead: authHeader?.slice(0, 12) ?? null,
-      }
-    }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const now = new Date();
