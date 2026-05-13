@@ -27,6 +27,7 @@ import {
 } from '@/lib/notifications/reminder-dispatch';
 import { createNotification } from '@/lib/notifications/inbox/repo';
 import { resolveMemberIds } from '@/lib/auth/resolve-member-id';
+import { BROADCAST_ENABLED, BROADCAST_START_TYPE, computeBroadcastRecipients } from '@/lib/notifications/broadcast';
 
 // Channel type → inbox type. Email uses bare horizon strings (24hr / 1hr /
 // 15min); push uses push-prefixed strings (push-1hr / push-15min /
@@ -270,6 +271,69 @@ export async function GET(request: Request) {
             url,
             payload: { channel: 'push', horizon: w.type },
           });
+        }
+      }
+    }
+
+    // Broadcast at-start push to non-RSVPed members (gated by BROADCAST_ENABLED)
+    if (BROADCAST_ENABLED && w.type === 'push-start') {
+      const atStartEvents = await db
+        .select({
+          id: events.id,
+          title: events.title,
+          startsAt: events.startsAt,
+          visibility: events.visibility,
+          location: events.location,
+          description: events.description,
+        })
+        .from(events)
+        .where(and(
+          gte(events.startsAt, windowStart),
+          lte(events.startsAt, windowEnd),
+        ));
+
+      for (const ev of atStartEvents) {
+        const recipients = await computeBroadcastRecipients(db, {
+          id: ev.id,
+          visibility: ev.visibility,
+          startsAt: ev.startsAt,
+        });
+        if (recipients.length === 0) continue;
+
+        const url = pickPushClickUrl(ev.id, ev.location, ev.description);
+        const userIds = recipients.map((r) => r.userId);
+        const result = await sendPushToUsers(userIds, {
+          title: ev.title,
+          body: `${ev.title} is starting now`,
+          url,
+          tag: `broadcast-start-${ev.id}`,
+        });
+        pushSent += result.sent;
+
+        if (result.sent > 0) {
+          const memberIdMap = await resolveMemberIds(db, userIds);
+          await db
+            .insert(notificationLog)
+            .values(
+              userIds.map((uid) => ({
+                eventId: ev.id,
+                userId: uid,
+                memberId: memberIdMap.get(uid) ?? null,
+                type: BROADCAST_START_TYPE,
+              })),
+            )
+            .onConflictDoNothing();
+          for (const uid of userIds) {
+            await safeCreateInboxRow(db, {
+              userId: uid,
+              type: 'reminder.start',
+              eventId: ev.id,
+              title: ev.title,
+              body: `${ev.title} is starting now`,
+              url,
+              payload: { channel: 'push', horizon: 'broadcast' },
+            });
+          }
         }
       }
     }
