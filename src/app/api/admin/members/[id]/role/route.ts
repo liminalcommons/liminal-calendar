@@ -42,6 +42,6 @@ export async function POST(
 
   if (!updated) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
 
-  console.info('[admin/role] caller=%s target=%d role=%s', caller.id, memberId, body.role);
+  console.warn('[admin/role] caller=%s target=%d role=%s', caller.id, memberId, body.role);
   return NextResponse.json({ id: updated.id, role: updated.role });
 }
