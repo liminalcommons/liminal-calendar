@@ -98,7 +98,6 @@ Auth: standard session (Clerk or NextAuth-Hylo) via `getAuthedUser()`. memberId 
 
 ## Guardrails
 
-- **Audience cap**: skip broadcast if recipient set would exceed 500 members; log to `notification_log` with `type='broadcast.start.skipped-cap'` for visibility instead of failing silently. Reason: prevents accidental fanout on a malformed event/audience definition.
 - **Private events**: `event.visibility = 'private'` → broadcast helper returns empty recipient set.
 - **Already-sent dedupe**: enforced at DB level via `unique(event_id, user_id, type)` on `notification_log`.
 - **Push subscription validity**: broadcast helper only counts members with at least one `push_subscriptions` row.
@@ -160,6 +159,6 @@ Auth: standard session (Clerk or NextAuth-Hylo) via `getAuthedUser()`. memberId 
 
 ## Open risks accepted
 
-- **Member count growth**: 500-member cap is a soft ceiling for v1; revisit when community grows past that. Larger communities will need per-host/per-category subscriptions to avoid the fatigue cliff.
+- **Unbounded fanout**: no audience cap. Per user direction, every member without a mute gets the push. At small community scale (~hundreds) this is fine; if membership grows into the thousands, per-host/per-category subscriptions become the next iteration to manage fatigue.
 - **iOS PWA install gap**: members on iPhone who haven't installed the PWA receive no push regardless of broadcast logic. The feature is materially less effective for that segment. Accepted; install-promotion is a separate workstream.
 - **Mute-then-RSVP edge case**: if a user mutes a series and later RSVPs to a specific instance, they currently get no notifications (mute wins). Implementation should make RSVP override mute for that one event instance — to be confirmed during plan writing.
