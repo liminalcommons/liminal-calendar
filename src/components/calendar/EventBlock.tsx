@@ -27,6 +27,9 @@ interface EventBlockProps {
    *  the cursor, and a DragSnapGhost (rendered by the destination DayColumn)
    *  shows the snap target. */
   isDragging?: boolean;
+  /** True when the current user has muted notifications for this event's
+   *  series. Renders a 🔕 indicator in the top-right corner of the block. */
+  isMuted?: boolean;
 }
 
 function hashId(id: string): number {
@@ -103,6 +106,7 @@ const EventBlock = React.memo(function EventBlock({
   isOwner = false,
   onDragStart,
   isDragging = false,
+  isMuted = false,
 }: EventBlockProps) {
   const blockRef = useRef<HTMLDivElement>(null);
 
@@ -183,6 +187,13 @@ const EventBlock = React.memo(function EventBlock({
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
         </>
+      )}
+
+      {/* Muted indicator */}
+      {isMuted && (
+        <span aria-label="Muted" title="Notifications muted" className="absolute right-1 top-1 text-xs text-white/70 z-10 leading-none">
+          🔕
+        </span>
       )}
 
       {/* Content */}
