@@ -39,7 +39,7 @@ const sql = neon(url);
 
 const TITLE = 'Show & Tell';
 const LOCATION = 'Castalia';
-const DURATION_MINUTES = 40;
+const DURATION_MINUTES = 60;
 const TIMEZONE = 'Europe/Berlin';
 // Local time in TIMEZONE for the first instance:
 const TARGET_HOUR_LOCAL = 18; // 6pm

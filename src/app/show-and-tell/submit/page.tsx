@@ -28,7 +28,9 @@ export default function TopicSubmitPage() {
 
   const [imageUrl, setImageUrl] = useState<string>('');
   const [generatingImage, setGeneratingImage] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -100,6 +102,37 @@ export default function TopicSubmitPage() {
       setChatError(e instanceof Error ? e.message : 'Chat failed');
     } finally {
       setThinking(false);
+    }
+  }
+
+  async function onUploadImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageError(null);
+    if (!file.type.startsWith('image/')) {
+      setImageError('Please choose an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('Image is over 5MB — please pick a smaller one.');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Upload failed (${res.status})`);
+      }
+      const data = await res.json();
+      if (data.url) setImageUrl(data.url);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -182,26 +215,17 @@ export default function TopicSubmitPage() {
         <NavBar />
         <main className="min-h-screen bg-grove-bg text-grove-text">
           <section className="mx-auto max-w-2xl px-6 py-20 text-center">
-            <h1 className="font-serif text-3xl">Submit a Topic</h1>
+            <h1 className="font-serif text-3xl">Sign in to submit a Topic</h1>
             <p className="mt-4 text-grove-text-muted">
-              The AI chat host needs you signed in (so it can save your draft as
-              you go). Don&apos;t want to sign in? You can submit anonymously
-              with the quick form instead.
+              Show &amp; Tell is for the Liminal Web. Sign in to share what
+              you&apos;re working on.
             </p>
-            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Link
-                href="/welcome"
-                className="inline-block rounded-md border border-grove-accent bg-grove-accent/10 px-4 py-2 text-sm font-medium text-grove-accent hover:bg-grove-accent/20"
-              >
-                Sign in &amp; chat with the host
-              </Link>
-              <Link
-                href="/show-and-tell/submit/quick"
-                className="inline-block rounded-md border border-grove-border px-4 py-2 text-sm font-medium text-grove-text-muted hover:bg-grove-surface hover:text-grove-text"
-              >
-                Use the quick form →
-              </Link>
-            </div>
+            <Link
+              href="/welcome"
+              className="mt-6 inline-block rounded-md border border-grove-accent bg-grove-accent/10 px-4 py-2 text-sm font-medium text-grove-accent hover:bg-grove-accent/20"
+            >
+              Sign in
+            </Link>
           </section>
         </main>
       </>
@@ -356,26 +380,52 @@ export default function TopicSubmitPage() {
               </div>
 
               <div className="rounded-lg border border-grove-border bg-grove-surface p-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
                   <label className="block text-xs uppercase tracking-wider text-grove-text-muted">
                     Banner image <span className="normal-case">(optional)</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={onGenerateImage}
-                    disabled={generatingImage || !form.title?.trim()}
-                    className="rounded-md border border-grove-border px-3 py-1 text-xs text-grove-text hover:bg-grove-bg disabled:opacity-50"
-                  >
-                    {generatingImage ? 'Generating…' : 'Generate with AI'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={onGenerateImage}
+                      disabled={generatingImage || uploadingImage || !form.title?.trim()}
+                      className="rounded-md border border-grove-border px-3 py-1 text-xs text-grove-text hover:bg-grove-bg disabled:opacity-50"
+                    >
+                      {generatingImage ? 'Generating…' : 'Generate with AI'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={generatingImage || uploadingImage}
+                      className="rounded-md border border-grove-border px-3 py-1 text-xs text-grove-text hover:bg-grove-bg disabled:opacity-50"
+                    >
+                      {uploadingImage ? 'Uploading…' : 'Upload image'}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={onUploadImage}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
                 {imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={imageUrl}
-                    alt="Topic banner"
-                    className="mt-3 w-full rounded-md border border-grove-border"
-                  />
+                  <div className="mt-3 space-y-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageUrl}
+                      alt="Topic banner"
+                      className="w-full rounded-md border border-grove-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl('')}
+                      className="text-xs text-grove-text-muted hover:text-grove-text"
+                    >
+                      Remove image
+                    </button>
+                  </div>
                 )}
                 {imageError && (
                   <p className="mt-2 text-xs text-red-400">{imageError}</p>

@@ -7,12 +7,13 @@ import { and, asc, desc, eq, gte, ne } from 'drizzle-orm';
 export const metadata: Metadata = {
   title: 'Show & Tell — Liminal Calendar',
   description:
-    'A biweekly 40-minute meeting for ideas and insights across the Liminal Web. Submit an idea, attend the next session, see what others have brought.',
+    'A biweekly 60-minute meeting for ideas and insights across the Liminal Web. Submit an idea, attend the next session, see what others have brought.',
 };
 
 export const dynamic = 'force-dynamic';
 
 const SHOW_AND_TELL_TITLE = 'Show & Tell';
+const SLOT_COUNT = 4;
 
 async function loadNextSession() {
   try {
@@ -29,7 +30,7 @@ async function loadNextSession() {
   }
 }
 
-async function loadOpenSubmissions() {
+async function loadLineup() {
   try {
     const rows = await db
       .select({
@@ -37,13 +38,14 @@ async function loadOpenSubmissions() {
         title: topicSubmissions.title,
         description: topicSubmissions.description,
         submitterName: topicSubmissions.submitterName,
+        imageUrl: topicSubmissions.imageUrl,
         status: topicSubmissions.status,
         createdAt: topicSubmissions.createdAt,
       })
       .from(topicSubmissions)
       .where(ne(topicSubmissions.status, 'declined'))
       .orderBy(desc(topicSubmissions.createdAt))
-      .limit(20);
+      .limit(SLOT_COUNT);
     return rows;
   } catch {
     return [];
@@ -68,14 +70,16 @@ function truncate(s: string, n: number) {
 }
 
 export default async function ShowAndTellPage() {
-  const [nextSession, submissions] = await Promise.all([
+  const [nextSession, lineup] = await Promise.all([
     loadNextSession(),
-    loadOpenSubmissions(),
+    loadLineup(),
   ]);
+
+  const slots = Array.from({ length: SLOT_COUNT }, (_, i) => lineup[i] ?? null);
 
   return (
     <main className="min-h-screen bg-grove-bg text-grove-text">
-      <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
+      <div className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
         <Link
           href="/"
           className="text-sm text-grove-text-muted hover:text-grove-text"
@@ -83,7 +87,7 @@ export default async function ShowAndTellPage() {
           ← Calendar
         </Link>
 
-        <header className="mt-10">
+        <header className="mt-10 max-w-2xl">
           <p className="text-xs uppercase tracking-[0.2em] text-grove-accent">
             Liminal Web · Biweekly
           </p>
@@ -91,9 +95,9 @@ export default async function ShowAndTellPage() {
             Show &amp; Tell
           </h1>
           <p className="mt-6 text-lg leading-relaxed text-grove-text-muted">
-            A biweekly 40-minute meeting for ideas and insights across the
-            Liminal Web. Bring something half-formed, or come empty-handed and
-            listen.
+            A biweekly 60-minute meeting for ideas and insights across the
+            Liminal Web. Four slots per session — bring something half-formed,
+            or come empty-handed and listen.
           </p>
         </header>
 
@@ -112,7 +116,8 @@ export default async function ShowAndTellPage() {
           </div>
           {nextSession ? (
             <p className="mt-3 text-sm text-grove-text-muted">
-              40 minutes. Open to anyone in the Liminal Web orbit.
+              60 minutes. Four 10-minute slots. Open to anyone in the Liminal
+              Web orbit.
               {nextSession.location && (
                 <>
                   {' '}Meeting in{' '}
@@ -128,10 +133,10 @@ export default async function ShowAndTellPage() {
           )}
           <div className="mt-5 flex items-center gap-4 text-sm">
             <Link
-              href="/show-and-tell/submit/quick"
+              href="/show-and-tell/submit"
               className="rounded-md border border-grove-accent bg-grove-accent/10 px-3 py-1.5 text-grove-accent hover:bg-grove-accent/20"
             >
-              Submit an idea →
+              Submit a Topic →
             </Link>
             <Link
               href="/"
@@ -144,54 +149,78 @@ export default async function ShowAndTellPage() {
 
         <section className="mt-14">
           <div className="flex items-baseline justify-between gap-4">
-            <h2 className="font-serif text-2xl text-grove-text">
-              Submitted ideas
-            </h2>
+            <h2 className="font-serif text-2xl text-grove-text">The lineup</h2>
             <span className="text-xs uppercase tracking-[0.18em] text-grove-text-muted">
-              {submissions.length} {submissions.length === 1 ? 'idea' : 'ideas'}
+              {lineup.length} of {SLOT_COUNT} {lineup.length === 1 ? 'slot' : 'slots'} filled
             </span>
           </div>
 
-          {submissions.length === 0 ? (
-            <p className="mt-4 text-grove-text-muted">
-              No ideas submitted yet. Be the first —{' '}
-              <Link
-                href="/show-and-tell/submit/quick"
-                className="text-grove-accent hover:text-grove-accent-deep"
-              >
-                drop one in
-              </Link>
-              .
-            </p>
-          ) : (
-            <ol className="mt-5 space-y-3">
-              {submissions.map((s) => (
-                <li
-                  key={s.id}
-                  className="rounded-md border border-grove-border bg-grove-surface px-4 py-3"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <h3 className="font-medium text-grove-text">{s.title}</h3>
-                    <span className="shrink-0 text-xs text-grove-text-muted">
-                      {s.submitterName}
+          <ol className="mt-5 grid gap-4 sm:grid-cols-2">
+            {slots.map((submission, idx) => {
+              const slot = String(idx + 1).padStart(2, '0');
+              if (!submission) {
+                return (
+                  <li
+                    key={`open-${idx}`}
+                    className="flex min-h-[160px] flex-col items-start justify-between rounded-lg border border-dashed border-grove-border bg-grove-surface/40 p-5"
+                  >
+                    <span className="text-xs uppercase tracking-[0.18em] text-grove-accent">
+                      {slot}
                     </span>
+                    <span className="text-sm italic text-grove-text-muted">
+                      Open slot — could be yours
+                    </span>
+                    <Link
+                      href="/show-and-tell/submit"
+                      className="text-xs text-grove-accent hover:text-grove-accent-deep"
+                    >
+                      Claim →
+                    </Link>
+                  </li>
+                );
+              }
+              return (
+                <li
+                  key={submission.id}
+                  className="flex flex-col overflow-hidden rounded-lg border border-grove-border bg-grove-surface"
+                >
+                  {submission.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={submission.imageUrl}
+                      alt=""
+                      className="aspect-[16/9] w-full object-cover"
+                    />
+                  )}
+                  <div className="flex flex-1 flex-col gap-2 p-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-xs uppercase tracking-[0.18em] text-grove-accent">
+                        {slot}
+                      </span>
+                      <span className="text-xs text-grove-text-muted">
+                        {submission.submitterName}
+                      </span>
+                    </div>
+                    <h3 className="font-medium text-grove-text">{submission.title}</h3>
+                    <p className="text-sm leading-relaxed text-grove-text-muted">
+                      {truncate(submission.description, 180)}
+                    </p>
                   </div>
-                  <p className="mt-1.5 text-sm leading-relaxed text-grove-text-muted">
-                    {truncate(s.description, 240)}
-                  </p>
                 </li>
-              ))}
-            </ol>
-          )}
+              );
+            })}
+          </ol>
         </section>
 
-        <section className="mt-14 space-y-4">
+        <section className="mt-14 max-w-2xl space-y-4">
           <h2 className="font-serif text-2xl text-grove-text">How it works</h2>
           <p className="leading-relaxed text-grove-text-muted">
-            Submit an idea (email is enough — no account required). It shows up
-            on this page. Every other week we meet for 40 minutes and present a
-            handful of them. The meetings are recorded and edited into clips for
-            YouTube, Facebook, and other channels.
+            Submit a Topic — the AI host helps you sharpen it into a TED-style
+            10-minute pitch with a banner image (generated or uploaded). It
+            shows up here as part of the next session&apos;s lineup. Every
+            other week we meet for 60 minutes and present four of them. The
+            meetings are recorded and edited into clips for YouTube, Facebook,
+            and other channels.
           </p>
           <p className="leading-relaxed text-grove-text-muted">
             Open to anyone in the Liminal Web orbit. Bringing something is
