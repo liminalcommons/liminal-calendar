@@ -34,8 +34,8 @@ export const TOPIC_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'set_title',
-      description: 'A short, punchy title for the Topic. Visible to the user and host.',
-      parameters: stringField('Title'),
+      description: 'A short, punchy title for the Topic (max 80 characters). Visible to the user and host.',
+      parameters: stringField('Title — under 80 characters'),
     },
   },
   {
@@ -43,8 +43,8 @@ export const TOPIC_TOOLS = [
     function: {
       name: 'set_description',
       description:
-        'The 60–120 word Topic description in the user\'s voice as a copywriter would polish it. Visible to the user and host. Should read like a TED-talk abstract: what they\'ll show in 10 minutes, the single idea or thing, why it matters.',
-      parameters: stringField('Description'),
+        'The 60–120 word (under 600 characters) Topic description in the user\'s voice as a copywriter would polish it. Visible to the user and host. Should read like a TED-talk abstract: what they\'ll show in 10 minutes, the single idea or thing, why it matters.',
+      parameters: stringField('Description — under 600 characters'),
     },
   },
   {
@@ -79,6 +79,15 @@ export const TOPIC_TOOLS = [
       parameters: stringField('Materials URL'),
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'generate_banner_image',
+      description:
+        "Generate an AI banner image for the Topic. Use this once the title and description are clear and the user seems happy with them — a banner makes the lineup card pop. Don't call it before the title is set. The image is auto-generated from the current title and description; no arguments needed. If the user has already uploaded their own banner, don't call this unless they ask for a new one.",
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
 ];
 
 export function buildTopicSystemPrompt(state: TopicFormState): string {
@@ -97,6 +106,7 @@ How to work:
 6. Never invent details. If something is fuzzy, ask one sharp question.
 7. The user can edit Title and Description directly anytime — respect their edits.
 8. Do NOT ask for the user's name or email — they're already signed in.
+9. Once title and description are set and the user seems happy, offer to generate a banner image and call generate_banner_image. A banner makes their lineup card visible on /show-and-tell. The user can also upload their own — don't push generation if they've uploaded.
 
 Current form state (read-only — do not echo back, just use as context):
 ${JSON.stringify(state, null, 2)}

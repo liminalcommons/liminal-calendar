@@ -13,11 +13,26 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
 
+  const TITLE_MAX = 80;
+  const DESCRIPTION_MAX = 600;
+
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const description = typeof body.description === 'string' ? body.description.trim() : '';
   if (!title || !description) {
     return NextResponse.json(
       { error: 'Title and description are required.' },
+      { status: 400 },
+    );
+  }
+  if (title.length > TITLE_MAX) {
+    return NextResponse.json(
+      { error: `Title is over ${TITLE_MAX} characters (${title.length}). Please shorten it.` },
+      { status: 400 },
+    );
+  }
+  if (description.length > DESCRIPTION_MAX) {
+    return NextResponse.json(
+      { error: `Description is over ${DESCRIPTION_MAX} characters (${description.length}). Please shorten it.` },
       { status: 400 },
     );
   }

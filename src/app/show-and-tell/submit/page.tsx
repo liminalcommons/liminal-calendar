@@ -54,8 +54,8 @@ export default function TopicSubmitPage() {
           )
             next.formatHint = args.formatHint;
           break;
-        case 'set_title': next.title = String(args.value ?? ''); break;
-        case 'set_description': next.description = String(args.value ?? ''); break;
+        case 'set_title': next.title = String(args.value ?? '').slice(0, 80); break;
+        case 'set_description': next.description = String(args.value ?? '').slice(0, 600); break;
         case 'set_hook': next.hook = String(args.value ?? ''); break;
         case 'set_audience': next.audience = String(args.value ?? ''); break;
         case 'set_takeaway': next.takeaway = String(args.value ?? ''); break;
@@ -63,6 +63,10 @@ export default function TopicSubmitPage() {
       }
       return next;
     });
+    if (name === 'generate_banner_image') {
+      // Fire-and-forget — onGenerateImage handles its own state.
+      void onGenerateImage();
+    }
   }
 
   async function sendMessage(text: string) {
@@ -95,8 +99,15 @@ export default function TopicSubmitPage() {
           console.warn('Bad tool args:', tc.function.arguments, e);
         }
       }
-      const reply: string =
-        msg.content ?? (toolCalls.length > 0 ? '(updated the form — what next?)' : '');
+      const calledImageGen = toolCalls.some(
+        (tc) => tc.function.name === 'generate_banner_image',
+      );
+      const fallback = calledImageGen
+        ? '(generating banner image — it\'ll appear in the preview)'
+        : toolCalls.length > 0
+        ? '(updated the form — what next?)'
+        : '';
+      const reply: string = msg.content ?? fallback;
       if (reply) setMessages((m) => [...m, { role: 'assistant', content: reply }]);
     } catch (e) {
       setChatError(e instanceof Error ? e.message : 'Chat failed');
@@ -277,6 +288,28 @@ export default function TopicSubmitPage() {
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {/* Chat panel */}
             <section className="flex h-[70vh] flex-col rounded-lg border border-grove-border bg-grove-surface">
+              <div className="flex flex-wrap items-center gap-2 border-b border-grove-border px-3 py-2 text-xs">
+                <span className="mr-2 text-grove-text-muted">Banner:</span>
+                <button
+                  type="button"
+                  onClick={onGenerateImage}
+                  disabled={generatingImage || uploadingImage || !form.title?.trim()}
+                  className="rounded-md border border-grove-border px-2 py-1 text-grove-text hover:bg-grove-bg disabled:opacity-50"
+                >
+                  {generatingImage ? 'Generating…' : 'Generate with AI'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={generatingImage || uploadingImage}
+                  className="rounded-md border border-grove-border px-2 py-1 text-grove-text hover:bg-grove-bg disabled:opacity-50"
+                >
+                  {uploadingImage ? 'Uploading…' : 'Upload image'}
+                </button>
+                {imageUrl && (
+                  <span className="ml-auto text-grove-accent">✓ banner set</span>
+                )}
+              </div>
               <div
                 ref={scrollRef}
                 className="flex-1 space-y-3 overflow-y-auto p-4"
@@ -332,27 +365,47 @@ export default function TopicSubmitPage() {
             {/* Live preview / form */}
             <section className="flex flex-col gap-4">
               <div className="rounded-lg border border-grove-border bg-grove-surface p-5">
-                <label className="block text-xs uppercase tracking-wider text-grove-text-muted">
-                  Title
-                </label>
+                <div className="flex items-baseline justify-between">
+                  <label className="block text-xs uppercase tracking-wider text-grove-text-muted">
+                    Title
+                  </label>
+                  <span className={`text-xs ${
+                    (form.title?.length ?? 0) > 80
+                      ? 'text-red-400'
+                      : 'text-grove-text-muted'
+                  }`}>
+                    {form.title?.length ?? 0} / 80
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={form.title ?? ''}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, title: e.target.value }))
+                    setForm((p) => ({ ...p, title: e.target.value.slice(0, 80) }))
                   }
+                  maxLength={80}
                   placeholder="A short, punchy Topic title"
                   className="mt-2 w-full rounded-md border border-grove-border bg-grove-bg px-3 py-2 text-grove-text focus:outline-none focus:ring-1 focus:ring-grove-accent"
                 />
 
-                <label className="mt-4 block text-xs uppercase tracking-wider text-grove-text-muted">
-                  Description
-                </label>
+                <div className="mt-4 flex items-baseline justify-between">
+                  <label className="block text-xs uppercase tracking-wider text-grove-text-muted">
+                    Description
+                  </label>
+                  <span className={`text-xs ${
+                    (form.description?.length ?? 0) > 600
+                      ? 'text-red-400'
+                      : 'text-grove-text-muted'
+                  }`}>
+                    {form.description?.length ?? 0} / 600
+                  </span>
+                </div>
                 <textarea
                   value={form.description ?? ''}
                   onChange={(e) =>
-                    setForm((p) => ({ ...p, description: e.target.value }))
+                    setForm((p) => ({ ...p, description: e.target.value.slice(0, 600) }))
                   }
+                  maxLength={600}
                   placeholder="What you'll show in 10 minutes — TED-talk abstract."
                   rows={8}
                   className="mt-2 w-full rounded-md border border-grove-border bg-grove-bg px-3 py-2 text-sm text-grove-text focus:outline-none focus:ring-1 focus:ring-grove-accent"
