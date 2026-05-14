@@ -14,7 +14,7 @@ interface ChatMessage {
 const INITIAL_GREETING: ChatMessage = {
   role: 'assistant',
   content:
-    "Welcome — I'm helping you shape a Topic for Show & Tell. You'll have ten minutes to present, TED-style. To start: what's the one thing you want to show, share, or wrestle with in front of the room?",
+    "Welcome — I'm the Show & Tell host. I'm here to help you turn a half-formed idea into a tight 10-minute Topic.\n\nAs we chat, I'll fill in the Title and Description on the right (you can edit them anytime). Once we've got something solid, I can generate a banner image for your lineup card — or you can upload your own using the panel on the right.\n\nTo start: what's the one thing you want to show, share, or wrestle with in front of the room?",
 };
 
 export default function TopicSubmitPage() {
@@ -288,28 +288,6 @@ export default function TopicSubmitPage() {
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {/* Chat panel */}
             <section className="flex h-[70vh] flex-col rounded-lg border border-grove-border bg-grove-surface">
-              <div className="flex flex-wrap items-center gap-2 border-b border-grove-border px-3 py-2 text-xs">
-                <span className="mr-2 text-grove-text-muted">Banner:</span>
-                <button
-                  type="button"
-                  onClick={onGenerateImage}
-                  disabled={generatingImage || uploadingImage || !form.title?.trim()}
-                  className="rounded-md border border-grove-border px-2 py-1 text-grove-text hover:bg-grove-bg disabled:opacity-50"
-                >
-                  {generatingImage ? 'Generating…' : 'Generate with AI'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={generatingImage || uploadingImage}
-                  className="rounded-md border border-grove-border px-2 py-1 text-grove-text hover:bg-grove-bg disabled:opacity-50"
-                >
-                  {uploadingImage ? 'Uploading…' : 'Upload image'}
-                </button>
-                {imageUrl && (
-                  <span className="ml-auto text-grove-accent">✓ banner set</span>
-                )}
-              </div>
               <div
                 ref={scrollRef}
                 className="flex-1 space-y-3 overflow-y-auto p-4"
@@ -319,8 +297,8 @@ export default function TopicSubmitPage() {
                     key={i}
                     className={
                       m.role === 'user'
-                        ? 'ml-auto max-w-[85%] rounded-lg bg-grove-accent/20 px-3 py-2 text-sm text-grove-text'
-                        : 'mr-auto max-w-[85%] rounded-lg bg-grove-bg px-3 py-2 text-sm text-grove-text'
+                        ? 'ml-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-grove-accent/20 px-3 py-2 text-sm text-grove-text'
+                        : 'mr-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-grove-bg px-3 py-2 text-sm text-grove-text'
                     }
                   >
                     {m.content}
