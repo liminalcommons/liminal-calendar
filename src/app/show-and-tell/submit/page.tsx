@@ -261,9 +261,30 @@ export default function TopicSubmitPage() {
               The host will be in touch about which Show &amp; Tell session
               you&apos;ll present in.
             </p>
+
+            <div className="mx-auto mt-8 max-w-md rounded-lg border border-grove-border bg-grove-surface p-5 text-left">
+              <div className="text-xs uppercase tracking-wider text-grove-text-muted">
+                Distribution permissions you set
+              </div>
+              <ul className="mt-3 space-y-1.5 text-sm text-grove-text">
+                <li>
+                  <ConsentMark on={consentYoutube} /> YouTube
+                </li>
+                <li>
+                  <ConsentMark on={consentTelegram} /> Telegram groups
+                </li>
+                <li>
+                  <ConsentMark on={consentFacebook} /> Facebook groups
+                </li>
+              </ul>
+              <p className="mt-3 text-xs text-grove-text-muted">
+                Want to change these? Email the host before the session.
+              </p>
+            </div>
+
             <Link
               href="/show-and-tell"
-              className="mt-6 inline-block text-sm text-grove-accent hover:text-grove-accent-deep"
+              className="mt-8 inline-block text-sm text-grove-accent hover:text-grove-accent-deep"
             >
               ← Back to Show &amp; Tell
             </Link>
@@ -522,6 +543,21 @@ export default function TopicSubmitPage() {
         </div>
       </main>
     </>
+  );
+}
+
+function ConsentMark({ on }: { on: boolean }) {
+  return (
+    <span
+      className={
+        on
+          ? 'mr-2 inline-block text-grove-accent'
+          : 'mr-2 inline-block text-grove-text-muted'
+      }
+      aria-label={on ? 'allowed' : 'not allowed'}
+    >
+      {on ? '✓' : '○'}
+    </span>
   );
 }
 
