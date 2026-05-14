@@ -311,6 +311,11 @@ export const topicSubmissions = pgTable('topic_submissions', {
   takeaway: text('takeaway'),
   status: text('status').notNull().default('submitted'), // 'submitted' | 'accepted' | 'declined'
   targetSessionDate: date('target_session_date'),
+  // Distribution consent — independent per-channel toggles. Host uses these
+  // when deciding what to publish where after the meeting is recorded.
+  consentYoutube: boolean('consent_youtube').notNull().default(false),
+  consentTelegram: boolean('consent_telegram').notNull().default(false),
+  consentFacebook: boolean('consent_facebook').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

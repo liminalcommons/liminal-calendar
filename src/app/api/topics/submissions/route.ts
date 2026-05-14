@@ -46,6 +46,7 @@ export async function POST(request: Request) {
     const v = body[k];
     return typeof v === 'string' && v.trim() ? v.trim() : null;
   };
+  const optBool = (k: string): boolean => body[k] === true;
 
   const [row] = await db
     .insert(topicSubmissions)
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
       hook: optString('hook'),
       audience: optString('audience'),
       takeaway: optString('takeaway'),
+      consentYoutube: optBool('consentYoutube'),
+      consentTelegram: optBool('consentTelegram'),
+      consentFacebook: optBool('consentFacebook'),
     })
     .returning();
 

@@ -32,6 +32,10 @@ export default function TopicSubmitPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [consentYoutube, setConsentYoutube] = useState(false);
+  const [consentTelegram, setConsentTelegram] = useState(false);
+  const [consentFacebook, setConsentFacebook] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -193,6 +197,9 @@ export default function TopicSubmitPage() {
           hook: form.hook || null,
           audience: form.audience || null,
           takeaway: form.takeaway || null,
+          consentYoutube,
+          consentTelegram,
+          consentFacebook,
         }),
       });
       if (!res.ok) {
@@ -463,6 +470,38 @@ export default function TopicSubmitPage() {
                 )}
               </div>
 
+              <div className="rounded-lg border border-grove-border bg-grove-surface p-5">
+                <label className="block text-xs uppercase tracking-wider text-grove-text-muted">
+                  Distribution permissions
+                </label>
+                <p className="mt-2 text-xs text-grove-text-muted">
+                  The meeting is recorded. After the session, the host edits it
+                  into clips and posts. Tick the channels where your Topic may
+                  be shared. Untick any you&apos;d rather skip — defaults to all
+                  off.
+                </p>
+                <div className="mt-3 space-y-2">
+                  <ConsentCheckbox
+                    label="YouTube"
+                    detail="Recording uploaded to YouTube"
+                    checked={consentYoutube}
+                    onChange={setConsentYoutube}
+                  />
+                  <ConsentCheckbox
+                    label="Telegram"
+                    detail="Posted to Liminal Web-related Telegram groups we have access to"
+                    checked={consentTelegram}
+                    onChange={setConsentTelegram}
+                  />
+                  <ConsentCheckbox
+                    label="Facebook"
+                    detail="Posted to Liminal Web Facebook groups (Metamodern, etc.)"
+                    checked={consentFacebook}
+                    onChange={setConsentFacebook}
+                  />
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
@@ -483,5 +522,32 @@ export default function TopicSubmitPage() {
         </div>
       </main>
     </>
+  );
+}
+
+function ConsentCheckbox({
+  label,
+  detail,
+  checked,
+  onChange,
+}: {
+  label: string;
+  detail: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2 rounded-md border border-grove-border bg-grove-bg px-3 py-2 hover:border-grove-accent/50">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 cursor-pointer accent-grove-accent"
+      />
+      <span className="flex flex-col">
+        <span className="text-sm text-grove-text">{label}</span>
+        <span className="text-xs text-grove-text-muted">{detail}</span>
+      </span>
+    </label>
   );
 }

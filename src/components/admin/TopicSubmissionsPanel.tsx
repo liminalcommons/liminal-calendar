@@ -17,6 +17,9 @@ interface TopicRow {
   takeaway: string | null;
   status: string;
   targetSessionDate: string | null;
+  consentYoutube: boolean;
+  consentTelegram: boolean;
+  consentFacebook: boolean;
   createdAt: string;
 }
 
@@ -136,6 +139,24 @@ export function TopicSubmissionsPanel() {
                           className="max-w-md rounded-md border border-grove-border"
                         />
                       )}
+                      <div>
+                        <div className="text-xs uppercase tracking-wider text-grove-text-muted">
+                          Distribution consent
+                        </div>
+                        <ul className="mt-1 space-y-1 text-sm">
+                          <li>
+                            <ConsentMark on={r.consentYoutube} /> YouTube
+                          </li>
+                          <li>
+                            <ConsentMark on={r.consentTelegram} /> Telegram
+                            groups
+                          </li>
+                          <li>
+                            <ConsentMark on={r.consentFacebook} /> Facebook
+                            groups
+                          </li>
+                        </ul>
+                      </div>
                       {r.submitterEmail && (
                         <div className="text-xs text-grove-text-muted">
                           Contact: {r.submitterEmail}
@@ -161,5 +182,20 @@ function Detail({ label, value }: { label: string; value: string }) {
       </div>
       <p className="mt-1 whitespace-pre-wrap">{value}</p>
     </div>
+  );
+}
+
+function ConsentMark({ on }: { on: boolean }) {
+  return (
+    <span
+      className={
+        on
+          ? 'mr-2 inline-block text-grove-accent'
+          : 'mr-2 inline-block text-grove-text-muted'
+      }
+      aria-label={on ? 'allowed' : 'not allowed'}
+    >
+      {on ? '✓' : '○'}
+    </span>
   );
 }
