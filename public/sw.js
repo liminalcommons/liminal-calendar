@@ -46,6 +46,21 @@ function broadcastMuteChange(eventId, muted) {
   }
 }
 
+async function focusOrOpenCalendar(url) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    if (
+      client.url.includes('liminalcalendar.com') ||
+      client.url.includes('calendar.castalia.one') ||
+      client.url.includes('localhost')
+    ) {
+      try { await client.navigate(url); } catch {}
+      return client.focus();
+    }
+  }
+  return self.clients.openWindow(url);
+}
+
 async function handleMuteAction(eventId) {
   try {
     const res = await fetch(`/api/events/${eventId}/mute`, {
@@ -64,6 +79,9 @@ async function handleMuteAction(eventId) {
         data: { url: '/settings', eventId, unmuteAction: true },
         actions: [{ action: 'unmute', title: '↩ Undo' }],
       });
+      // Surface the calendar so the user sees the event immediately dimmed
+      // (broadcast already updated state in any open tab).
+      await focusOrOpenCalendar('/');
     }
   } catch {
     // network blip — silent
@@ -85,6 +103,7 @@ async function handleUnmuteAction(eventId) {
         tag: `unmute-confirm-${eventId}`,
         data: { url: '/' },
       });
+      await focusOrOpenCalendar('/');
     }
   } catch {
     // silent

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat, Bell, BellOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
@@ -103,7 +103,39 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const canEdit = canEditEvent(role, isCreator);
   const canDelete = canDeleteEvent(role, isCreator);
 
-  const pos = computePosition(anchorRect);
+  const initialPos = computePosition(anchorRect);
+  const [pos, setPos] = useState(initialPos);
+
+  // After mount, measure actual popover height and reposition so the bottom
+  // doesn't get cropped behind the internal scroll. The initial position uses
+  // a static 420px estimate — real content (long description + meeting link +
+  // RSVP row + footer) often exceeds that for events near the bottom of the
+  // grid, leaving the footer hidden until the user scrolls inside the popover.
+  useLayoutEffect(() => {
+    const el = popoverRef.current;
+    if (!el) return;
+    const vh = window.innerHeight;
+    const actualHeight = el.offsetHeight;
+    const maxTop = vh - actualHeight - 8;
+    const desiredTop = Math.min(initialPos.top, Math.max(8, maxTop));
+    if (desiredTop !== pos.top) setPos({ top: desiredTop, left: initialPos.left });
+    // Recompute on viewport resize for tablet rotations etc.
+    const onResize = () => {
+      const node = popoverRef.current;
+      if (!node) return;
+      const h = node.offsetHeight;
+      const recomputed = computePopoverPosition(
+        anchorRect,
+        { width: window.innerWidth, height: window.innerHeight },
+        POPOVER_WIDTH,
+        h,
+      );
+      setPos(recomputed);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchorRect, showDeleteConfirm]);
 
   // Play warp on mount
   useEffect(() => {
