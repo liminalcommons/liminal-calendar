@@ -10,6 +10,7 @@ const VIEWS = [
   { label: 'Week', path: '/', pref: 'week' },
   { label: 'Month', path: '/month', pref: 'month' },
   { label: 'List', path: '/list', pref: 'list' },
+  { label: 'Show & Tell', path: '/show-and-tell', pref: 'show-and-tell' },
 ] as const;
 
 export function ViewToggle() {

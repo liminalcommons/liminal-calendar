@@ -182,17 +182,26 @@ export default function TopicSubmitPage() {
         <NavBar />
         <main className="min-h-screen bg-grove-bg text-grove-text">
           <section className="mx-auto max-w-2xl px-6 py-20 text-center">
-            <h1 className="font-serif text-3xl">Sign in to submit a Topic</h1>
+            <h1 className="font-serif text-3xl">Submit a Topic</h1>
             <p className="mt-4 text-grove-text-muted">
-              Show &amp; Tell is for the Liminal Web. Sign in to share what
-              you&apos;re working on.
+              The AI chat host needs you signed in (so it can save your draft as
+              you go). Don&apos;t want to sign in? You can submit anonymously
+              with the quick form instead.
             </p>
-            <Link
-              href="/welcome"
-              className="mt-6 inline-block rounded-md border border-grove-accent bg-grove-accent/10 px-4 py-2 text-sm font-medium text-grove-accent hover:bg-grove-accent/20"
-            >
-              Sign in
-            </Link>
+            <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+              <Link
+                href="/welcome"
+                className="inline-block rounded-md border border-grove-accent bg-grove-accent/10 px-4 py-2 text-sm font-medium text-grove-accent hover:bg-grove-accent/20"
+              >
+                Sign in &amp; chat with the host
+              </Link>
+              <Link
+                href="/show-and-tell/submit/quick"
+                className="inline-block rounded-md border border-grove-border px-4 py-2 text-sm font-medium text-grove-text-muted hover:bg-grove-surface hover:text-grove-text"
+              >
+                Use the quick form →
+              </Link>
+            </div>
           </section>
         </main>
       </>

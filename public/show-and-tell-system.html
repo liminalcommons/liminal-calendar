@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Show & Tell — System Map</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0f1419;
+    --surface:   #1a2028;
+    --surface-2: #232b35;
+    --border:    #2e3a47;
+    --border-2:  #475569;
+    --text:      #e8edf3;
+    --muted:     #94a3b8;
+    --faint:     #64748b;
+    --accent:    #60a5fa;
+    --accent-2:  #fbbf24;
+    --success:   #4ade80;
+    --warn:      #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); }
+  body {
+    margin: 0;
+    color: var(--text);
+    font: 16px/1.6 "Inter", system-ui, -apple-system, sans-serif;
+    padding: 3rem 1.5rem 5rem;
+  }
+  main { max-width: 1200px; margin: 0 auto; }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+  h1 {
+    font-weight: 700;
+    font-size: 2.6rem;
+    margin: 0 0 0.75rem;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  h1 .sub {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    letter-spacing: 0;
+  }
+  .lede {
+    color: var(--muted);
+    font-size: 1.05rem;
+    max-width: 720px;
+    line-height: 1.6;
+    margin: 0 0 2.5rem;
+  }
+  h2 {
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 3rem 0 1rem;
+  }
+
+  /* Diagram frame — break out of main column to full viewport width */
+  .diagram-wrap {
+    position: relative;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    width: 100vw;
+    padding: 0 1.5rem;
+  }
+  .diagram {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1.5rem;
+    overflow: auto;
+    position: relative;
+  }
+  .diagram:fullscreen,
+  .diagram:-webkit-full-screen {
+    border-radius: 0;
+    padding: 2rem 3rem;
+    background: var(--bg);
+    overflow: auto;
+  }
+  .fs-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 5;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border-2);
+    border-radius: 4px;
+    padding: 0.4rem 0.75rem;
+    font: 500 12px/1 "Inter", system-ui, sans-serif;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  .fs-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .mermaid { font-family: "Inter", system-ui, sans-serif !important; }
+  .mermaid svg {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    min-height: 80vh;
+    display: block;
+  }
+  .diagram:fullscreen .mermaid svg,
+  .diagram:-webkit-full-screen .mermaid svg {
+    min-height: 92vh;
+  }
+  .mermaid .nodeLabel,
+  .mermaid .edgeLabel {
+    font-family: "Inter", system-ui, sans-serif !important;
+    font-size: 16px !important;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+  }
+  .sw-system   { background: #1e3a2e; border: 1px solid #4ade80; }
+  .sw-human    { background: #3a2e1e; border: 1px solid #fbbf24; }
+  .sw-store    { background: #1e2a3a; border: 1px solid #60a5fa; border-radius: 50%; }
+  .sw-channel  { background: #2a2438; border: 1px solid #a78bfa; }
+  .sw-manual   { background: #3a1e1e; border: 1px dashed #f87171; }
+
+  /* Loop cards */
+  .loops {
+    margin-top: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .loop {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    padding: 1.25rem 1.25rem 1.1rem;
+  }
+  .loop h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .loop p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+  .loop code {
+    display: block;
+    margin-bottom: 0.6rem;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 0.5rem 0.7rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    word-break: break-word;
+    line-height: 1.5;
+  }
+
+  .foot {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--faint);
+    font-size: 0.9rem;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js"></script>
+<script>
+  function toggleFs() {
+    const el = document.getElementById('diagram');
+    if (!document.fullscreenElement) {
+      (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+  }
+</script>
+</head>
+<body>
+<main>
+
+  <div class="eyebrow">Liminal Calendar · A Practice</div>
+  <h1>
+    Show &amp; Tell
+    <span class="sub">— the system that carries it —</span>
+  </h1>
+  <p class="lede">
+    A biweekly 40-minute community meeting where submitted ideas get presented.
+    Submission stays open between sessions — email is enough; no account needed.
+    The meeting is recorded; clips and posts are made by hand and distributed to
+    the channels we already use.
+  </p>
+
+  <h2>The simple loop</h2>
+  <div class="diagram-wrap">
+  <div class="diagram" id="diagram">
+    <button class="fs-btn" onclick="toggleFs()" type="button">⛶ Fullscreen</button>
+    <pre class="mermaid">
+flowchart LR
+  classDef store    fill:#1e2a3a,stroke:#60a5fa,stroke-width:2px,color:#e8edf3
+  classDef system   fill:#1e3a2e,stroke:#4ade80,stroke-width:1.6px,color:#e8edf3
+  classDef human    fill:#3a2e1e,stroke:#fbbf24,stroke-width:1.6px,color:#e8edf3
+  classDef manual   fill:#3a1e1e,stroke:#f87171,stroke-width:2px,color:#e8edf3,stroke-dasharray: 4 3
+  classDef channel  fill:#2a2438,stroke:#a78bfa,stroke-width:1.4px,color:#e8edf3
+
+  SUBMIT[/"Submit an idea<br/>(email enough,<br/>or sign in to edit)"/]:::human
+  POOL[("Submission pool<br/>on /show-and-tell")]:::store
+  MEETING(("Biweekly meeting<br/>40 min · Castalia")):::system
+  REC["Recording"]:::system
+  EDIT["Manual edit<br/>into clips &amp; posts"]:::manual
+
+  subgraph DIST ["Distribution (manual)"]
+    direction TB
+    YT[/"YouTube"/]:::channel
+    FB[/"Facebook<br/>Metamodern group"/]:::channel
+    TG[/"Telegram<br/>related groups"/]:::channel
+    HYLO[/"Hylo<br/>Limicon groups"/]:::channel
+    NL[/"Newsletter"/]:::channel
+  end
+
+  AUDIENCE(("Audience")):::store
+
+  SUBMIT --> POOL
+  POOL --> MEETING
+  MEETING --> REC
+  REC --> EDIT
+
+  EDIT --> YT
+  EDIT --> FB
+  EDIT --> TG
+  EDIT --> HYLO
+  EDIT --> NL
+
+  YT --> AUDIENCE
+  FB --> AUDIENCE
+  TG --> AUDIENCE
+  HYLO --> AUDIENCE
+  NL --> AUDIENCE
+
+  AUDIENCE -.->|next idea| SUBMIT
+    </pre>
+
+    <div class="legend">
+      <span><span class="swatch sw-system"></span> System (automated)</span>
+      <span><span class="swatch sw-human"></span> Human action</span>
+      <span><span class="swatch sw-store"></span> Store / vessel</span>
+      <span><span class="swatch sw-channel"></span> Channel</span>
+      <span><span class="swatch sw-manual"></span> Manual work (outside the app)</span>
+      <span style="color:var(--faint)">— forward · - - - feedback</span>
+    </div>
+  </div>
+  </div>
+
+  <h2>What the app does</h2>
+  <div class="loops">
+    <div class="loop">
+      <h3>Submission</h3>
+      <p>
+        A public form on <code>/show-and-tell/submit</code>. Email is enough to
+        submit. Signed-in users can revisit and edit their submission later
+        (guests can&apos;t — they&apos;d need to email the host).
+      </p>
+    </div>
+    <div class="loop">
+      <h3>The pool</h3>
+      <p>
+        <code>/show-and-tell</code> shows the next meeting time and the running
+        list of submitted ideas. Anyone can see what&apos;s been brought in.
+      </p>
+    </div>
+    <div class="loop">
+      <h3>The meeting itself</h3>
+      <p>
+        A biweekly recurring event in the calendar (40 min, Wed early evening),
+        rendered on the Week and Month views like any other event. Held in
+        Castalia.
+      </p>
+    </div>
+  </div>
+
+  <h2>What stays manual</h2>
+  <div class="loops">
+    <div class="loop">
+      <h3>Editing the recording</h3>
+      <p>
+        After each meeting, the host edits the recording into clips, descriptions,
+        and short posts. Done in whatever editing tool the host already uses.
+        The app doesn&apos;t touch this.
+      </p>
+    </div>
+    <div class="loop">
+      <h3>Cross-posting</h3>
+      <p>
+        The host posts to YouTube, the Facebook Metamodern group, related
+        Telegram groups, Hylo Limicon groups, and the newsletter — by hand,
+        on each platform. No app automation.
+      </p>
+    </div>
+    <div class="loop">
+      <h3>Why manual on purpose</h3>
+      <p>
+        Building cross-posting automation is weeks of work for marginal time
+        savings. Run the practice 3–5 cycles first. If a specific friction
+        becomes intolerable (e.g. "I keep forgetting which channels each idea
+        went to"), build only that.
+      </p>
+    </div>
+  </div>
+
+  <div class="foot">
+    The practice keeps itself; subscribers show up if they choose to.
+  </div>
+
+</main>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      background: '#1a2028',
+      primaryColor: '#1e2a3a',
+      primaryTextColor: '#e8edf3',
+      primaryBorderColor: '#60a5fa',
+      lineColor: '#94a3b8',
+      secondaryColor: '#1e3a2e',
+      tertiaryColor: '#3a2e1e',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: '15px',
+      edgeLabelBackground: '#1a2028'
+    },
+    flowchart: {
+      curve: 'basis',
+      padding: 28,
+      nodeSpacing: 60,
+      rankSpacing: 90,
+      htmlLabels: true
+    }
+  });
+</script>
+</body>
+</html>

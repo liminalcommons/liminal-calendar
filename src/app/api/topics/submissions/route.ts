@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { topicSubmissions } from '@/lib/db/schema';
 import { desc } from 'drizzle-orm';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export async function POST(request: Request) {
   const user = await getAuthedUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Sign in to submit a Topic.' }, { status: 401 });
-  }
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
@@ -20,6 +20,38 @@ export async function POST(request: Request) {
       { error: 'Title and description are required.' },
       { status: 400 },
     );
+  }
+
+  // Guest submissions: require email + name. Authenticated users use session identity.
+  let submitterId: string;
+  let submitterName: string;
+  let submitterEmail: string | null;
+  let memberId: number | null;
+
+  if (user) {
+    submitterId = user.id;
+    submitterName = user.name || 'Anonymous';
+    submitterEmail = user.email ?? null;
+    memberId = user.memberId ?? null;
+  } else {
+    const emailRaw = typeof body.submitterEmail === 'string' ? body.submitterEmail.trim() : '';
+    const nameRaw = typeof body.submitterName === 'string' ? body.submitterName.trim() : '';
+    if (!EMAIL_RE.test(emailRaw)) {
+      return NextResponse.json(
+        { error: 'A valid email is required for guest submissions.' },
+        { status: 400 },
+      );
+    }
+    if (!nameRaw) {
+      return NextResponse.json(
+        { error: 'Your name is required.' },
+        { status: 400 },
+      );
+    }
+    submitterId = `guest:${randomUUID()}`;
+    submitterName = nameRaw;
+    submitterEmail = emailRaw;
+    memberId = null;
   }
 
   const formatHintRaw = typeof body.formatHint === 'string' ? body.formatHint : null;
@@ -35,10 +67,10 @@ export async function POST(request: Request) {
   const [row] = await db
     .insert(topicSubmissions)
     .values({
-      submitterId: user.id,
-      memberId: user.memberId ?? null,
-      submitterName: user.name || 'Anonymous',
-      submitterEmail: user.email ?? null,
+      submitterId,
+      memberId,
+      submitterName,
+      submitterEmail,
       title,
       description,
       formatHint,
