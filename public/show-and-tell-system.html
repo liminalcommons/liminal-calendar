@@ -246,8 +246,6 @@ flowchart LR
     YT[/"YouTube"/]:::channel
     FB[/"Facebook<br/>Metamodern group"/]:::channel
     TG[/"Telegram<br/>related groups"/]:::channel
-    HYLO[/"Hylo<br/>Limicon groups"/]:::channel
-    NL[/"Newsletter"/]:::channel
   end
 
   AUDIENCE(("Audience")):::store
@@ -260,14 +258,10 @@ flowchart LR
   EDIT --> YT
   EDIT --> FB
   EDIT --> TG
-  EDIT --> HYLO
-  EDIT --> NL
 
   YT --> AUDIENCE
   FB --> AUDIENCE
   TG --> AUDIENCE
-  HYLO --> AUDIENCE
-  NL --> AUDIENCE
 
   AUDIENCE -.->|next idea| SUBMIT
     </pre>
@@ -324,9 +318,10 @@ flowchart LR
     <div class="loop">
       <h3>Cross-posting</h3>
       <p>
-        The host posts to YouTube, the Facebook Metamodern group, related
-        Telegram groups, Hylo Limicon groups, and the newsletter — by hand,
-        on each platform. No app automation.
+        The host posts to YouTube, the Facebook Metamodern group, and related
+        Telegram groups — by hand, on each platform. These are the three
+        channels the submission form actually asks consent for; if other
+        channels get added later, the form gets a checkbox in the same commit.
       </p>
     </div>
     <div class="loop">
