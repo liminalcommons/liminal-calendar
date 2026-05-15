@@ -16,7 +16,6 @@ interface TopicRow {
   audience: string | null;
   takeaway: string | null;
   status: string;
-  targetSessionDate: string | null;
   consentYoutube: boolean;
   consentTelegram: boolean;
   consentFacebook: boolean;
