@@ -41,6 +41,33 @@ describe('computePopoverPosition', () => {
     const pos = computePopoverPosition({ left: 200, right: 280, top: -50 }, viewport, W);
     expect(pos.top).toBe(8);
   });
+
+  // EventExpansion measures the popover's real rendered height after mount
+  // and feeds it back through this function (or the inline equivalent in the
+  // useLayoutEffect). These cases cover what happens when actual content is
+  // taller than the 420px default — the scenario that was cropping bottom-row
+  // events before commit 5967381.
+  it('shifts a tall popover (560px) further up so the bottom stays in view', () => {
+    const pos = computePopoverPosition(
+      { left: 200, right: 280, top: 700 },
+      viewport,
+      W,
+      560,
+    );
+    // 800 - 560 - 8 = 232 → top clamped up from anchor.top=700 to 232
+    expect(pos.top).toBe(232);
+  });
+
+  it('clamps a popover taller than the viewport to top=8 (internal scroll fallback)', () => {
+    const pos = computePopoverPosition(
+      { left: 200, right: 280, top: 600 },
+      viewport,
+      W,
+      900, // larger than viewport.height (800)
+    );
+    // vh - h - 8 = -108 → max(8, -108) = 8
+    expect(pos.top).toBe(8);
+  });
 });
 
 describe('formatEventDuration', () => {
