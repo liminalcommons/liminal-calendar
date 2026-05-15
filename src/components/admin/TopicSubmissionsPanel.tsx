@@ -12,9 +12,6 @@ interface TopicRow {
   formatHint: string | null;
   materialsUrl: string | null;
   imageUrl: string | null;
-  hook: string | null;
-  audience: string | null;
-  takeaway: string | null;
   status: string;
   consentYoutube: boolean;
   consentTelegram: boolean;
@@ -106,15 +103,6 @@ export function TopicSubmissionsPanel() {
                         </div>
                         <p className="mt-1 whitespace-pre-wrap">{r.description}</p>
                       </div>
-                      {r.hook && (
-                        <Detail label="Hook (internal)" value={r.hook} />
-                      )}
-                      {r.audience && (
-                        <Detail label="Audience (internal)" value={r.audience} />
-                      )}
-                      {r.takeaway && (
-                        <Detail label="Takeaway (internal)" value={r.takeaway} />
-                      )}
                       {r.materialsUrl && (
                         <div>
                           <div className="text-xs uppercase tracking-wider text-grove-text-muted">
@@ -169,17 +157,6 @@ export function TopicSubmissionsPanel() {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-xs uppercase tracking-wider text-grove-text-muted">
-        {label}
-      </div>
-      <p className="mt-1 whitespace-pre-wrap">{value}</p>
     </div>
   );
 }
