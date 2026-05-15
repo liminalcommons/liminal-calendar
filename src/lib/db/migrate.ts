@@ -232,10 +232,16 @@ export async function runMigrations() {
       takeaway TEXT,
       status TEXT NOT NULL DEFAULT 'submitted',
       target_session_date DATE,
+      consent_youtube BOOLEAN NOT NULL DEFAULT FALSE,
+      consent_telegram BOOLEAN NOT NULL DEFAULT FALSE,
+      consent_facebook BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_youtube BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_telegram BOOLEAN NOT NULL DEFAULT FALSE`;
+  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_facebook BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`CREATE INDEX IF NOT EXISTS topic_submissions_status_created_idx ON topic_submissions(status, created_at DESC)`;
 
   // Booking-event race guard. Without this, two simultaneous POST /book
