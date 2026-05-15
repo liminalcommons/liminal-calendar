@@ -215,12 +215,10 @@ export default async function ShowAndTellPage() {
         <section className="mt-14 max-w-2xl space-y-4">
           <h2 className="font-serif text-2xl text-grove-text">How it works</h2>
           <p className="leading-relaxed text-grove-text-muted">
-            Submit a Topic — the AI host helps you sharpen it into a TED-style
-            10-minute pitch with a banner image (generated or uploaded). It
-            shows up here as part of the next session&apos;s lineup. Every
-            other week we meet for 60 minutes and present four of them. The
-            meetings are recorded and edited into clips for YouTube, Facebook,
-            and other channels.
+            Submit a Topic. It shows up here as part of the next session&apos;s
+            lineup. Every other week we meet for 60 minutes and present four
+            of them. The meetings are recorded and — with your consent —
+            edited into clips for YouTube, Facebook, and Telegram.
           </p>
           <p className="leading-relaxed text-grove-text-muted">
             Open to anyone in the Liminal Web orbit. Bringing something is
