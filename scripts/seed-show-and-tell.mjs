@@ -1,7 +1,7 @@
 // Seed a biweekly recurring Show & Tell event (idempotent).
 // Run: node scripts/seed-show-and-tell.mjs
 //
-// Defaults: next Wednesday at 18:00 Europe/Berlin, 40 minutes, fortnightly.
+// Defaults: next Wednesday at 18:00 Europe/Berlin, fortnightly.
 // Adjust the constants below if you want a different starting day/time.
 //
 // Idempotency: if an event titled "Show & Tell" already exists in the future,
