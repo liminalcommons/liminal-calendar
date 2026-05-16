@@ -37,11 +37,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const formatHintRaw = typeof body.formatHint === 'string' ? body.formatHint : null;
-  const allowedFormats = new Set(['demo', 'insight', 'question', 'other']);
-  const formatHint =
-    formatHintRaw && allowedFormats.has(formatHintRaw) ? formatHintRaw : null;
-
   const optString = (k: string): string | null => {
     const v = body[k];
     return typeof v === 'string' && v.trim() ? v.trim() : null;
@@ -57,12 +52,8 @@ export async function POST(request: Request) {
       submitterEmail: user.email ?? null,
       title,
       description,
-      formatHint,
       materialsUrl: optString('materialsUrl'),
       imageUrl: optString('imageUrl'),
-      hook: optString('hook'),
-      audience: optString('audience'),
-      takeaway: optString('takeaway'),
       consentYoutube: optBool('consentYoutube'),
       consentTelegram: optBool('consentTelegram'),
       consentFacebook: optBool('consentFacebook'),

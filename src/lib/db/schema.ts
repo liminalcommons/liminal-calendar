@@ -300,13 +300,8 @@ export const topicSubmissions = pgTable('topic_submissions', {
   submitterEmail: text('submitter_email'),
   title: text('title').notNull(),
   description: text('description').notNull(),
-  formatHint: text('format_hint'), // 'demo' | 'insight' | 'question' | 'other' | null
   materialsUrl: text('materials_url'),
   imageUrl: text('image_url'),
-  // Internal scaffolding from the AI host conversation — kept for triage context.
-  hook: text('hook'),
-  audience: text('audience'),
-  takeaway: text('takeaway'),
   status: text('status').notNull().default('submitted'), // 'submitted' | 'accepted' | 'declined'
   // Distribution consent — independent per-channel toggles. Host uses these
   // when deciding what to publish where after the meeting is recorded.
