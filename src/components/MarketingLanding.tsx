@@ -7,12 +7,17 @@
  */
 
 import Link from 'next/link';
-import { Calendar, Link2, Users } from 'lucide-react';
 import { RuneAccent } from './RuneAccent';
+
+const SERIF_STACK =
+  "'Iowan Old Style', 'Palatino Linotype', Palatino, 'Hoefler Text', Georgia, serif";
 
 export function MarketingLanding() {
   return (
-    <div className="min-h-screen bg-grove-bg text-grove-text">
+    <div
+      className="min-h-screen bg-grove-bg text-grove-text"
+      style={{ fontFamily: SERIF_STACK }}
+    >
       <header className="flex items-center justify-between px-6 py-4 border-b border-grove-border">
         <div className="flex items-center gap-2">
           <RuneAccent size="md" seed={2} />
@@ -26,47 +31,24 @@ export function MarketingLanding() {
         </Link>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-16 space-y-16">
-        <section className="space-y-5 text-center">
-          <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
-            A calendar that belongs to your community.
-          </h1>
-          <p className="text-lg text-grove-text-muted max-w-2xl mx-auto">
-            Liminal Calendar is a shared, public calendar for groups, plus
-            Calendly-style 1:1 booking from a handle you can share anywhere.
+      <main
+        data-testid="liminal-landing"
+        className="max-w-3xl mx-auto px-6 py-16 space-y-16"
+      >
+        <section className="space-y-8 text-center">
+          <SeasonalWheel />
+          <p className="text-2xl sm:text-3xl leading-snug max-w-xl mx-auto italic">
+            A place to keep track of when we gather —
+            <br className="hidden sm:inline" /> the dinners, the rituals, the
+            quiet weeks.
           </p>
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <Link
-              href="/welcome"
-              className="px-4 py-2 rounded bg-grove-accent text-white font-medium"
-            >
-              Get started
-            </Link>
-            <a
-              href="#how-it-works"
-              className="px-4 py-2 rounded border border-grove-border text-sm hover:bg-grove-surface"
-            >
-              How it works
-            </a>
-          </div>
-        </section>
-
-        <section className="grid gap-6 sm:grid-cols-3">
-          <FeatureCard
-            icon={<Calendar size={20} />}
-            title="Shared events"
-            body="One calendar for the whole community. RSVP, repeat, and discover what's happening."
-          />
-          <FeatureCard
-            icon={<Link2 size={20} />}
-            title="1:1 booking"
-            body="Claim a handle, set your hours, and share liminalcalendar.com/you to take meetings."
-          />
-          <FeatureCard
-            icon={<Users size={20} />}
-            title="Invite-only events"
-            body="Some gatherings are open, others are intimate. Choose who can see and join."
-          />
+          <p className="text-base text-grove-text-muted max-w-xl mx-auto">
+            You can{' '}
+            <Link href="/welcome" className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text">
+              sign in with Hylo &rarr;
+            </Link>{' '}
+            to RSVP, or just read what&rsquo;s coming.
+          </p>
         </section>
 
         <section id="how-it-works" className="rounded border border-grove-border bg-grove-surface p-6 space-y-3 scroll-mt-20">
@@ -95,20 +77,129 @@ export function MarketingLanding() {
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  body,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  body: string;
-}) {
+/**
+ * SeasonalWheel — hand-drawn-feeling SVG. Pure decoration, no a11y label
+ * beyond aria-hidden. Lines are intentionally wavy via cubic-bezier
+ * controls; the four cardinal marks are slightly rotated; marginalia
+ * (sprout, leaf, flame, branch) sit outside the wheel like inkwell
+ * sketches in a commonplace book.
+ */
+function SeasonalWheel() {
   return (
-    <div className="rounded border border-grove-border bg-grove-surface p-5 space-y-2">
-      <div className="text-grove-accent">{icon}</div>
-      <h3 className="text-base font-semibold">{title}</h3>
-      <p className="text-sm text-grove-text-muted">{body}</p>
-    </div>
+    <svg
+      role="img"
+      aria-label="A hand-drawn seasonal wheel"
+      viewBox="0 0 360 360"
+      width="280"
+      height="280"
+      className="mx-auto text-grove-accent-deep"
+      style={{ overflow: 'visible' }}
+    >
+      {/* outer wavy ring — two passes, slight offsets, dashed inner shadow */}
+      <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+        <path
+          d="M 180 40
+             C 250 38, 322 86, 322 178
+             C 324 252, 256 322, 180 322
+             C 104 324, 38 254, 40 178
+             C 38 102, 108 42, 180 40 Z"
+          strokeWidth="2.2"
+        />
+        <path
+          d="M 180 52
+             C 244 50, 312 96, 310 178
+             C 312 246, 250 310, 180 310
+             C 110 312, 50 248, 52 178
+             C 50 110, 116 54, 180 52 Z"
+          strokeWidth="1"
+          strokeDasharray="2 5"
+          opacity="0.55"
+        />
+        {/* cardinal cross — irregular */}
+        <path d="M 180 60 L 181 132" strokeWidth="1.6" />
+        <path d="M 180 228 L 179 300" strokeWidth="1.6" />
+        <path d="M 60 180 L 132 181" strokeWidth="1.6" />
+        <path d="M 228 180 L 300 179" strokeWidth="1.6" />
+
+        {/* small inner sun */}
+        <circle cx="180" cy="180" r="8" strokeWidth="1.6" />
+        <path d="M 180 158 L 180 168" strokeWidth="1.2" />
+        <path d="M 180 192 L 180 202" strokeWidth="1.2" />
+        <path d="M 158 180 L 168 180" strokeWidth="1.2" />
+        <path d="M 192 180 L 202 180" strokeWidth="1.2" />
+        <path d="M 164 164 L 170 170" strokeWidth="1.2" />
+        <path d="M 190 190 L 196 196" strokeWidth="1.2" />
+        <path d="M 196 164 L 190 170" strokeWidth="1.2" />
+        <path d="M 170 190 L 164 196" strokeWidth="1.2" />
+      </g>
+
+      {/* marginalia — sprout (spring, top) */}
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        transform="translate(168 8) rotate(-6)"
+      >
+        <path d="M 12 28 L 12 12" />
+        <path d="M 12 16 C 4 14, 2 6, 8 4 C 11 8, 12 12, 12 16 Z" />
+        <path d="M 12 19 C 20 17, 22 9, 16 7 C 13 11, 12 15, 12 19 Z" />
+      </g>
+
+      {/* marginalia — leaf (summer, right) */}
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        transform="translate(322 168) rotate(20)"
+      >
+        <path d="M 4 14 C 14 -2, 30 0, 30 14 C 30 24, 18 30, 6 26 C 4 22, 2 18, 4 14 Z" />
+        <path d="M 8 18 L 24 10" strokeWidth="1" />
+      </g>
+
+      {/* marginalia — flame / hearth (autumn, bottom) */}
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        transform="translate(168 322) rotate(4)"
+      >
+        <path d="M 12 28 C 4 26, 2 18, 10 12 C 8 18, 14 16, 12 8 C 18 12, 22 18, 20 24 C 18 28, 14 30, 12 28 Z" />
+      </g>
+
+      {/* marginalia — bare branch (winter, left) */}
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+        transform="translate(8 162) rotate(-14)"
+      >
+        <path d="M 4 22 L 28 14" />
+        <path d="M 12 19 L 8 12" />
+        <path d="M 18 17 L 22 10" />
+        <path d="M 24 15 L 20 8" />
+      </g>
+
+      {/* tiny dotted spiral near center, like ink residue */}
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="0.9"
+        opacity="0.5"
+      >
+        <path
+          d="M 110 250 C 116 242, 124 240, 130 246 C 138 254, 132 264, 124 262"
+          strokeDasharray="1 3"
+        />
+      </g>
+    </svg>
   );
 }
