@@ -254,6 +254,9 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
             onChange={(e) => setBufferBefore(parseInt(e.target.value, 10) || 0)}
             className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
           />
+          <p className="text-[10px] text-grove-text-muted mt-0.5">
+            Padding before each booking (e.g. setup time).
+          </p>
         </div>
         <div>
           <label className="block text-xs font-medium text-grove-text">Buffer after (min)</label>
@@ -265,6 +268,9 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
             onChange={(e) => setBufferAfter(parseInt(e.target.value, 10) || 0)}
             className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
           />
+          <p className="text-[10px] text-grove-text-muted mt-0.5">
+            Padding after each booking (e.g. notes / break).
+          </p>
         </div>
         <div>
           <label className="block text-xs font-medium text-grove-text">Minimum notice (min)</label>
@@ -275,6 +281,9 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
             onChange={(e) => setMinNotice(parseInt(e.target.value, 10) || 0)}
             className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
           />
+          <p className="text-[10px] text-grove-text-muted mt-0.5">
+            How far ahead a booker must reserve (60 = at least 1h ahead).
+          </p>
           {fieldErrors.minNotice && (
             <p role="alert" className="text-xs text-red-700 mt-1">{fieldErrors.minNotice}</p>
           )}
@@ -289,6 +298,9 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
             onChange={(e) => setMaxDaysAhead(parseInt(e.target.value, 10) || 1)}
             className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
           />
+          <p className="text-[10px] text-grove-text-muted mt-0.5">
+            How far into the future bookings open.
+          </p>
           {fieldErrors.maxDaysAhead && (
             <p role="alert" className="text-xs text-red-700 mt-1">{fieldErrors.maxDaysAhead}</p>
           )}
