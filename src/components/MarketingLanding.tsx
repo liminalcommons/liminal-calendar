@@ -27,7 +27,7 @@ export function MarketingLanding() {
 
       <main
         data-testid="liminal-landing"
-        className="max-w-3xl mx-auto px-6 py-16 space-y-16"
+        className="max-w-4xl mx-auto px-6 py-16 space-y-16"
       >
         <section className="space-y-8 text-center">
           <SeasonalWheel />
@@ -38,14 +38,85 @@ export function MarketingLanding() {
           </p>
           <p className="text-base text-grove-text-muted max-w-xl mx-auto">
             You can{' '}
-            <Link href="/welcome" className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text">
+            <Link
+              href="/welcome"
+              className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text"
+            >
               sign in with Hylo &rarr;
             </Link>{' '}
             to RSVP, or just read what&rsquo;s coming.
           </p>
         </section>
 
-        <section id="how-it-works" className="rounded border border-grove-border bg-grove-surface p-6 space-y-3 scroll-mt-20">
+        <section
+          data-testid="liminal-essay"
+          className="liminal-prose mx-auto text-[1.05rem] leading-relaxed space-y-5"
+        >
+          <p>
+            This is a calendar for{' '}
+            <Term>
+              coliving
+              <Sidenote>
+                Households where people share a kitchen, a porch, and the
+                weekly rhythm of being in each other&rsquo;s lives.
+              </Sidenote>
+            </Term>{' '}
+            communities &mdash; the places where someone makes coffee for
+            seven, and a Tuesday potluck is older than the lease.
+          </p>
+          <p>
+            Anyone can{' '}
+            <Term>
+              host
+              <Sidenote>
+                The person who tends the gathering. Not a manager &mdash;
+                more like the one who chose the date and unlocked the door.
+              </Sidenote>
+            </Term>{' '}
+            a gathering, and anyone can{' '}
+            <Term>
+              RSVP
+              <Sidenote>
+                A soft commitment. You can change your mind. Others see the
+                count and can plan the bread.
+              </Sidenote>
+            </Term>
+            . Some events are{' '}
+            <Term>
+              recurring rituals
+              <Sidenote>
+                Weekly dinners, Sunday walks, full-moon fires &mdash; events
+                that keep their place by being kept.
+              </Sidenote>
+            </Term>{' '}
+            &mdash; they keep their place on the calendar by being kept.
+          </p>
+          <p>
+            Signing in goes through{' '}
+            <Term>
+              Hylo
+              <Sidenote>
+                A sister platform for community signals; sign-in is shared
+                so your face is the same in both places.
+              </Sidenote>
+            </Term>
+            . You can claim a{' '}
+            <Term>
+              handle
+              <Sidenote>
+                A short name like{' '}
+                <span className="font-mono">liminalcalendar.com/you</span>{' '}
+                &mdash; the address where people find you to book a time.
+              </Sidenote>
+            </Term>{' '}
+            and that becomes your address on the calendar.
+          </p>
+        </section>
+
+        <section
+          id="how-it-works"
+          className="rounded border border-grove-border bg-grove-surface p-6 space-y-3 scroll-mt-20"
+        >
           <h2 className="text-xl font-semibold">How it works</h2>
           <ol className="space-y-2 text-sm text-grove-text-muted list-decimal pl-5">
             <li>Sign in with your community account.</li>
@@ -69,6 +140,22 @@ export function MarketingLanding() {
       </footer>
     </div>
   );
+}
+
+/**
+ * Term + Sidenote — Tufte-style marginalia primitives. Pure presentation,
+ * no JS, no client-state. The dotted underline on the term is the visual
+ * affordance; the sidenote text lives in the right gutter on md+ and
+ * collapses to an inline em-dashed gloss on mobile via globals.css.
+ *
+ * Compose: <Term>RSVP<Sidenote>a soft commitment…</Sidenote></Term>
+ */
+function Term({ children }: { children: React.ReactNode }) {
+  return <span className="liminal-term">{children}</span>;
+}
+
+function Sidenote({ children }: { children: React.ReactNode }) {
+  return <span className="liminal-sidenote">{children}</span>;
 }
 
 /**

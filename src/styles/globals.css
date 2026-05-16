@@ -13,6 +13,62 @@
     "Hoefler Text", Georgia, Cambria, "Times New Roman", serif;
 }
 
+/**
+ * Tufte-style sidenote layout for the Liminal-Web landing.
+ *
+ * Default (mobile): sidenote renders inline as an italicized gloss
+ * after the term, prefixed by an em-dash. Easy to read, no offscreen
+ * content.
+ *
+ * md+ : the `.liminal-prose` container reserves a right gutter
+ * (padding-right) wide enough for `.liminal-sidenote` to float into
+ * via a negative margin-right. The em-dash prefix is suppressed; the
+ * note sits beside its anchor word the way a commonplace book would
+ * keep a marginal note. No JS — purely CSS.
+ *
+ * The container also gets a `.liminal-marker` slot in the right
+ * margin (used by event entries in move 4 for hand-drawn icons).
+ */
+.liminal-prose {
+  max-width: 38rem;
+  position: relative;
+}
+.liminal-sidenote {
+  display: inline;
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: rgb(var(--grove-text-muted));
+}
+.liminal-sidenote::before {
+  content: " — ";
+  color: rgb(var(--grove-text-dim));
+}
+@media (min-width: 768px) {
+  .liminal-prose {
+    padding-right: 12rem;
+  }
+  .liminal-sidenote {
+    float: right;
+    clear: right;
+    width: 10.5rem;
+    margin-right: -11.5rem;
+    margin-top: 0.35rem;
+    margin-bottom: 0.6rem;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    text-align: left;
+    color: rgb(var(--grove-text-muted));
+  }
+  .liminal-sidenote::before {
+    content: "";
+  }
+}
+.liminal-term {
+  border-bottom: 1px dotted rgb(var(--grove-accent) / 0.55);
+  cursor: help;
+}
+
 :root {
   --grove-bg: 232 223 208;
   --grove-surface: 240 232 219;
