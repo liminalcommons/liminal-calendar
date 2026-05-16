@@ -12,6 +12,7 @@
  */
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api-fetch';
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
@@ -21,6 +22,7 @@ interface HandleEditorProps {
 }
 
 export function HandleEditor({ initialHandle }: HandleEditorProps) {
+  const router = useRouter();
   const [handle, setHandle] = useState(initialHandle ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +67,7 @@ export function HandleEditor({ initialHandle }: HandleEditorProps) {
       const data = (await res.json()) as { handle: string };
       setHandle(data.handle);
       setSaved(true);
+      router.refresh();
     } catch {
       setError('Network error — please retry.');
     } finally {

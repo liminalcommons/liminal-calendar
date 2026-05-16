@@ -1,4 +1,5 @@
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
@@ -8,6 +9,8 @@ import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
+import { MarketingLanding } from '@/components/MarketingLanding';
+import { BookingOnboardingNudge } from '@/components/booking/BookingOnboardingNudge';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
 import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -16,7 +19,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const authed = await getAuthedUser();
+  if (!authed) {
+    return <MarketingLanding />;
+  }
   const currentUserId = authed?.id;
+  const member = await getCurrentMember(db);
+  const showBookingNudge = !!member && !member.handle;
 
   let displayEvents: DisplayEvent[] = [];
 
@@ -57,6 +65,7 @@ export default async function HomePage() {
       <NavBar />
       <AvailabilityBanner />
       <SubscribeBanner />
+      {showBookingNudge && <BookingOnboardingNudge />}
       <main className="flex-1 min-h-0 border border-grove-border rounded-lg overflow-hidden">
         <WeeklyGrid events={displayEvents} />
       </main>

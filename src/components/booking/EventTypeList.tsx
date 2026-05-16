@@ -8,11 +8,31 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Copy, Check } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 import { EventTypeForm, type EventTypeRecord } from './EventTypeForm';
 
-export function EventTypeList() {
+const HOST = 'liminalcalendar.com';
+
+interface EventTypeListProps {
+  handle: string | null;
+}
+
+export function EventTypeList({ handle }: EventTypeListProps) {
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  async function onCopy(record: EventTypeRecord) {
+    if (!handle) return;
+    const url = `https://${HOST}/${handle}/${record.slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedId(record.id);
+      setTimeout(() => setCopiedId((cur) => (cur === record.id ? null : cur)), 1500);
+    } catch {
+      // clipboard write failed silently
+    }
+  }
+
   const [items, setItems] = useState<EventTypeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +114,17 @@ export function EventTypeList() {
                     </p>
                   </div>
                   <div className="flex gap-1">
+                    {handle && (
+                      <button
+                        type="button"
+                        aria-label={`Copy share link for ${r.title}`}
+                        title={`Copy ${HOST}/${handle}/${r.slug}`}
+                        onClick={() => void onCopy(r)}
+                        className="p-1.5 rounded hover:bg-grove-border/30 text-grove-text-muted"
+                      >
+                        {copiedId === r.id ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    )}
                     <button
                       type="button"
                       aria-label={`Edit ${r.title}`}

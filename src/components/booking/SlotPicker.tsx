@@ -46,6 +46,7 @@ interface Booking {
 export interface SlotPickerProps {
   handle: string;
   slug: string;
+  isAuthed?: boolean;
 }
 
 const dayKeyFmt = new Intl.DateTimeFormat(undefined, {
@@ -82,7 +83,7 @@ function isExternalLocation(location: string | null): boolean {
   return /^https?:\/\//i.test(location);
 }
 
-export function SlotPicker({ handle, slug }: SlotPickerProps) {
+export function SlotPicker({ handle, slug, isAuthed = true }: SlotPickerProps) {
   const [loading, setLoading] = useState(true);
   const [eventType, setEventType] = useState<EventTypeMeta | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -120,8 +121,12 @@ export function SlotPicker({ handle, slug }: SlotPickerProps) {
   }, [handle, slug]);
 
   useEffect(() => {
+    if (!isAuthed) {
+      setLoading(false);
+      return;
+    }
     void fetchSlots();
-  }, [fetchSlots]);
+  }, [fetchSlots, isAuthed]);
 
   async function bookSlot(startsAt: string) {
     setBookingInFlight(startsAt);
@@ -155,6 +160,23 @@ export function SlotPicker({ handle, slug }: SlotPickerProps) {
     } finally {
       setBookingInFlight(null);
     }
+  }
+
+  if (!isAuthed) {
+    const next = `/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`;
+    return (
+      <div className="rounded border border-grove-border bg-grove-bg p-4 space-y-3">
+        <p className="text-sm text-grove-text">
+          Sign in to see available times and book this session.
+        </p>
+        <a
+          href={`/welcome?next=${encodeURIComponent(next)}`}
+          className="inline-flex items-center px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
+        >
+          Sign in to book
+        </a>
+      </div>
+    );
   }
 
   if (loading) {

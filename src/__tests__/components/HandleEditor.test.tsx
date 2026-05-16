@@ -5,6 +5,10 @@ jest.mock('@/lib/api-fetch', () => ({
   apiFetch: jest.fn(),
 }));
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: jest.fn(), push: jest.fn(), replace: jest.fn() }),
+}));
+
 import { apiFetch } from '@/lib/api-fetch';
 const mockApiFetch = apiFetch as jest.MockedFunction<typeof apiFetch>;
 

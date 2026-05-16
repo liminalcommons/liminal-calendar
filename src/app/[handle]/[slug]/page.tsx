@@ -2,26 +2,24 @@
  * Public booking page at `/<handle>/<slug>` — Task 8 of Plan 3 (1:1 Booking).
  *
  * Server component that:
- *   1. Gates on auth (`getCurrentMember(db)`). Redirects to
- *      `/sign-in?next=/<handle>/<slug>` if unauthenticated.
- *   2. Resolves <handle> → ownerMemberId via `resolveHandleToMemberId`.
+ *   1. Resolves <handle> → ownerMemberId via `resolveHandleToMemberId`.
  *      `notFound()` (404) if no such handle.
- *   3. Looks up the event type by `(ownerMemberId, slug)` —
+ *   2. Looks up the event type by `(ownerMemberId, slug)` —
  *      `getEventTypeBySlug`. `notFound()` if missing/inactive.
- *   4. Looks up the owner Member row for the display name/avatar.
- *   5. Renders the header + the client `<SlotPicker>` which handles
- *      the slot-fetch and POST /book lifecycle.
+ *   3. Looks up the owner Member row for the display name/avatar.
+ *   4. Renders the header + the client `<SlotPicker>` which handles
+ *      the slot-fetch and POST /book lifecycle. The slot-picker is
+ *      authoring-gated: anon visitors see event details and a
+ *      "Sign in to book" CTA instead of the slot grid.
  *
- * The `[handle]` segment is a catch-all from Next's perspective — it
- * shadows nothing because it sits inside a dynamic folder that only
- * matches when no static `src/app/<dir>/` route does. The
- * `RESERVED_HANDLES` set + `reserved-handles.test.ts` enforce that
- * no user can register a handle colliding with a static route.
+ * Public route — anyone can view event details. The book action
+ * itself requires sign-in (enforced both client-side by SlotPicker
+ * and server-side by the /api/booking/.../book route).
  *
  * Next.js 15: `params` is async — must be awaited.
  */
 import { eq } from 'drizzle-orm';
-import { notFound, redirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -37,9 +35,7 @@ export default async function Page({ params }: PageProps) {
   const { handle, slug } = await params;
 
   const me = await getCurrentMember(db);
-  if (!me) {
-    redirect(`/sign-in?next=/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`);
-  }
+  const isAuthed = !!me;
 
   const ownerMemberId = await resolveHandleToMemberId(handle);
   if (ownerMemberId === null) {
@@ -94,7 +90,7 @@ export default async function Page({ params }: PageProps) {
         </p>
       )}
 
-      <SlotPicker handle={handle} slug={slug} />
+      <SlotPicker handle={handle} slug={slug} isAuthed={isAuthed} />
     </div>
   );
 }

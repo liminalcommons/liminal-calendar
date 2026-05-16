@@ -15,6 +15,7 @@ import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { HandleEditor } from '@/components/booking/HandleEditor';
 import { BookableWindowsEditor } from '@/components/booking/BookableWindowsEditor';
 import { EventTypeList } from '@/components/booking/EventTypeList';
+import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
 
 export default async function Page() {
   const member = await getCurrentMember(db);
@@ -39,6 +40,8 @@ export default async function Page() {
           availability, and the event types you offer.
         </p>
       </header>
+
+      {member.handle && <ProfileUrlBanner handle={member.handle} />}
 
       <section className="space-y-3">
         <div>
@@ -72,7 +75,7 @@ export default async function Page() {
             The kinds of sessions someone can book — name, duration, where you meet.
           </p>
         </div>
-        <EventTypeList />
+        <EventTypeList handle={member.handle ?? null} />
       </section>
     </div>
   );
