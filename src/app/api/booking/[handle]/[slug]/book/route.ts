@@ -28,11 +28,12 @@ import { events, rsvps, members } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
-import { listMyWindows } from '@/lib/booking/windows-repo';
 import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { computeSlots } from '@/lib/booking/slots';
 import { mintCastaliaRoomUrl } from '@/lib/booking/castalia-room';
 import { createNotification } from '@/lib/notifications/inbox/repo';
+import { sendEmail } from '@/lib/email';
+import { buildBookingConfirmedEmail } from '@/lib/notifications/booking-emails';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -88,9 +89,8 @@ export async function POST(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Slot re-validation. Same window-source logic as GET /slots — keep
-  // these in sync. Read from `members.availability` first; fall back to
-  // legacy `bookable_windows` for hosts who haven't migrated yet.
+  // Slot re-validation reads owner's availability heatmap (same source as
+  // GET /slots and the /profile editor — keep them in sync).
   const [ownerRow] = await db
     .select({ availability: members.availability, timezone: members.timezone })
     .from(members)
@@ -100,28 +100,13 @@ export async function POST(
   let availSlots: number[] = [];
   if (ownerRow?.availability) {
     try {
-      const parsed = JSON.parse(ownerRow.availability);
-      if (Array.isArray(parsed)) availSlots = parsed.filter((n) => Number.isInteger(n));
+      const parsedAvail = JSON.parse(ownerRow.availability);
+      if (Array.isArray(parsedAvail)) availSlots = parsedAvail.filter((n) => Number.isInteger(n));
     } catch {
       availSlots = [];
     }
   }
-  const ownerTz = ownerRow?.timezone ?? 'UTC';
-  let windows = availabilityToWindows(availSlots, ownerTz).map((w) => ({
-    dayOfWeek: w.dayOfWeek,
-    startMinute: w.startMinute,
-    endMinute: w.endMinute,
-    timezone: w.timezone,
-  }));
-  if (windows.length === 0) {
-    const legacy = await listMyWindows(ownerMemberId);
-    windows = legacy.map((w) => ({
-      dayOfWeek: w.dayOfWeek,
-      startMinute: w.startMinute,
-      endMinute: w.endMinute,
-      timezone: w.timezone ?? 'UTC',
-    }));
-  }
+  const windows = availabilityToWindows(availSlots, ownerRow?.timezone ?? 'UTC');
   const now = new Date();
   const horizon = new Date(now.getTime() + et.maxDaysAhead * MS_PER_DAY);
   const blockingRows = await db
@@ -287,6 +272,60 @@ export async function POST(
     });
   } catch (err) {
     console.error('[POST /api/booking/book] booker notification failed', err);
+  }
+
+  // 4. Transactional emails (owner + booker). Booking confirmations are
+  // not gated on notification_preferences — those control recurring
+  // reminders. The first "you have a meeting" message is a one-time
+  // transactional notice that always sends when we have an address.
+  const ownerName = ownerMember.name ?? 'host';
+  const bookerName = bookerMember.name ?? 'someone';
+  const eventTimezone = 'UTC';
+
+  if (ownerMember.email) {
+    try {
+      const { subject, html } = buildBookingConfirmedEmail({
+        flavor: 'owner',
+        eventId,
+        eventTitle: et.title,
+        startsAt: requestedStart,
+        endsAt,
+        location,
+        ownerName,
+        bookerName,
+        recipientTimezone: ownerMember.timezone ?? eventTimezone,
+        eventTimezone,
+      });
+      const result = await sendEmail(ownerMember.email, subject, html);
+      if (!result.success) {
+        console.error('[POST /api/booking/book] owner email failed', result.error);
+      }
+    } catch (err) {
+      console.error('[POST /api/booking/book] owner email threw', err);
+    }
+  }
+
+  if (bookerMember.email) {
+    try {
+      const { subject, html } = buildBookingConfirmedEmail({
+        flavor: 'booker',
+        eventId,
+        eventTitle: et.title,
+        startsAt: requestedStart,
+        endsAt,
+        location,
+        ownerName,
+        bookerName,
+        recipientTimezone: bookerMember.timezone ?? eventTimezone,
+        eventTimezone,
+      });
+      const result = await sendEmail(bookerMember.email, subject, html);
+      if (!result.success) {
+        console.error('[POST /api/booking/book] booker email failed', result.error);
+      }
+    } catch (err) {
+      console.error('[POST /api/booking/book] booker email threw', err);
+    }
   }
 
   return NextResponse.json(

@@ -23,20 +23,20 @@ jest.mock('@/lib/booking/handle-resolver', () => ({
 jest.mock('@/lib/booking/event-types-repo', () => ({
   getEventTypeBySlug: jest.fn(),
 }));
-jest.mock('@/lib/booking/windows-repo', () => ({
-  listMyWindows: jest.fn(),
+jest.mock('@/lib/booking/availability-to-windows', () => ({
+  availabilityToWindows: jest.fn(),
 }));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
-import { listMyWindows } from '@/lib/booking/windows-repo';
+import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { GET } from '@/app/api/booking/[handle]/[slug]/slots/route';
 
 const mockGetCurrentMember = getCurrentMember as unknown as jest.Mock;
 const mockResolveHandle = resolveHandleToMemberId as unknown as jest.Mock;
 const mockGetEventTypeBySlug = getEventTypeBySlug as unknown as jest.Mock;
-const mockListMyWindows = listMyWindows as unknown as jest.Mock;
+const mockAvailabilityToWindows = availabilityToWindows as unknown as jest.Mock;
 
 function makeReq(): import('next/server').NextRequest {
   return {} as unknown as import('next/server').NextRequest;
@@ -68,12 +68,13 @@ function setupDbMocks(opts: BlockingMockOpts) {
     then: (resolve: (v: unknown[]) => unknown) =>
       Promise.resolve(opts.blockingEvents ?? []).then(resolve),
   };
-  // members lookup chain: select({...}).from(members).where(...).limit(1)
-  // Tests don't exercise the availability path — return an empty owner row
-  // so the route falls back to `listMyWindows` (which the existing mocks cover).
+  // members lookup: select({...}).from(members).where(...).limit(1) — the
+  // route reads availability + timezone here. We return a non-null
+  // availability string so the route invokes availabilityToWindows, which
+  // is jest-mocked at module level to return the test's preferred windows.
   const membersLimitChain = {
     then: (resolve: (v: unknown[]) => unknown) =>
-      Promise.resolve([{ availability: null, timezone: null }]).then(resolve),
+      Promise.resolve([{ availability: '[]', timezone: 'UTC' }]).then(resolve),
   };
   const membersWhereChain = { limit: jest.fn(() => membersLimitChain) };
 
@@ -143,7 +144,7 @@ describe('GET /api/booking/[handle]/[slug]/slots', () => {
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
     // Tuesday window (dayOfWeek=1 in storage convention 0=Mon..6=Sun)
     // 12:00-13:00 UTC. With duration 30 → two slots.
-    mockListMyWindows.mockResolvedValue([
+    mockAvailabilityToWindows.mockReturnValue([
       {
         id: 1,
         ownerMemberId: 42,
@@ -173,7 +174,7 @@ describe('GET /api/booking/[handle]/[slug]/slots', () => {
     mockResolveHandle.mockResolvedValue(42);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
     // Tuesday 2026-05-12 12:00-13:00 UTC window → would give two 30-min slots.
-    mockListMyWindows.mockResolvedValue([
+    mockAvailabilityToWindows.mockReturnValue([
       {
         id: 1,
         ownerMemberId: 42,
@@ -216,7 +217,7 @@ describe('GET /api/booking/[handle]/[slug]/slots', () => {
     mockGetCurrentMember.mockResolvedValue({ id: 1, logtoId: 'lg_1' });
     mockResolveHandle.mockResolvedValue(42);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([
+    mockAvailabilityToWindows.mockReturnValue([
       {
         id: 1,
         ownerMemberId: 42,
@@ -248,7 +249,7 @@ describe('GET /api/booking/[handle]/[slug]/slots', () => {
     mockGetCurrentMember.mockResolvedValue({ id: 1, logtoId: 'lg_1' });
     mockResolveHandle.mockResolvedValue(42);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([
+    mockAvailabilityToWindows.mockReturnValue([
       {
         id: 1,
         ownerMemberId: 42,

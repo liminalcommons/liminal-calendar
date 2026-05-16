@@ -27,8 +27,8 @@ jest.mock('@/lib/booking/handle-resolver', () => ({
 jest.mock('@/lib/booking/event-types-repo', () => ({
   getEventTypeBySlug: jest.fn(),
 }));
-jest.mock('@/lib/booking/windows-repo', () => ({
-  listMyWindows: jest.fn(),
+jest.mock('@/lib/booking/availability-to-windows', () => ({
+  availabilityToWindows: jest.fn(),
 }));
 jest.mock('@/lib/booking/castalia-room', () => ({
   mintCastaliaRoomUrl: jest.fn(),
@@ -36,21 +36,26 @@ jest.mock('@/lib/booking/castalia-room', () => ({
 jest.mock('@/lib/notifications/inbox/repo', () => ({
   createNotification: jest.fn(),
 }));
+jest.mock('@/lib/email', () => ({
+  sendEmail: jest.fn(async () => ({ success: true })),
+}));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
-import { listMyWindows } from '@/lib/booking/windows-repo';
+import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { mintCastaliaRoomUrl } from '@/lib/booking/castalia-room';
 import { createNotification } from '@/lib/notifications/inbox/repo';
+import { sendEmail } from '@/lib/email';
 import { POST } from '@/app/api/booking/[handle]/[slug]/book/route';
 
 const mockGetCurrentMember = getCurrentMember as unknown as jest.Mock;
 const mockResolveHandle = resolveHandleToMemberId as unknown as jest.Mock;
 const mockGetEventTypeBySlug = getEventTypeBySlug as unknown as jest.Mock;
-const mockListMyWindows = listMyWindows as unknown as jest.Mock;
+const mockAvailabilityToWindows = availabilityToWindows as unknown as jest.Mock;
 const mockMintCastaliaRoomUrl = mintCastaliaRoomUrl as unknown as jest.Mock;
 const mockCreateNotification = createNotification as unknown as jest.Mock;
+const mockSendEmail = sendEmail as unknown as jest.Mock;
 
 function makeReq(body: unknown): import('next/server').NextRequest {
   return {
@@ -137,13 +142,13 @@ function setupDbMocks(opts: DbMockOpts = {}) {
   const insertedEvent = opts.insertedEvent ?? { id: 999 };
 
   // The route does three distinct selects:
-  //   1) owner availability/timezone from `members` (chain: select().from(members).where(...).limit(1))
-  //      — tests don't exercise this path; return a blank row so the
-  //      route falls back to `listMyWindows` (which existing mocks cover)
-  //   2) blocking events from `events` (chain: select(cols).from(events).where(...))
-  //   3) owner Member row for the booking creator name (chain: select().from(members).where(...).limit(1))
-  // We distinguish 1 vs 3 by call order against the `members` table;
-  // 2 is distinguished by the `events` table.
+  //   1) owner availability/timezone from `members` — first members call
+  //   2) blocking events from `events` — awaited directly, no .limit
+  //   3) owner Member row for booking creator name — second members call
+  // The availability adapter is jest-mocked at module level, so the value
+  // returned for (1) only needs to be a non-null availability string to
+  // exercise the parse path; mockAvailabilityToWindows controls the
+  // resulting windows.
   let membersCallIdx = 0;
   dbModule.db.select = jest.fn(() => ({
     from: jest.fn((table: unknown) => {
@@ -153,11 +158,8 @@ function setupDbMocks(opts: DbMockOpts = {}) {
           where: jest.fn(() => ({
             limit: jest.fn(() => {
               if (idx === 0) {
-                // availability/timezone lookup — empty row so we fall through
-                // to the listMyWindows mock for backwards-compat behaviour
-                return Promise.resolve([{ availability: null, timezone: null }]);
+                return Promise.resolve([{ availability: '[]', timezone: 'UTC' }]);
               }
-              // Owner row for booking creator name
               return Promise.resolve(
                 opts.ownerMemberRow === null
                   ? []
@@ -167,7 +169,6 @@ function setupDbMocks(opts: DbMockOpts = {}) {
           })),
         };
       }
-      // events / other tables: blocking events query, awaited directly (no .limit)
       return {
         where: jest.fn(() => Promise.resolve(opts.blockingEvents ?? [])),
       };
@@ -257,7 +258,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     setupDbMocks({ blockingEvents: [] });
 
     // Tuesday 2026-05-12 at 15:00 UTC is OUTSIDE the 12:00-13:00 window.
@@ -272,7 +273,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
     const { insertCalls } = setupDbMocks({ blockingEvents: [] });
 
@@ -300,7 +301,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
     const { insertCalls } = setupDbMocks({ blockingEvents: [] });
 
@@ -330,7 +331,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType); // castalia
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/zzz999');
     const { insertCalls } = setupDbMocks({ blockingEvents: [] });
 
@@ -355,7 +356,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
       locationKind: 'external_link',
       locationValue: 'https://zoom.us/j/123',
     });
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     const { insertCalls } = setupDbMocks({ blockingEvents: [] });
 
     const res = await POST(
@@ -372,7 +373,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
     setupDbMocks({ blockingEvents: [] });
 
@@ -405,6 +406,50 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     expect(bookerNotif.eventId).toBe(999);
   });
 
+  it('201 — sends booking-confirmed email to both owner and booker', async () => {
+    mockGetCurrentMember.mockResolvedValue(bookerMember);
+    mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
+    mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
+    mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
+    setupDbMocks({ blockingEvents: [] });
+
+    const res = await POST(
+      makeReq({ startsAt: '2026-05-12T12:00:00.000Z' }),
+      paramsOf('alice', 'coffee-30'),
+    );
+    expect(res.status).toBe(201);
+
+    expect(mockSendEmail).toHaveBeenCalledTimes(2);
+    const recipients = mockSendEmail.mock.calls.map((c) => c[0]);
+    expect(recipients).toContain('alice@example.com');
+    expect(recipients).toContain('bob@example.com');
+
+    const ownerCall = mockSendEmail.mock.calls.find((c) => c[0] === 'alice@example.com');
+    const bookerCall = mockSendEmail.mock.calls.find((c) => c[0] === 'bob@example.com');
+    expect(ownerCall![1]).toMatch(/Bob Booker booked/);
+    expect(bookerCall![1]).toMatch(/Booked: .*with Alice Owner/);
+  });
+
+  it('201 — skips email when recipient has no email address', async () => {
+    mockGetCurrentMember.mockResolvedValue({ ...bookerMember, email: null });
+    mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
+    mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
+    mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
+    setupDbMocks({ blockingEvents: [] });
+
+    const res = await POST(
+      makeReq({ startsAt: '2026-05-12T12:00:00.000Z' }),
+      paramsOf('alice', 'coffee-30'),
+    );
+    expect(res.status).toBe(201);
+
+    // Owner has email; booker does not. Only one send.
+    expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendEmail.mock.calls[0][0]).toBe('alice@example.com');
+  });
+
   // Race-safety regression: a partial unique index
   // `events_booking_owner_starts_unique` on (member_id, starts_at) WHERE
   // source_event_type_id IS NOT NULL guards against two concurrent bookers
@@ -414,7 +459,7 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
     mockGetCurrentMember.mockResolvedValue(bookerMember);
     mockResolveHandle.mockResolvedValue(OWNER_MEMBER_ID);
     mockGetEventTypeBySlug.mockResolvedValue(baseEventType);
-    mockListMyWindows.mockResolvedValue([windowRow]);
+    mockAvailabilityToWindows.mockReturnValue([windowRow]);
     mockMintCastaliaRoomUrl.mockResolvedValue('https://castalia.one/r/abc123');
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports

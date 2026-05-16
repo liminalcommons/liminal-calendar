@@ -22,7 +22,6 @@ import { events, members } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
-import { listMyWindows } from '@/lib/booking/windows-repo';
 import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { computeSlots } from '@/lib/booking/slots';
 
@@ -49,10 +48,9 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Bookable hours = the owner's `members.availability` half-hour heatmap
-  // (set in /profile). Legacy `bookable_windows` rows are honored as a
-  // fallback for hosts who set up booking before the unification — they
-  // continue to work until they migrate their availability into /profile.
+  // Bookable hours = the owner's `members.availability` half-hour heatmap,
+  // set in /profile. Single source of truth — same data the WeeklyGrid
+  // heatmap reads.
   const [ownerRow] = await db
     .select({ availability: members.availability, timezone: members.timezone })
     .from(members)
@@ -68,23 +66,7 @@ export async function GET(
       availSlots = [];
     }
   }
-  const ownerTz = ownerRow?.timezone ?? 'UTC';
-  let windows = availabilityToWindows(availSlots, ownerTz).map((w) => ({
-    dayOfWeek: w.dayOfWeek,
-    startMinute: w.startMinute,
-    endMinute: w.endMinute,
-    timezone: w.timezone,
-  }));
-  if (windows.length === 0) {
-    // Fallback to legacy bookable_windows for hosts who haven't migrated.
-    const legacy = await listMyWindows(ownerMemberId);
-    windows = legacy.map((w) => ({
-      dayOfWeek: w.dayOfWeek,
-      startMinute: w.startMinute,
-      endMinute: w.endMinute,
-      timezone: w.timezone ?? 'UTC',
-    }));
-  }
+  const windows = availabilityToWindows(availSlots, ownerRow?.timezone ?? 'UTC');
 
   const now = new Date();
   const horizon = new Date(now.getTime() + eventType.maxDaysAhead * MS_PER_DAY);

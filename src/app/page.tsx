@@ -11,6 +11,7 @@ import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 import { MarketingLanding } from '@/components/MarketingLanding';
 import { BookingOnboardingNudge } from '@/components/booking/BookingOnboardingNudge';
+import { YourBookingHomeBanner } from '@/components/booking/YourBookingHomeBanner';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
 import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -25,6 +26,7 @@ export default async function HomePage() {
   const currentUserId = authed?.id;
   const member = await getCurrentMember(db);
   const showBookingNudge = !!member && !member.handle;
+  const memberHandle = member?.handle ?? null;
 
   let displayEvents: DisplayEvent[] = [];
 
@@ -66,6 +68,7 @@ export default async function HomePage() {
       <AvailabilityBanner />
       <SubscribeBanner />
       {showBookingNudge && <BookingOnboardingNudge />}
+      {memberHandle && <YourBookingHomeBanner handle={memberHandle} />}
       <main className="flex-1 min-h-0 border border-grove-border rounded-lg overflow-hidden">
         <WeeklyGrid events={displayEvents} />
       </main>
