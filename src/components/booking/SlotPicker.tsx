@@ -47,6 +47,8 @@ export interface SlotPickerProps {
   handle: string;
   slug: string;
   isAuthed?: boolean;
+  /** Display name of the owner — used to contextualize the anon CTA. */
+  ownerLabel?: string;
 }
 
 const dayKeyFmt = new Intl.DateTimeFormat(undefined, {
@@ -83,7 +85,7 @@ function isExternalLocation(location: string | null): boolean {
   return /^https?:\/\//i.test(location);
 }
 
-export function SlotPicker({ handle, slug, isAuthed = true }: SlotPickerProps) {
+export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPickerProps) {
   const [loading, setLoading] = useState(true);
   const [eventType, setEventType] = useState<EventTypeMeta | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -164,16 +166,17 @@ export function SlotPicker({ handle, slug, isAuthed = true }: SlotPickerProps) {
 
   if (!isAuthed) {
     const next = `/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`;
+    const whose = ownerLabel ? `${ownerLabel}'s` : 'available';
     return (
       <div className="rounded border border-grove-border bg-grove-bg p-4 space-y-3">
         <p className="text-sm text-grove-text">
-          Sign in to see available times and book this session.
+          Sign in to see {whose} open times and book a 1:1.
         </p>
         <a
           href={`/welcome?next=${encodeURIComponent(next)}`}
           className="inline-flex items-center px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
         >
-          Sign in to book
+          {ownerLabel ? `Sign in to book with ${ownerLabel}` : 'Sign in to book'}
         </a>
       </div>
     );

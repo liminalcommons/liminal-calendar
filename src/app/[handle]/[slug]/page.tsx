@@ -90,7 +90,7 @@ export default async function Page({ params }: PageProps) {
         </p>
       )}
 
-      <SlotPicker handle={handle} slug={slug} isAuthed={isAuthed} />
+      <SlotPicker handle={handle} slug={slug} isAuthed={isAuthed} ownerLabel={ownerLabel} />
     </div>
   );
 }
