@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Liminal-Web body serif — warm transitional / humanist serif stack
+ * used by the marketing landing and (transitively) by anything that
+ * opts in via `.font-liminal`. Kept here (not in tailwind.config.ts)
+ * so the stack is hot-reloaded in dev without a server restart.
+ */
+.font-liminal {
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino,
+    "Hoefler Text", Georgia, Cambria, "Times New Roman", serif;
+}
+
 :root {
   --grove-bg: 232 223 208;
   --grove-surface: 240 232 219;
@@ -51,7 +62,8 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: Georgia, Cambria, "Times New Roman", serif;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Hoefler Text",
+    Georgia, Cambria, "Times New Roman", serif;
 }
 
 /* Custom scrollbar — responds to theme via CSS vars */
