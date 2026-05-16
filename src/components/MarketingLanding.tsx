@@ -42,12 +42,12 @@ export function MarketingLanding() {
             >
               Get started
             </Link>
-            <Link
-              href="/list"
+            <a
+              href="#how-it-works"
               className="px-4 py-2 rounded border border-grove-border text-sm hover:bg-grove-surface"
             >
-              Browse events
-            </Link>
+              How it works
+            </a>
           </div>
         </section>
 
@@ -69,7 +69,7 @@ export function MarketingLanding() {
           />
         </section>
 
-        <section className="rounded border border-grove-border bg-grove-surface p-6 space-y-3">
+        <section id="how-it-works" className="rounded border border-grove-border bg-grove-surface p-6 space-y-3 scroll-mt-20">
           <h2 className="text-xl font-semibold">How it works</h2>
           <ol className="space-y-2 text-sm text-grove-text-muted list-decimal pl-5">
             <li>Sign in with your community account.</li>
