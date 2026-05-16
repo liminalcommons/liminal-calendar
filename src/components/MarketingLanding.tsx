@@ -3,13 +3,73 @@
  * unauthenticated visitors. Signed-in users see the WeeklyGrid
  * instead (handled by the host page).
  *
- * Server component — purely presentational, no client state.
+ * Server component — fetches a small slice of upcoming public events
+ * and renders them as essay-style entries with hand-drawn marginal
+ * icons, lifecycle badges, and a "planted N days ago" stamp.
  */
 
 import Link from 'next/link';
+import { and, asc, gte } from 'drizzle-orm';
+import { formatDistanceToNow, format } from 'date-fns';
+import { db } from '@/lib/db';
+import { events } from '@/lib/db/schema';
+import { publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { RuneAccent } from './RuneAccent';
 
-export function MarketingLanding() {
+type UpcomingEvent = {
+  id: number;
+  title: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  timezone: string | null;
+  location: string | null;
+  recurrenceRule: string | null;
+  creatorName: string;
+  createdAt: Date | null;
+};
+
+async function fetchUpcomingPublicEvents(limit = 5): Promise<UpcomingEvent[]> {
+  try {
+    const rows = await db
+      .select({
+        id: events.id,
+        title: events.title,
+        startsAt: events.startsAt,
+        endsAt: events.endsAt,
+        timezone: events.timezone,
+        location: events.location,
+        recurrenceRule: events.recurrenceRule,
+        creatorName: events.creatorName,
+        createdAt: events.createdAt,
+      })
+      .from(events)
+      .where(and(publicOnlyEventsCondition(), gte(events.startsAt, new Date())))
+      .orderBy(asc(events.startsAt))
+      .limit(limit);
+    return rows;
+  } catch (e) {
+    console.error(
+      'MarketingLanding: upcoming-events query failed:',
+      e instanceof Error ? e.message : String(e),
+    );
+    return [];
+  }
+}
+
+type Lifecycle = { emoji: string; word: string; tone: string };
+function lifecycleFor(startsAt: Date): Lifecycle {
+  const now = Date.now();
+  const ms = startsAt.getTime() - now;
+  const fortnight = 14 * 24 * 60 * 60 * 1000;
+  if (ms < 0) return { emoji: '🍂', word: 'past', tone: 'text-grove-text-dim' };
+  if (ms <= fortnight)
+    return { emoji: '🌿', word: 'confirmed', tone: 'text-grove-green-deep' };
+  return { emoji: '🌱', word: 'proposed', tone: 'text-grove-accent-deep' };
+}
+
+export async function MarketingLanding() {
+  const upcoming = await fetchUpcomingPublicEvents(5);
+
   return (
     <div className="min-h-screen bg-grove-bg text-grove-text font-liminal">
       <header className="flex items-center justify-between px-6 py-5 border-b border-grove-border">
@@ -114,24 +174,21 @@ export function MarketingLanding() {
         </section>
 
         <section
-          id="how-it-works"
-          className="rounded border border-grove-border bg-grove-surface p-6 space-y-3 scroll-mt-20"
+          id="upcoming"
+          data-testid="upcoming-events"
+          className="liminal-prose mx-auto space-y-8 scroll-mt-20"
         >
-          <h2 className="text-xl font-semibold">How it works</h2>
-          <ol className="space-y-2 text-sm text-grove-text-muted list-decimal pl-5">
-            <li>Sign in with your community account.</li>
-            <li>Pick a handle — that becomes your booking URL.</li>
-            <li>Set your weekly availability and the kinds of sessions you offer.</li>
-            <li>Share <span className="font-mono">liminalcalendar.com/&lt;your-handle&gt;</span> wherever you want bookings to come from.</li>
-          </ol>
-          <div className="pt-2">
-            <Link
-              href="/welcome"
-              className="inline-flex items-center px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
-            >
-              Create your booking page
-            </Link>
-          </div>
+          <h2 className="text-xl italic tracking-wide text-grove-text">
+            What&rsquo;s coming
+          </h2>
+          {upcoming.length === 0 ? (
+            <p className="text-base text-grove-text-muted italic">
+              The calendar is quiet this week. Nothing on the books &mdash; or
+              nothing public, anyway.
+            </p>
+          ) : (
+            upcoming.map((ev, i) => <EventEntry key={ev.id} ev={ev} i={i} />)
+          )}
         </section>
       </main>
 
@@ -156,6 +213,140 @@ function Term({ children }: { children: React.ReactNode }) {
 
 function Sidenote({ children }: { children: React.ReactNode }) {
   return <span className="liminal-sidenote">{children}</span>;
+}
+
+/**
+ * EventEntry — a single upcoming event rendered as an essay paragraph
+ * with a hand-drawn marginal icon, lifecycle badge, and "planted N days
+ * ago" stamp. No card. No grid.
+ */
+function EventEntry({ ev, i }: { ev: UpcomingEvent; i: number }) {
+  const lc = lifecycleFor(ev.startsAt);
+  const planted = ev.createdAt
+    ? `planted ${formatDistanceToNow(ev.createdAt, { addSuffix: false })} ago`
+    : null;
+  const when = format(ev.startsAt, 'EEEE, MMMM d');
+  const time = format(ev.startsAt, 'h:mma').toLowerCase();
+  return (
+    <article
+      data-testid="event-entry"
+      className="space-y-1.5"
+    >
+      <header className="flex items-baseline gap-3">
+        <span aria-hidden className="shrink-0 -mt-0.5">
+          <MarginalIcon kind={i % 5} />
+        </span>
+        <h3 className="italic text-lg sm:text-xl leading-snug flex-1">
+          {ev.title}
+        </h3>
+        <span
+          data-testid="lifecycle-badge"
+          className={`shrink-0 text-xs italic font-normal whitespace-nowrap ${lc.tone}`}
+          title={`Lifecycle: ${lc.word}`}
+        >
+          <span aria-hidden>{lc.emoji}</span> {lc.word}
+        </span>
+      </header>
+      <p className="text-sm text-grove-text-muted leading-relaxed pl-8">
+        <span className="font-mono not-italic text-grove-text-dim">{when}</span>
+        <span className="mx-1.5">·</span>
+        <span className="font-mono not-italic text-grove-text-dim">{time}</span>
+        {ev.location ? (
+          <>
+            <span className="mx-1.5">·</span>at {ev.location}
+          </>
+        ) : null}
+        <span className="mx-1.5">·</span>hosted by {ev.creatorName}
+        {ev.recurrenceRule ? (
+          <>
+            <span className="mx-1.5">·</span>
+            <em>{ev.recurrenceRule}</em>
+          </>
+        ) : null}
+      </p>
+      {planted ? (
+        <p className="text-xs italic text-grove-text-dim pl-8">{planted}</p>
+      ) : null}
+    </article>
+  );
+}
+
+/**
+ * MarginalIcon — small hand-drawn-feeling SVG. Five variants picked by
+ * the caller (typically `index % 5`). Each is a stroke-only doodle so
+ * it inherits `currentColor` and lives in the page's serif-and-ink key.
+ */
+function MarginalIcon({ kind }: { kind: number }) {
+  const stroke = {
+    fill: 'none' as const,
+    stroke: 'currentColor',
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    strokeWidth: 1.4,
+  };
+  const common = (children: React.ReactNode) => (
+    <svg
+      role="img"
+      aria-hidden
+      viewBox="0 0 28 28"
+      width="22"
+      height="22"
+      className="text-grove-accent-deep inline-block"
+      style={{ overflow: 'visible' }}
+    >
+      <g {...stroke}>{children}</g>
+    </svg>
+  );
+
+  switch (kind % 5) {
+    case 0: // cup with curl of steam (a quiet gathering / tea)
+      return common(
+        <>
+          <path d="M 5 12 C 5 11, 6 10.5, 7 10.5 L 20 10.5 C 21 10.5, 22 11, 22 12 L 21.4 19 C 21.2 21, 19.5 22, 18 22 L 9 22 C 7.5 22, 5.8 21, 5.6 19 Z" />
+          <path d="M 22 13 C 24.5 13, 25 16, 22.5 17" />
+          <path d="M 10 7 C 10 5, 11 4.5, 11 3" strokeDasharray="1.4 1.6" />
+          <path d="M 14 7 C 14 5, 13 4.5, 13 3" strokeDasharray="1.4 1.6" />
+          <path d="M 18 7 C 18 5, 19 4.5, 19 3" strokeDasharray="1.4 1.6" />
+        </>,
+      );
+    case 1: // small flame (hearth)
+      return common(
+        <>
+          <path d="M 14 4 C 11 8, 8 11, 8 16 C 8 20, 11 24, 14 24 C 17 24, 20 20, 20 16 C 20 13, 18 11, 17 13 C 18 10, 15 9, 14 4 Z" />
+          <path d="M 12 18 C 13 19, 15 19, 16 18" />
+        </>,
+      );
+    case 2: // sprout in soil
+      return common(
+        <>
+          <path d="M 14 22 L 14 12" />
+          <path d="M 14 14 C 8 13, 6 9, 9 6 C 12 8, 14 11, 14 14 Z" />
+          <path d="M 14 16 C 21 15, 23 11, 20 8 C 17 10, 15 13, 14 16 Z" />
+          <path d="M 4 23 L 24 23" />
+          <path d="M 6 25 L 9 23.5" />
+          <path d="M 19 25 L 22 23.5" />
+        </>,
+      );
+    case 3: // crescent moon w/ stars (evening ritual)
+      return common(
+        <>
+          <path d="M 22 14 C 22 8, 17 4, 11 6 C 14 6, 18 9, 18 14 C 18 19, 14 22, 11 22 C 17 24, 22 20, 22 14 Z" />
+          <path d="M 5 8 L 7 8" strokeDasharray="0.6 1.2" />
+          <path d="M 6 7 L 6 9" strokeDasharray="0.6 1.2" />
+          <path d="M 8 18 L 9 18" strokeDasharray="0.6 1.2" />
+          <path d="M 8.5 17.5 L 8.5 18.5" strokeDasharray="0.6 1.2" />
+        </>,
+      );
+    case 4: // bowl + spoon (potluck)
+    default:
+      return common(
+        <>
+          <path d="M 4 14 C 4 13, 5 12.5, 6 12.5 L 22 12.5 C 23 12.5, 24 13, 24 14 C 24 19, 19 23, 14 23 C 9 23, 4 19, 4 14 Z" />
+          <path d="M 18 6 C 19 6, 20 7, 20 8.5 C 20 10, 19 11, 18 11 C 17 11, 16 12, 16 13 L 17 13" />
+          <path d="M 7 16 C 9 17, 11 17, 13 16" strokeWidth="1" opacity="0.7" />
+        </>,
+      );
+  }
 }
 
 /**
