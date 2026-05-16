@@ -17,6 +17,7 @@ import { apiFetch } from '@/lib/api-fetch';
 import { EventRSVP } from './EventRSVP';
 import { CommentSection } from '@/components/comments/CommentSection';
 import { AttendanceReportSection } from '@/components/attendance-reports/AttendanceReportSection';
+import { EmbedSnippet } from '@/components/embed/EmbedSnippet';
 
 interface EventDetailViewProps {
   eventId: string;
@@ -310,6 +311,10 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         >
           Add to Calendar (.ics)
         </button>
+
+        {/* Embed code — anyone with the URL can grab the iframe snippet;
+            the embed route itself only renders public events. */}
+        <EmbedSnippet embedPath={`/embed/events/${event.id}`} height={320} />
 
         {/* Mute toggle — authenticated users only */}
         {status === 'authenticated' && (

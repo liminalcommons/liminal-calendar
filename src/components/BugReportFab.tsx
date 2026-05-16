@@ -3,16 +3,20 @@
 import { useState, useEffect } from 'react';
 import { Bug, X, Send, Check, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import { installConsoleInterceptors, getRecentLogsAsString } from '@/lib/client-logger';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function BugReportFab() {
   const { data: session } = useSession();
+  const pathname = usePathname();
+  const isEmbed = pathname?.startsWith('/embed/') ?? false;
 
   useEffect(() => {
+    if (isEmbed) return;
     installConsoleInterceptors();
-  }, []);
+  }, [isEmbed]);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -65,6 +69,8 @@ export function BugReportFab() {
       setErrorMsg(err.message || 'Failed to submit');
     }
   };
+
+  if (isEmbed) return null;
 
   return (
     <>
