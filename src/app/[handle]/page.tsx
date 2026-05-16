@@ -10,9 +10,10 @@
 import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, Plus } from 'lucide-react';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { listMyEventTypes } from '@/lib/booking/event-types-repo';
 
@@ -46,6 +47,9 @@ export default async function Page({ params }: PageProps) {
   const eventTypes = await listMyEventTypes(ownerMemberId);
   const ownerLabel = owner.name?.trim() || handle;
 
+  const viewer = await getCurrentMember(db);
+  const viewerIsOwner = viewer?.id === ownerMemberId;
+
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <header className="flex items-center gap-4">
@@ -73,9 +77,24 @@ export default async function Page({ params }: PageProps) {
       </header>
 
       {eventTypes.length === 0 ? (
-        <p className="text-sm text-grove-text-muted italic">
-          {ownerLabel} hasn&apos;t set up any bookable sessions yet.
-        </p>
+        viewerIsOwner ? (
+          <div className="rounded border border-dashed border-grove-border bg-grove-bg p-5 text-center space-y-3">
+            <p className="text-sm text-grove-text">
+              You haven&apos;t set up any bookable sessions yet.
+            </p>
+            <Link
+              href="/settings/booking"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
+            >
+              <Plus size={14} aria-hidden="true" />
+              Create your first session
+            </Link>
+          </div>
+        ) : (
+          <p className="text-sm text-grove-text-muted italic">
+            {ownerLabel} hasn&apos;t set up any bookable sessions yet.
+          </p>
+        )
       ) : (
         <ul className="space-y-2">
           {eventTypes.map((et) => (
