@@ -12,9 +12,10 @@
 
 import { eq } from 'drizzle-orm';
 import { notFound } from 'next/navigation';
-import { Calendar, MapPin, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, ExternalLink, Download } from 'lucide-react';
 import { db } from '@/lib/db';
 import { events } from '@/lib/db/schema';
+import { getICSDataURL } from '@/lib/ics-generator';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -68,6 +69,21 @@ export default async function Page({ params }: PageProps) {
 
   const canonicalUrl = `https://liminalcalendar.com/events/${id}`;
 
+  // Build an ICS data URL so embedded viewers can add the event to their
+  // own calendar without leaving the iframe (the only auth-free action
+  // available inside an embed — RSVP requires the canonical page).
+  const icsDataUrl = getICSDataURL({
+    title: event.title,
+    description: description || undefined,
+    location: event.location || undefined,
+    url: canonicalUrl,
+    starts_at: event.startsAt.toISOString(),
+    ends_at: event.endsAt ? event.endsAt.toISOString() : undefined,
+    organizer: { name: event.creatorName },
+    recurrenceRule: event.recurrenceRule ?? undefined,
+  });
+  const icsFilename = `${event.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.ics`;
+
   return (
     <article className="min-h-screen bg-grove-bg text-grove-text p-4">
       <div className="max-w-xl mx-auto rounded border border-grove-border bg-grove-surface p-5 space-y-3">
@@ -89,15 +105,25 @@ export default async function Page({ params }: PageProps) {
           <p className="text-sm whitespace-pre-line text-grove-text">{description}</p>
         )}
 
-        <a
-          href={canonicalUrl}
-          target="_top"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
-        >
-          View &amp; RSVP
-          <ExternalLink size={12} aria-hidden="true" />
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={canonicalUrl}
+            target="_top"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium"
+          >
+            View &amp; RSVP
+            <ExternalLink size={12} aria-hidden="true" />
+          </a>
+          <a
+            href={icsDataUrl}
+            download={icsFilename}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-grove-border text-sm text-grove-text hover:bg-grove-bg"
+          >
+            <Download size={12} aria-hidden="true" />
+            Add to calendar
+          </a>
+        </div>
 
         <footer className="pt-2 border-t border-grove-border text-xs text-grove-text-muted">
           Powered by{' '}
