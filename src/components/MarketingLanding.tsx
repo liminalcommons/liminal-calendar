@@ -174,6 +174,23 @@ export async function MarketingLanding() {
         </section>
 
         <section
+          data-testid="gatherings-map"
+          className="liminal-prose mx-auto space-y-4"
+        >
+          <h2 className="text-xl italic tracking-wide text-grove-text">
+            Where we gather
+          </h2>
+          <GatheringsMap />
+          <p className="text-sm text-grove-text-muted italic">
+            A loose map of the standing places. The wood is{' '}
+            <span className="not-italic">Castalia</span>, the open clearing is
+            the <span className="not-italic">Liminal Bazaar</span>, the small
+            fire is for the recurring rituals that keep their dates by being
+            kept.
+          </p>
+        </section>
+
+        <section
           id="upcoming"
           data-testid="upcoming-events"
           className="liminal-prose mx-auto space-y-8 scroll-mt-20"
@@ -192,9 +209,39 @@ export async function MarketingLanding() {
         </section>
       </main>
 
-      <footer className="border-t border-grove-border px-6 py-6 text-center text-xs text-grove-text-muted">
-        Liminal Commons · <Link href="/welcome" className="underline">Sign in</Link>
-      </footer>
+      <aside
+        data-testid="colophon"
+        className="max-w-4xl mx-auto px-6 pb-16 pt-2"
+      >
+        <div className="liminal-prose mx-auto border-t border-grove-border pt-6 text-xs italic text-grove-text-muted space-y-1.5 leading-relaxed">
+          <p>
+            Set in Iowan Old Style with Palatino and Hoefler Text fallbacks.
+            Mono runs Menlo / Consolas. Illustrations are hand-drawn inline
+            SVG &mdash; nothing is fetched, nothing is generated.
+          </p>
+          <p>
+            Tended by{' '}
+            <span className="not-italic">Liminal Commons</span>. Source at{' '}
+            <a
+              href="https://github.com/liminalcommons/liminal-calendar"
+              className="not-italic font-mono text-[0.72rem] underline decoration-grove-accent underline-offset-4 hover:text-grove-text"
+            >
+              github.com/liminalcommons/liminal-calendar
+            </a>
+            . You can also{' '}
+            <Link
+              href="/welcome"
+              className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text"
+            >
+              sign in with Hylo &rarr;
+            </Link>
+            .
+          </p>
+          <p className="pt-1 text-grove-text-dim">
+            &mdash; midwifing new culture while hospicing the old.
+          </p>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -268,6 +315,203 @@ function EventEntry({ ev, i }: { ev: UpcomingEvent; i: number }) {
         <p className="text-xs italic text-grove-text-dim pl-8">{planted}</p>
       ) : null}
     </article>
+  );
+}
+
+/**
+ * GatheringsMap — hand-drawn-feeling SVG. A sketched territory of standing
+ * places where this community meets, with three annotated pins for the
+ * known gatherings (Castalia, the Liminal Bazaar, and the recurring-ritual
+ * hearth). Pure decoration, no a11y label beyond aria-label.
+ *
+ * Strokes are intentionally irregular (varying control-point offsets,
+ * dashed accents), pins are rotated slightly, labels are set in the
+ * body serif via foreignObject for typographic continuity. No external
+ * assets — pure inline SVG, server-renderable.
+ */
+function GatheringsMap() {
+  return (
+    <svg
+      role="img"
+      aria-label="A hand-drawn map of the standing places where the community gathers"
+      viewBox="0 0 480 280"
+      className="w-full max-w-2xl mx-auto text-grove-accent-deep"
+      style={{ overflow: 'visible' }}
+    >
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* irregular land outline — main territory */}
+        <path
+          d="M 36 178
+             C 22 152, 28 116, 56 100
+             C 84 84, 116 96, 138 82
+             C 162 66, 196 60, 226 70
+             C 256 80, 282 62, 312 70
+             C 352 82, 398 84, 426 110
+             C 452 132, 458 168, 438 196
+             C 418 226, 376 232, 338 226
+             C 296 220, 256 232, 218 230
+             C 178 228, 142 246, 108 238
+             C 76 232, 48 208, 36 178 Z"
+          strokeWidth="1.8"
+        />
+        {/* a softer ghost-outline 6px inside, dashed */}
+        <path
+          d="M 46 178
+             C 36 156, 42 128, 66 114
+             C 90 100, 122 110, 144 96
+             C 168 82, 200 78, 226 86
+             C 252 94, 278 78, 308 84
+             C 348 94, 388 98, 412 120
+             C 432 138, 438 168, 422 190
+             C 402 214, 366 220, 332 216
+             C 296 212, 260 220, 222 220
+             C 188 220, 154 232, 122 226
+             C 92 220, 60 200, 46 178 Z"
+          strokeWidth="0.9"
+          strokeDasharray="2 4"
+          opacity="0.5"
+        />
+
+        {/* small inner contour — like a hill */}
+        <path
+          d="M 168 152 C 200 138, 244 142, 268 156 C 282 164, 270 174, 248 172 C 220 170, 198 172, 178 168 C 168 166, 160 158, 168 152 Z"
+          strokeWidth="1"
+          opacity="0.65"
+        />
+
+        {/* hatch lines for shading along the bottom edge */}
+        <g strokeWidth="0.7" opacity="0.55">
+          <path d="M 80 230 L 92 244" />
+          <path d="M 110 232 L 122 246" />
+          <path d="M 140 236 L 152 250" />
+          <path d="M 200 234 L 212 248" />
+          <path d="M 240 234 L 252 248" />
+          <path d="M 290 230 L 302 244" />
+          <path d="M 340 232 L 352 246" />
+          <path d="M 380 230 L 392 244" />
+        </g>
+
+        {/* tiny compass rose, upper-right */}
+        <g transform="translate(420 38)">
+          <circle cx="0" cy="0" r="14" strokeWidth="1" />
+          <path d="M 0 -16 L 0 16" strokeWidth="1" />
+          <path d="M -16 0 L 16 0" strokeWidth="1" />
+          <path d="M 0 -16 L -3 -10 L 0 -8 L 3 -10 Z" strokeWidth="1" fill="currentColor" fillOpacity="0.65" />
+          <text
+            x="0"
+            y="-20"
+            textAnchor="middle"
+            fontSize="7"
+            fill="currentColor"
+            stroke="none"
+            fontStyle="italic"
+          >
+            N
+          </text>
+        </g>
+
+        {/* tiny stippled river / path winding through */}
+        <path
+          d="M 80 116 C 130 130, 180 110, 230 122 C 280 134, 320 122, 372 140"
+          strokeWidth="0.9"
+          strokeDasharray="1 3"
+          opacity="0.7"
+        />
+      </g>
+
+      {/* PIN 1 — Castalia (a small house) */}
+      <g transform="translate(150 120) rotate(-4)">
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.4"
+        >
+          <path d="M 0 8 L 12 -4 L 24 8 L 24 22 L 0 22 Z" />
+          <path d="M 8 22 L 8 14 L 16 14 L 16 22" />
+          <path d="M 12 -4 L 12 -10" />
+          <circle cx="12" cy="-12" r="2" fill="currentColor" fillOpacity="0.6" />
+        </g>
+        <text
+          x="32"
+          y="14"
+          fontSize="11"
+          fill="currentColor"
+          stroke="none"
+          fontStyle="italic"
+        >
+          Castalia
+        </text>
+      </g>
+
+      {/* PIN 2 — Liminal Bazaar (a market tent / canopy) */}
+      <g transform="translate(286 168) rotate(3)">
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.4"
+        >
+          <path d="M 0 14 L 14 -4 L 28 14" />
+          <path d="M 4 14 L 4 24" />
+          <path d="M 24 14 L 24 24" />
+          <path d="M 14 -4 L 14 -12" />
+          <path d="M 4 14 C 10 11, 18 11, 24 14" strokeDasharray="2 3" />
+          <path d="M 4 24 L 24 24" />
+        </g>
+        <text
+          x="34"
+          y="20"
+          fontSize="11"
+          fill="currentColor"
+          stroke="none"
+          fontStyle="italic"
+        >
+          Liminal Bazaar
+        </text>
+      </g>
+
+      {/* PIN 3 — The Hearth (recurring-ritual fire) */}
+      <g transform="translate(370 96) rotate(-2)">
+        <g
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.4"
+        >
+          <path d="M 14 4 C 11 8, 8 12, 8 17 C 8 21, 11 24, 14 24 C 17 24, 20 21, 20 17 C 20 14, 18 12, 17 14 C 18 11, 15 9, 14 4 Z" />
+          <path d="M 4 26 L 24 26" strokeWidth="1" />
+          <path d="M 6 28 L 22 28" strokeWidth="0.8" strokeDasharray="1 2" />
+        </g>
+        <text
+          x="28"
+          y="20"
+          fontSize="11"
+          fill="currentColor"
+          stroke="none"
+          fontStyle="italic"
+        >
+          The Hearth
+        </text>
+      </g>
+
+      {/* ink-residue dots scattered */}
+      <g fill="currentColor" opacity="0.4">
+        <circle cx="90" cy="72" r="0.8" />
+        <circle cx="98" cy="78" r="0.6" />
+        <circle cx="260" cy="62" r="0.7" />
+        <circle cx="200" cy="200" r="0.6" />
+        <circle cx="396" cy="200" r="0.7" />
+      </g>
+    </svg>
   );
 }
 
