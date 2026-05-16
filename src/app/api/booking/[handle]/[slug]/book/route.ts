@@ -29,6 +29,7 @@ import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
 import { listMyWindows } from '@/lib/booking/windows-repo';
+import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { computeSlots } from '@/lib/booking/slots';
 import { mintCastaliaRoomUrl } from '@/lib/booking/castalia-room';
 import { createNotification } from '@/lib/notifications/inbox/repo';
@@ -87,8 +88,40 @@ export async function POST(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  // Slot re-validation. Same query shape as GET /slots — keep these in sync.
-  const windows = await listMyWindows(ownerMemberId);
+  // Slot re-validation. Same window-source logic as GET /slots — keep
+  // these in sync. Read from `members.availability` first; fall back to
+  // legacy `bookable_windows` for hosts who haven't migrated yet.
+  const [ownerRow] = await db
+    .select({ availability: members.availability, timezone: members.timezone })
+    .from(members)
+    .where(eq(members.id, ownerMemberId))
+    .limit(1);
+
+  let availSlots: number[] = [];
+  if (ownerRow?.availability) {
+    try {
+      const parsed = JSON.parse(ownerRow.availability);
+      if (Array.isArray(parsed)) availSlots = parsed.filter((n) => Number.isInteger(n));
+    } catch {
+      availSlots = [];
+    }
+  }
+  const ownerTz = ownerRow?.timezone ?? 'UTC';
+  let windows = availabilityToWindows(availSlots, ownerTz).map((w) => ({
+    dayOfWeek: w.dayOfWeek,
+    startMinute: w.startMinute,
+    endMinute: w.endMinute,
+    timezone: w.timezone,
+  }));
+  if (windows.length === 0) {
+    const legacy = await listMyWindows(ownerMemberId);
+    windows = legacy.map((w) => ({
+      dayOfWeek: w.dayOfWeek,
+      startMinute: w.startMinute,
+      endMinute: w.endMinute,
+      timezone: w.timezone ?? 'UTC',
+    }));
+  }
   const now = new Date();
   const horizon = new Date(now.getTime() + et.maxDaysAhead * MS_PER_DAY);
   const blockingRows = await db
@@ -111,12 +144,7 @@ export async function POST(
       minNoticeMinutes: et.minNoticeMinutes ?? 0,
       maxDaysAhead: et.maxDaysAhead,
     },
-    windows: windows.map((w) => ({
-      dayOfWeek: w.dayOfWeek,
-      startMinute: w.startMinute,
-      endMinute: w.endMinute,
-      timezone: w.timezone ?? 'UTC',
-    })),
+    windows,
     blockingEvents: (blockingRows as Array<{ startsAt: Date | string; endsAt: Date | string | null }>).map(
       (r) => ({
         startsAt: r.startsAt instanceof Date ? r.startsAt : new Date(r.startsAt),

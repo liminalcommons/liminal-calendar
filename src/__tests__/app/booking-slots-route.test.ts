@@ -58,13 +58,33 @@ interface BlockingMockOpts {
 function setupDbMocks(opts: BlockingMockOpts) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const schema = require('@/lib/db/schema') as {
+    events: unknown;
+    members: unknown;
+  };
 
-  const whereChain = {
+  const eventsWhereChain = {
     then: (resolve: (v: unknown[]) => unknown) =>
       Promise.resolve(opts.blockingEvents ?? []).then(resolve),
   };
-  const fromChain = { where: jest.fn(() => whereChain) };
-  dbModule.db.select = jest.fn(() => ({ from: jest.fn(() => fromChain) }));
+  // members lookup chain: select({...}).from(members).where(...).limit(1)
+  // Tests don't exercise the availability path — return an empty owner row
+  // so the route falls back to `listMyWindows` (which the existing mocks cover).
+  const membersLimitChain = {
+    then: (resolve: (v: unknown[]) => unknown) =>
+      Promise.resolve([{ availability: null, timezone: null }]).then(resolve),
+  };
+  const membersWhereChain = { limit: jest.fn(() => membersLimitChain) };
+
+  dbModule.db.select = jest.fn(() => ({
+    from: jest.fn((table: unknown) => {
+      if (table === schema.members) {
+        return { where: jest.fn(() => membersWhereChain) };
+      }
+      return { where: jest.fn(() => eventsWhereChain) };
+    }),
+  }));
 }
 
 const baseEventType = {

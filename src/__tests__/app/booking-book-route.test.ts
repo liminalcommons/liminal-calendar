@@ -127,37 +127,52 @@ interface DbMockOpts {
 function setupDbMocks(opts: DbMockOpts = {}) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const schema = require('@/lib/db/schema') as {
+    events: unknown;
+    members: unknown;
+  };
 
   const insertCalls: Array<{ table: unknown; values: unknown }> = [];
   const insertedEvent = opts.insertedEvent ?? { id: 999 };
 
-  // The route does two distinct selects:
-  //   1) blocking events from `events` (chain: select(cols).from(events).where(...))
-  //   2) owner Member row (chain: select().from(members).where(...).limit(1))
-  // We distinguish by call order: first call → blocking events, second → owner.
-  let selectCallIdx = 0;
-  dbModule.db.select = jest.fn(() => {
-    const idx = selectCallIdx++;
-    const fromChain = {
-      where: jest.fn(() => {
-        if (idx === 0) {
-          // blocking events query — awaited directly (no .limit)
-          return Promise.resolve(opts.blockingEvents ?? []);
-        }
-        // owner Member lookup — .limit(1)
+  // The route does three distinct selects:
+  //   1) owner availability/timezone from `members` (chain: select().from(members).where(...).limit(1))
+  //      — tests don't exercise this path; return a blank row so the
+  //      route falls back to `listMyWindows` (which existing mocks cover)
+  //   2) blocking events from `events` (chain: select(cols).from(events).where(...))
+  //   3) owner Member row for the booking creator name (chain: select().from(members).where(...).limit(1))
+  // We distinguish 1 vs 3 by call order against the `members` table;
+  // 2 is distinguished by the `events` table.
+  let membersCallIdx = 0;
+  dbModule.db.select = jest.fn(() => ({
+    from: jest.fn((table: unknown) => {
+      if (table === schema.members) {
+        const idx = membersCallIdx++;
         return {
-          limit: jest.fn(() =>
-            Promise.resolve(
-              opts.ownerMemberRow === null
-                ? []
-                : [opts.ownerMemberRow ?? ownerMember],
-            ),
-          ),
+          where: jest.fn(() => ({
+            limit: jest.fn(() => {
+              if (idx === 0) {
+                // availability/timezone lookup — empty row so we fall through
+                // to the listMyWindows mock for backwards-compat behaviour
+                return Promise.resolve([{ availability: null, timezone: null }]);
+              }
+              // Owner row for booking creator name
+              return Promise.resolve(
+                opts.ownerMemberRow === null
+                  ? []
+                  : [opts.ownerMemberRow ?? ownerMember],
+              );
+            }),
+          })),
         };
-      }),
-    };
-    return { from: jest.fn(() => fromChain) };
-  });
+      }
+      // events / other tables: blocking events query, awaited directly (no .limit)
+      return {
+        where: jest.fn(() => Promise.resolve(opts.blockingEvents ?? [])),
+      };
+    }),
+  }));
 
   dbModule.db.insert = jest.fn((table: unknown) => ({
     values: jest.fn((values: unknown) => {
@@ -404,20 +419,30 @@ describe('POST /api/booking/[handle]/[slug]/book', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const schema = require('@/lib/db/schema') as {
+      events: unknown;
+      members: unknown;
+    };
 
-    // select chain: 1st returns blocking events ([]), 2nd returns owner row.
-    let selectCallIdx = 0;
-    dbModule.db.select = jest.fn(() => {
-      const idx = selectCallIdx++;
-      return {
-        from: jest.fn(() => ({
-          where: jest.fn(() => {
-            if (idx === 0) return Promise.resolve([]);
-            return { limit: jest.fn(() => Promise.resolve([ownerMember])) };
-          }),
-        })),
-      };
-    });
+    // select chain: availability lookup → blocking events ([]) → owner row.
+    let membersCallIdx = 0;
+    dbModule.db.select = jest.fn(() => ({
+      from: jest.fn((table: unknown) => {
+        if (table === schema.members) {
+          const idx = membersCallIdx++;
+          return {
+            where: jest.fn(() => ({
+              limit: jest.fn(() => {
+                if (idx === 0) return Promise.resolve([{ availability: null, timezone: null }]);
+                return Promise.resolve([ownerMember]);
+              }),
+            })),
+          };
+        }
+        return { where: jest.fn(() => Promise.resolve([])) };
+      }),
+    }));
 
     // insert chain: throws a PG-shaped unique violation on .returning().
     const uniqueErr = Object.assign(

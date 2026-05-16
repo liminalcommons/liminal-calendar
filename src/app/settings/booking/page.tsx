@@ -9,11 +9,10 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { db } from '@/lib/db';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { HandleEditor } from '@/components/booking/HandleEditor';
-import { BookableWindowsEditor } from '@/components/booking/BookableWindowsEditor';
 import { EventTypeList } from '@/components/booking/EventTypeList';
 import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
 
@@ -59,11 +58,18 @@ export default async function Page() {
         <div>
           <h2 className="text-base font-semibold text-grove-text">Weekly availability</h2>
           <p className="text-sm text-grove-text-muted">
-            The recurring windows when you accept bookings. Times are stored in
-            your timezone.
+            Bookings respect the same weekly availability you set in your
+            profile. Edit there once and it applies to both event discovery
+            and 1:1 booking.
           </p>
         </div>
-        <BookableWindowsEditor />
+        <Link
+          href="/profile"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-grove-border text-sm text-grove-text hover:bg-grove-bg"
+        >
+          Edit availability in your profile
+          <ExternalLink size={12} aria-hidden="true" />
+        </Link>
       </section>
 
       <hr className="border-grove-border/30" />

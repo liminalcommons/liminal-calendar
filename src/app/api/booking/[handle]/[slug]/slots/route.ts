@@ -18,11 +18,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { events } from '@/lib/db/schema';
+import { events, members } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
 import { listMyWindows } from '@/lib/booking/windows-repo';
+import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
 import { computeSlots } from '@/lib/booking/slots';
 
 const MS_PER_DAY = 86_400_000;
@@ -48,7 +49,43 @@ export async function GET(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  const windows = await listMyWindows(ownerMemberId);
+  // Bookable hours = the owner's `members.availability` half-hour heatmap
+  // (set in /profile). Legacy `bookable_windows` rows are honored as a
+  // fallback for hosts who set up booking before the unification — they
+  // continue to work until they migrate their availability into /profile.
+  const [ownerRow] = await db
+    .select({ availability: members.availability, timezone: members.timezone })
+    .from(members)
+    .where(eq(members.id, ownerMemberId))
+    .limit(1);
+
+  let availSlots: number[] = [];
+  if (ownerRow?.availability) {
+    try {
+      const parsed = JSON.parse(ownerRow.availability);
+      if (Array.isArray(parsed)) availSlots = parsed.filter((n) => Number.isInteger(n));
+    } catch {
+      availSlots = [];
+    }
+  }
+  const ownerTz = ownerRow?.timezone ?? 'UTC';
+  let windows = availabilityToWindows(availSlots, ownerTz).map((w) => ({
+    dayOfWeek: w.dayOfWeek,
+    startMinute: w.startMinute,
+    endMinute: w.endMinute,
+    timezone: w.timezone,
+  }));
+  if (windows.length === 0) {
+    // Fallback to legacy bookable_windows for hosts who haven't migrated.
+    const legacy = await listMyWindows(ownerMemberId);
+    windows = legacy.map((w) => ({
+      dayOfWeek: w.dayOfWeek,
+      startMinute: w.startMinute,
+      endMinute: w.endMinute,
+      timezone: w.timezone ?? 'UTC',
+    }));
+  }
+
   const now = new Date();
   const horizon = new Date(now.getTime() + eventType.maxDaysAhead * MS_PER_DAY);
 
@@ -75,12 +112,7 @@ export async function GET(
       minNoticeMinutes: eventType.minNoticeMinutes ?? 0,
       maxDaysAhead: eventType.maxDaysAhead,
     },
-    windows: windows.map((w) => ({
-      dayOfWeek: w.dayOfWeek,
-      startMinute: w.startMinute,
-      endMinute: w.endMinute,
-      timezone: w.timezone ?? 'UTC',
-    })),
+    windows,
     blockingEvents: blockingRows.map((r) => ({
       startsAt: r.startsAt instanceof Date ? r.startsAt : new Date(r.startsAt),
       endsAt: r.endsAt ? (r.endsAt instanceof Date ? r.endsAt : new Date(r.endsAt)) : null,
