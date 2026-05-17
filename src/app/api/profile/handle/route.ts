@@ -16,6 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -75,11 +76,25 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'handle is taken' }, { status: 409 });
     }
 
+    const previousHandle = member.handle ?? null;
+
     const [updated] = await db
       .update(members)
       .set({ handle })
       .where(eq(members.id, member.id))
       .returning();
+
+    // The handle bar renders on every server page; the public handle pages
+    // (/<handle>, /<handle>/<slug>) are also server-rendered. Invalidate
+    // both the old and new handle paths so neither shows stale content.
+    revalidatePath('/');
+    revalidatePath('/list');
+    revalidatePath('/month');
+    revalidatePath('/profile');
+    revalidatePath(`/${handle}`);
+    if (previousHandle && previousHandle !== handle) {
+      revalidatePath(`/${previousHandle}`);
+    }
 
     return NextResponse.json({ handle: updated?.handle ?? handle });
   } catch (err) {

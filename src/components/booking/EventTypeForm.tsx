@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
 
 export interface EventTypeRecord {
@@ -54,6 +55,50 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // AI-suggest state. Hidden when editing — only useful for fresh
+  // creates. The describe textarea is collapsible so it doesn't clutter
+  // the form for users who prefer manual entry.
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  async function onSuggestWithAi() {
+    if (!aiPrompt.trim()) return;
+    setAiBusy(true);
+    setAiError(null);
+    try {
+      const res = await apiFetch('/api/booking/event-types/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: aiPrompt.trim() }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setAiError(data.error ?? 'Could not generate — try rephrasing.');
+        return;
+      }
+      const { candidate } = (await res.json()) as { candidate: EventTypeRecord };
+      setTitle(candidate.title);
+      setSlug(candidate.slug);
+      setDescription(candidate.description ?? '');
+      setDuration(candidate.durationMinutes);
+      setCustomDuration(!PRESET_DURATIONS.includes(candidate.durationMinutes));
+      setLocationKind(candidate.locationKind);
+      setLocationValue(candidate.locationValue ?? '');
+      setBufferBefore(candidate.bufferBeforeMinutes);
+      setBufferAfter(candidate.bufferAfterMinutes);
+      setMinNotice(candidate.minNoticeMinutes);
+      setMaxDaysAhead(candidate.maxDaysAhead);
+      setFieldErrors({});
+      setError(null);
+    } catch {
+      setAiError('Network error — please retry.');
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -115,6 +160,58 @@ export function EventTypeForm({ initial, onSaved, onCancel }: EventTypeFormProps
 
   return (
     <form onSubmit={onSubmit} className="space-y-3 rounded border border-grove-border bg-grove-bg p-4">
+      {!editing && (
+        <div className="rounded border border-dashed border-grove-accent/40 bg-grove-surface p-3 space-y-2">
+          {!aiOpen ? (
+            <button
+              type="button"
+              onClick={() => setAiOpen(true)}
+              className="inline-flex items-center gap-1.5 text-sm text-grove-accent hover:text-grove-accent-deep font-medium"
+            >
+              <Sparkles size={14} aria-hidden="true" />
+              Describe with AI — let it fill the fields for you
+            </button>
+          ) : (
+            <>
+              <label className="block text-xs font-medium text-grove-text flex items-center gap-1.5">
+                <Sparkles size={12} aria-hidden="true" className="text-grove-accent" />
+                Describe the meeting in your own words
+              </label>
+              <textarea
+                aria-label="AI event type description"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g. 30-min coffee chat in Castalia, 15-min break between bookings, at least a day's notice"
+                rows={2}
+                className="w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setAiOpen(false); setAiPrompt(''); setAiError(null); }}
+                  className="text-xs text-grove-text-muted hover:text-grove-text"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onSuggestWithAi()}
+                  disabled={aiBusy || aiPrompt.trim().length < 3}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-grove-accent text-white text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Sparkles size={12} aria-hidden="true" />
+                  {aiBusy ? 'Generating…' : 'Generate'}
+                </button>
+              </div>
+              {aiError && <p role="alert" className="text-xs text-red-700">{aiError}</p>}
+              <p className="text-[10px] text-grove-text-muted">
+                AI fills the fields below — review and edit before saving.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       <div>
         <label className="block text-xs font-medium text-grove-text">Title</label>
         <input
