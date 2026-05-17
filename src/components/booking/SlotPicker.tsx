@@ -1,22 +1,21 @@
 'use client';
 
 /**
- * SlotPicker — client component for the public booking page
- * `/[handle]/[slug]`. Task 8 of Plan 3 (1:1 Booking).
+ * SlotPicker — public booking page time selection.
+ *
+ * Two-pane UX: a horizontal day strip on top, time list for the
+ * selected day below. Calendly-style — never shows a flat dump of
+ * every available time across every future day. Default selection is
+ * the first day with availability. The user's IANA timezone is shown
+ * at the top so they always know which clock the times are on.
  *
  * Lifecycle:
- *   1. GET  /api/booking/<handle>/<slug>/slots — render slots grouped by day.
- *   2. User clicks a slot button → POST /api/booking/<handle>/<slug>/book
- *      with `{ startsAt }`.
- *   3. 201 → confirmation card (title + local time + location link).
- *      409 → toast "That slot was just taken, refreshing…" then refetch.
- *      401 → redirect to /sign-in?next=<current path>.
- *
- * Time formatting uses Intl.DateTimeFormat in the user's local tz, so
- * day grouping respects the booker's wall-clock, not UTC.
+ *   1. GET  /api/booking/<handle>/<slug>/slots → render dayStrip + slots
+ *   2. POST /api/booking/<handle>/<slug>/book with `{ startsAt }`
+ *   3. 201 → confirmation card. 409 → toast + refetch. 401 → /sign-in.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
 
 interface EventTypeMeta {
@@ -27,7 +26,7 @@ interface EventTypeMeta {
 }
 
 interface Slot {
-  startsAt: string; // ISO
+  startsAt: string;
 }
 
 interface SlotsResponse {
@@ -47,42 +46,62 @@ export interface SlotPickerProps {
   handle: string;
   slug: string;
   isAuthed?: boolean;
-  /** Display name of the owner — used to contextualize the anon CTA. */
   ownerLabel?: string;
 }
 
-const dayKeyFmt = new Intl.DateTimeFormat(undefined, {
+const dayLongFmt = new Intl.DateTimeFormat(undefined, {
   weekday: 'long',
   year: 'numeric',
   month: 'long',
   day: 'numeric',
 });
 
+const dayKeyFmt = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+}); // YYYY-MM-DD in user's tz
+
+const dayWeekShortFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+const dayMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+const dayNumberFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric' });
 const timeFmt = new Intl.DateTimeFormat(undefined, {
   hour: 'numeric',
   minute: '2-digit',
 });
 
-function groupByDay(slots: Slot[]): Array<{ key: string; slots: Slot[] }> {
-  const out: Array<{ key: string; slots: Slot[] }> = [];
-  const byKey = new Map<string, Slot[]>();
+interface DayBucket {
+  key: string;
+  date: Date;
+  slots: Slot[];
+}
+
+function bucketByDay(slots: Slot[]): DayBucket[] {
+  const map = new Map<string, DayBucket>();
   for (const s of slots) {
     const d = new Date(s.startsAt);
     const key = dayKeyFmt.format(d);
-    let bucket = byKey.get(key);
+    let bucket = map.get(key);
     if (!bucket) {
-      bucket = [];
-      byKey.set(key, bucket);
-      out.push({ key, slots: bucket });
+      bucket = { key, date: new Date(d.getFullYear(), d.getMonth(), d.getDate()), slots: [] };
+      map.set(key, bucket);
     }
-    bucket.push(s);
+    bucket.slots.push(s);
   }
-  return out;
+  return [...map.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
 function isExternalLocation(location: string | null): boolean {
   if (!location) return false;
   return /^https?:\/\//i.test(location);
+}
+
+function userTimezoneLabel(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 }
 
 export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPickerProps) {
@@ -93,6 +112,21 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
   const [bookingInFlight, setBookingInFlight] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [selectedDayOverride, setSelectedDayOverride] = useState<string | null>(null);
+
+  const tzLabel = useMemo(userTimezoneLabel, []);
+  const days = useMemo(() => bucketByDay(slots), [slots]);
+
+  // Effective selection: user's clicked-on day if still available, else
+  // the first day with slots. Derived (not state) so rendering is
+  // consistent with the latest `days` snapshot — no re-render race.
+  const selectedDay = useMemo<string | null>(() => {
+    if (days.length === 0) return null;
+    if (selectedDayOverride && days.some((d) => d.key === selectedDayOverride)) {
+      return selectedDayOverride;
+    }
+    return days[0].key;
+  }, [days, selectedDayOverride]);
 
   const fetchSlots = useCallback(async () => {
     setError(null);
@@ -146,7 +180,7 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
         return;
       }
       if (res.status === 409) {
-        setToast('That slot was just taken, refreshing…');
+        setToast('That slot was just taken — refreshing…');
         await fetchSlots();
         return;
       }
@@ -201,16 +235,14 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
   if (confirmed) {
     const start = new Date(confirmed.startsAt);
     const end = new Date(confirmed.endsAt);
-    const dayLabel = dayKeyFmt.format(start);
+    const dayLabel = dayLongFmt.format(start);
     const timeLabel = `${timeFmt.format(start)} – ${timeFmt.format(end)}`;
     return (
       <div
         role="status"
         className="rounded border border-grove-border bg-grove-bg p-4 space-y-2"
       >
-        <h2 className="text-lg font-semibold text-grove-text">
-          You&apos;re booked.
-        </h2>
+        <h2 className="text-lg font-semibold text-grove-text">You&apos;re booked.</h2>
         <p className="text-sm text-grove-text">{confirmed.title}</p>
         <p className="text-sm text-grove-text-muted">
           {dayLabel} · {timeLabel}
@@ -232,20 +264,23 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
             Location: <span className="font-mono">{confirmed.location}</span>
           </p>
         )}
-        <p className="text-xs text-grove-text-muted">
-          A confirmation is in your inbox.
-        </p>
+        <p className="text-xs text-grove-text-muted">A confirmation is in your inbox.</p>
       </div>
     );
   }
 
-  const grouped = groupByDay(slots);
+  const selectedBucket = days.find((d) => d.key === selectedDay) ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {eventType && (
-        <div className="text-sm text-grove-text-muted">
-          {eventType.durationMinutes} min · {eventType.title}
+        <div className="flex items-center justify-between gap-2 text-xs text-grove-text-muted">
+          <span>
+            {eventType.durationMinutes} min · {eventType.title}
+          </span>
+          <span aria-label="Your timezone" title={tzLabel}>
+            {tzLabel}
+          </span>
         </div>
       )}
 
@@ -255,31 +290,76 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
         </div>
       )}
 
-      {grouped.length === 0 ? (
+      {days.length === 0 ? (
         <p className="text-sm text-grove-text-muted">
-          No times available — try again later.
+          No open times in the booking window. Try again later.
         </p>
       ) : (
-        grouped.map(({ key, slots: daySlots }) => (
-          <section key={key} className="space-y-2">
-            <h3 className="text-sm font-semibold text-grove-text">{key}</h3>
-            <div className="flex flex-wrap gap-2">
-              {daySlots.map((s) => (
-                <button
-                  key={s.startsAt}
-                  type="button"
-                  onClick={() => void bookSlot(s.startsAt)}
-                  disabled={bookingInFlight !== null}
-                  className="px-3 py-1.5 rounded border border-grove-border bg-grove-bg text-sm text-grove-text hover:bg-grove-accent hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {bookingInFlight === s.startsAt
-                    ? 'Booking…'
-                    : timeFmt.format(new Date(s.startsAt))}
-                </button>
-              ))}
+        <div className="grid gap-4 md:grid-cols-[1fr_minmax(0,1fr)]">
+          {/* Day strip */}
+          <div className="space-y-2">
+            <p className="text-xs text-grove-text-muted">Pick a day</p>
+            <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:max-h-[420px] md:overflow-y-auto pb-1 md:pb-0 md:pr-1">
+              {days.map((d) => {
+                const isActive = d.key === selectedDay;
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    data-testid="day-pill"
+                    onClick={() => setSelectedDayOverride(d.key)}
+                    className={[
+                      'shrink-0 md:shrink min-w-[68px] md:min-w-0 md:w-full px-3 py-2 rounded border text-left transition-colors flex md:items-center gap-1 md:gap-2 flex-col md:flex-row',
+                      isActive
+                        ? 'border-grove-accent bg-grove-accent text-white'
+                        : 'border-grove-border bg-grove-bg text-grove-text hover:bg-grove-surface',
+                    ].join(' ')}
+                    aria-pressed={isActive}
+                  >
+                    <span className="text-[10px] uppercase tracking-wide opacity-70 md:opacity-80">
+                      {dayWeekShortFmt.format(d.date)}
+                    </span>
+                    <span className="text-base font-semibold leading-none md:leading-tight">
+                      {dayMonthFmt.format(d.date)} {dayNumberFmt.format(d.date)}
+                    </span>
+                    <span className="text-[10px] opacity-70 md:ml-auto">
+                      {d.slots.length} slot{d.slots.length === 1 ? '' : 's'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-          </section>
-        ))
+          </div>
+
+          {/* Time list for selected day */}
+          <div className="space-y-2 min-h-[180px]">
+            {selectedBucket ? (
+              <>
+                <p className="text-xs text-grove-text-muted">
+                  {dayLongFmt.format(selectedBucket.date)}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {selectedBucket.slots.map((s) => (
+                    <button
+                      key={s.startsAt}
+                      type="button"
+                      data-testid="time-slot"
+                      onClick={() => void bookSlot(s.startsAt)}
+                      disabled={bookingInFlight !== null}
+                      className="px-3 py-2 rounded border border-grove-border bg-grove-bg text-sm text-grove-text hover:bg-grove-accent hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {bookingInFlight === s.startsAt
+                        ? 'Booking…'
+                        : timeFmt.format(new Date(s.startsAt))}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-grove-text-muted">Pick a day to see open times.</p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

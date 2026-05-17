@@ -1,6 +1,10 @@
 /**
  * SlotPicker — public booking page client component.
- * Task 8 of Plan 3 (1:1 Booking).
+ *
+ * Verifies the calendar-style picker: a day strip (one button per day
+ * with slots) on the left and a time-slot grid (only the selected
+ * day's slots) on the right. Default selection is the first day with
+ * slots, so a single day's time buttons appear on initial render.
  */
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { SlotPicker } from '@/components/booking/SlotPicker';
@@ -27,7 +31,6 @@ function slotsResponse(slots: string[]) {
   } as Response;
 }
 
-// Fixed dates so day-grouping is stable across machines/tz.
 const DAY1_A = '2026-06-01T15:00:00.000Z';
 const DAY1_B = '2026-06-01T16:00:00.000Z';
 const DAY2_A = '2026-06-02T15:00:00.000Z';
@@ -36,24 +39,37 @@ beforeEach(() => {
   mockApiFetch.mockReset();
 });
 
-test('shows loading state then renders slots grouped by day', async () => {
+test('renders one day-pill per day with slots; default-shows first day times', async () => {
   mockApiFetch.mockResolvedValueOnce(slotsResponse([DAY1_A, DAY1_B, DAY2_A]));
 
   render(<SlotPicker handle="alice" slug="coffee" />);
-  // Loading state present immediately
   expect(screen.getByRole('status')).toHaveTextContent(/loading/i);
 
   await waitFor(() => {
     expect(screen.queryByText(/loading/i)).toBeNull();
   });
 
-  // Two day groups (one for each unique calendar day in local tz).
-  const headings = screen.getAllByRole('heading', { level: 3 });
-  expect(headings.length).toBe(2);
+  // Two unique calendar days → two pills in the day strip.
+  expect(screen.getAllByTestId('day-pill').length).toBe(2);
 
-  // Three slot buttons total.
-  const buttons = screen.getAllByRole('button');
-  expect(buttons.length).toBe(3);
+  // First day has 2 slots; default selection shows them as time buttons.
+  expect(screen.getAllByTestId('time-slot').length).toBe(2);
+});
+
+test('clicking a different day pill switches the time-slot grid', async () => {
+  mockApiFetch.mockResolvedValueOnce(slotsResponse([DAY1_A, DAY1_B, DAY2_A]));
+
+  render(<SlotPicker handle="alice" slug="coffee" />);
+  await waitFor(() => {
+    expect(screen.getAllByTestId('day-pill').length).toBe(2);
+  });
+
+  // Default: day 1 selected, 2 slots.
+  expect(screen.getAllByTestId('time-slot').length).toBe(2);
+
+  // Switch to day 2.
+  fireEvent.click(screen.getAllByTestId('day-pill')[1]);
+  expect(screen.getAllByTestId('time-slot').length).toBe(1);
 });
 
 test('empty state when no slots are available', async () => {
@@ -62,7 +78,7 @@ test('empty state when no slots are available', async () => {
   render(<SlotPicker handle="alice" slug="coffee" />);
 
   await waitFor(() => {
-    expect(screen.getByText(/no times available/i)).toBeInTheDocument();
+    expect(screen.getByText(/no open times/i)).toBeInTheDocument();
   });
 });
 
@@ -82,9 +98,9 @@ test('confirmation card renders on 201', async () => {
 
   render(<SlotPicker handle="alice" slug="coffee" />);
   await waitFor(() => {
-    expect(screen.getAllByRole('button').length).toBe(1);
+    expect(screen.getAllByTestId('time-slot').length).toBe(1);
   });
-  fireEvent.click(screen.getAllByRole('button')[0]);
+  fireEvent.click(screen.getAllByTestId('time-slot')[0]);
 
   await waitFor(() => {
     expect(screen.getByText(/you're booked/i)).toBeInTheDocument();
@@ -97,36 +113,31 @@ test('confirmation card renders on 201', async () => {
 });
 
 test('409 path shows toast and refetches slots', async () => {
-  // 1st: initial slots
   mockApiFetch.mockResolvedValueOnce(slotsResponse([DAY1_A, DAY1_B]));
-  // 2nd: POST /book → 409
   mockApiFetch.mockResolvedValueOnce({
     ok: false,
     status: 409,
     json: async () => ({ error: 'taken' }),
   } as Response);
-  // 3rd: refetch → fewer slots
   mockApiFetch.mockResolvedValueOnce(slotsResponse([DAY1_B]));
 
   render(<SlotPicker handle="alice" slug="coffee" />);
   await waitFor(() => {
-    expect(screen.getAllByRole('button').length).toBe(2);
+    expect(screen.getAllByTestId('time-slot').length).toBe(2);
   });
 
   await act(async () => {
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getAllByTestId('time-slot')[0]);
   });
 
   await waitFor(() => {
-    expect(screen.getByText(/just taken, refreshing/i)).toBeInTheDocument();
+    expect(screen.getByText(/just taken/i)).toBeInTheDocument();
   });
 
-  // After refetch only 1 slot remains.
   await waitFor(() => {
-    expect(screen.getAllByRole('button').length).toBe(1);
+    expect(screen.getAllByTestId('time-slot').length).toBe(1);
   });
 
-  // 3 fetch calls total: initial GET, POST 409, refetch GET.
   expect(mockApiFetch).toHaveBeenCalledTimes(3);
   expect((mockApiFetch.mock.calls[0][0] as string)).toContain('/slots');
   expect((mockApiFetch.mock.calls[1][0] as string)).toContain('/book');
@@ -135,7 +146,6 @@ test('409 path shows toast and refetches slots', async () => {
 
 test('401 on slots redirects to sign-in', async () => {
   const originalLocation = window.location;
-  // jsdom: replace location with a stub we can read href off
   // @ts-expect-error: redefining
   delete window.location;
   // @ts-expect-error: stub
