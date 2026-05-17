@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -78,6 +79,10 @@ export async function POST(
         console.error('[POST /api/events/[id]/rsvp] newsletter subscribe failed:', err);
       });
     }
+
+    revalidatePath('/');
+    revalidatePath('/list');
+    revalidatePath('/month');
 
     return NextResponse.json({ success: true, response });
   } catch (err) {

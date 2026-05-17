@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api-fetch';
 
 export type RsvpResponse = 'yes' | 'interested' | 'no';
@@ -29,6 +30,7 @@ export interface RsvpSubmitResult {
  */
 export function useRsvpMutation(eventId: string) {
   const [pending, setPending] = useState(false);
+  const router = useRouter();
 
   const submit = useCallback(
     async ({ response, remindMe, subscribeToNewsletter }: RsvpSubmitInput): Promise<RsvpSubmitResult> => {
@@ -44,6 +46,9 @@ export function useRsvpMutation(eventId: string) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
+        if (res.ok) {
+          router.refresh();
+        }
         return { ok: res.ok, status: res.status };
       } catch {
         return { ok: false, status: 0 };
@@ -51,7 +56,7 @@ export function useRsvpMutation(eventId: string) {
         setPending(false);
       }
     },
-    [eventId],
+    [eventId, router],
   );
 
   return { submit, pending };
