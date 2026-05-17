@@ -32,7 +32,7 @@ export function UpcomingBookingsList({ initial }: { initial: UpcomingBooking[] }
     return (
       <p className="text-sm text-grove-text-muted">
         No upcoming 1:1s. When someone books time with you (or you book time
-        with someone), it'll show up here.
+        with someone), it&apos;ll show up here.
       </p>
     );
   }

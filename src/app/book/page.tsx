@@ -95,7 +95,7 @@ export default async function BookPage() {
                     Your upcoming 1:1s
                   </h2>
                   <p className="text-sm text-grove-text-muted">
-                    Meetings you're hosting or attending in the next 60 days.
+                    Meetings you&apos;re hosting or attending in the next 60 days.
                   </p>
                 </div>
                 <UpcomingBookingsList initial={upcoming} />

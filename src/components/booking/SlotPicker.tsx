@@ -345,7 +345,7 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
               className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
             />
             <span className="block text-[10px] text-grove-text-muted mt-0.5">
-              Included in the host's confirmation email. They'll see your note before the meeting.
+              Included in the host&apos;s confirmation email. They&apos;ll see your note before the meeting.
             </span>
           </label>
 
