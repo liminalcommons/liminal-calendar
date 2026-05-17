@@ -1,0 +1,116 @@
+/**
+ * /book — top-level 1:1 booking landing.
+ *
+ * Reached from the "Book" tab in the ViewToggle. Frames booking as a
+ * first-class feature for the signed-in user, not buried under Settings.
+ * For new users without a handle this is also the onboarding entry
+ * point — claim handle inline before the rest of the content unlocks.
+ */
+
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { ExternalLink, Calendar } from 'lucide-react';
+import { db } from '@/lib/db';
+import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { NavBar } from '@/components/NavBar';
+import { HandleEditor } from '@/components/booking/HandleEditor';
+import { EventTypeList } from '@/components/booking/EventTypeList';
+import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
+
+export const dynamic = 'force-dynamic';
+
+export default async function BookPage() {
+  const member = await getCurrentMember(db);
+  if (!member) {
+    redirect('/welcome?next=/book');
+  }
+
+  return (
+    <div className="min-h-screen bg-grove-bg flex flex-col">
+      <NavBar />
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-6 space-y-8">
+          <header>
+            <h1 className="text-2xl font-semibold text-grove-text flex items-center gap-2">
+              <Calendar size={22} className="text-grove-accent" aria-hidden="true" />
+              1:1 Booking
+            </h1>
+            <p className="mt-1 text-sm text-grove-text-muted">
+              Let people reserve time with you. Share one link, your weekly
+              availability fills the slots.
+            </p>
+          </header>
+
+          {member.handle ? (
+            <ProfileUrlBanner handle={member.handle} />
+          ) : (
+            <section className="space-y-3 rounded border border-grove-border bg-grove-surface p-4">
+              <div>
+                <h2 className="text-base font-semibold text-grove-text">
+                  Claim your booking handle
+                </h2>
+                <p className="text-sm text-grove-text-muted">
+                  Pick a short URL slug. Your public page becomes
+                  liminalcalendar.com/&lt;you&gt;.
+                </p>
+              </div>
+              <HandleEditor initialHandle={null} />
+            </section>
+          )}
+
+          {member.handle && (
+            <>
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base font-semibold text-grove-text">
+                    Event types
+                  </h2>
+                  <p className="text-sm text-grove-text-muted">
+                    The kinds of sessions someone can book — name, duration,
+                    where you meet.
+                  </p>
+                </div>
+                <EventTypeList handle={member.handle} />
+              </section>
+
+              <hr className="border-grove-border/30" />
+
+              <section className="space-y-2">
+                <div>
+                  <h2 className="text-base font-semibold text-grove-text">
+                    Weekly availability
+                  </h2>
+                  <p className="text-sm text-grove-text-muted">
+                    Bookings respect the same weekly availability heatmap you
+                    set in your profile.
+                  </p>
+                </div>
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-grove-border text-sm text-grove-text hover:bg-grove-surface"
+                >
+                  Edit availability in your profile
+                  <ExternalLink size={12} aria-hidden="true" />
+                </Link>
+              </section>
+
+              <hr className="border-grove-border/30" />
+
+              <section className="space-y-2">
+                <div>
+                  <h2 className="text-base font-semibold text-grove-text">
+                    Your handle
+                  </h2>
+                  <p className="text-sm text-grove-text-muted">
+                    Change the slug at the front of your booking URL.
+                  </p>
+                </div>
+                <HandleEditor initialHandle={member.handle} />
+              </section>
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
