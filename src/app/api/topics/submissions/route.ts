@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { topicSubmissions } from '@/lib/db/schema';
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
     })
     .returning();
 
+  revalidatePath('/admin');
+  revalidatePath('/show-and-tell');
   return NextResponse.json({ submission: row });
 }
 

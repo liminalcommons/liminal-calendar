@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events, type Event } from '@/lib/db/schema';
@@ -138,6 +139,7 @@ export async function POST(
       }
     }
 
+    revalidatePath('/admin/attendance-reports');
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
     console.error('[POST /api/events/[id]/attendance-report]', err);

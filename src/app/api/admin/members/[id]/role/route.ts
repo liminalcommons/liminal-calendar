@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { canPromoteMembers } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
@@ -43,5 +44,6 @@ export async function POST(
   if (!updated) return NextResponse.json({ error: 'Member not found' }, { status: 404 });
 
   console.warn('[admin/role] caller=%s target=%d role=%s', caller.id, memberId, body.role);
+  revalidatePath('/admin');
   return NextResponse.json({ id: updated.id, role: updated.role });
 }

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { validateProfileUpdate } from '@/lib/profile/update-input';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
+import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 
 export async function GET() {
   const member = await getCurrentMember(db);
@@ -55,6 +57,14 @@ export async function PATCH(request: NextRequest) {
       .set(updates)
       .where(eq(members.id, member.id))
       .returning();
+
+    // Availability bands drive the week grid background; timezone changes
+    // shift event rendering. Both feed into calendar views.
+    revalidateCalendarViews();
+    revalidatePath('/profile');
+    if (member.handle) {
+      revalidatePath(`/${member.handle}`);
+    }
 
     return NextResponse.json({
       hyloId: updated.hyloId,

@@ -21,10 +21,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events, rsvps, members } from '@/lib/db/schema';
+import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
 import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
@@ -327,6 +329,12 @@ export async function POST(
       console.error('[POST /api/booking/book] booker email threw', err);
     }
   }
+
+  // A successful booking writes an event into the owner's calendar AND
+  // burns one slot on the public picker. Invalidate both.
+  revalidateCalendarViews();
+  revalidatePath(`/${handle}/${slug}`);
+  revalidatePath(`/${handle}`);
 
   return NextResponse.json(
     {
