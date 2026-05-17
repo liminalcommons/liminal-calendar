@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
+import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 import { events, rsvps } from '@/lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { upsertRsvp } from '@/lib/rsvp/upsert';
@@ -80,9 +80,7 @@ export async function POST(
       });
     }
 
-    revalidatePath('/');
-    revalidatePath('/list');
-    revalidatePath('/month');
+    revalidateCalendarViews();
 
     return NextResponse.json({ success: true, response });
   } catch (err) {

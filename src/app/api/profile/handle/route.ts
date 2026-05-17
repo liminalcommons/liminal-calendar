@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
+import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 import { members } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -84,12 +85,11 @@ export async function PUT(request: NextRequest) {
       .where(eq(members.id, member.id))
       .returning();
 
-    // The handle bar renders on every server page; the public handle pages
-    // (/<handle>, /<handle>/<slug>) are also server-rendered. Invalidate
-    // both the old and new handle paths so neither shows stale content.
-    revalidatePath('/');
-    revalidatePath('/list');
-    revalidatePath('/month');
+    // The handle bar renders on every calendar view; the public handle
+    // pages (/<handle>, /<handle>/<slug>) are also server-rendered.
+    // Invalidate both the old and new handle paths so neither shows
+    // stale content.
+    revalidateCalendarViews();
     revalidatePath('/profile');
     revalidatePath(`/${handle}`);
     if (previousHandle && previousHandle !== handle) {

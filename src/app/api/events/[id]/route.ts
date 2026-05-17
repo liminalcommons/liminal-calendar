@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 import { canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
@@ -210,9 +210,7 @@ export async function PATCH(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    revalidatePath('/');
-    revalidatePath('/list');
-    revalidatePath('/month');
+    revalidateCalendarViews();
 
     return NextResponse.json(dbEventToDisplayEvent(updated, eventRsvps, authed.id));
   } catch (err) {
@@ -265,9 +263,7 @@ export async function DELETE(
 
     await db.delete(events).where(eq(events.id, numId));
 
-    revalidatePath('/');
-    revalidatePath('/list');
-    revalidatePath('/month');
+    revalidateCalendarViews();
 
     return NextResponse.json({ success: true });
   } catch (err) {
