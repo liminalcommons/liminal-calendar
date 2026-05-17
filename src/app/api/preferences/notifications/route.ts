@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { ensurePreferences, updatePreferences, type PreferencesUpdate } from '@/lib/notifications/preferences';
@@ -32,5 +33,6 @@ export async function PUT(request: Request) {
     }
   }
   await updatePreferences(db, authed.id, update);
+  revalidatePath('/preferences/notifications');
   return NextResponse.json({ ok: true });
 }

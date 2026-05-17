@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { muteSeries, unmuteSeries } from '@/lib/notifications/mute-repo';
@@ -20,6 +21,7 @@ export async function POST(_request: Request, ctx: Ctx) {
   const eventId = parseEventId(id);
   if (eventId == null) return NextResponse.json({ error: 'Invalid event id' }, { status: 400 });
   await muteSeries(db, authed.memberId, eventId);
+  revalidatePath('/preferences/notifications');
   return NextResponse.json({ muted: true, eventId });
 }
 
@@ -31,5 +33,6 @@ export async function DELETE(_request: Request, ctx: Ctx) {
   const eventId = parseEventId(id);
   if (eventId == null) return NextResponse.json({ error: 'Invalid event id' }, { status: 400 });
   await unmuteSeries(db, authed.memberId, eventId);
+  revalidatePath('/preferences/notifications');
   return NextResponse.json({ muted: false, eventId });
 }
