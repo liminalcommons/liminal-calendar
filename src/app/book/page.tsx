@@ -16,6 +16,7 @@ import { NavBar } from '@/components/NavBar';
 import { HandleEditor } from '@/components/booking/HandleEditor';
 import { EventTypeList } from '@/components/booking/EventTypeList';
 import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
+import { autoClaimHandle } from '@/lib/booking/auto-claim-handle';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,17 @@ export default async function BookPage() {
   const member = await getCurrentMember(db);
   if (!member) {
     redirect('/welcome?next=/book');
+  }
+
+  // Silent auto-claim: if the member arrives without a handle, derive
+  // one from their email/name and claim it. They can still rename via
+  // the editor below — no upfront friction for the common case.
+  let activeHandle: string | null = member.handle ?? null;
+  if (!activeHandle) {
+    activeHandle = await autoClaimHandle(db, member.id, {
+      email: member.email,
+      name: member.name,
+    });
   }
 
   return (
@@ -41,8 +53,8 @@ export default async function BookPage() {
             </p>
           </header>
 
-          {member.handle ? (
-            <ProfileUrlBanner handle={member.handle} />
+          {activeHandle ? (
+            <ProfileUrlBanner handle={activeHandle} />
           ) : (
             <section className="space-y-3 rounded border border-grove-border bg-grove-surface p-4">
               <div>
@@ -58,7 +70,7 @@ export default async function BookPage() {
             </section>
           )}
 
-          {member.handle && (
+          {activeHandle && (
             <>
               <section className="space-y-3">
                 <div>
@@ -70,7 +82,7 @@ export default async function BookPage() {
                     where you meet.
                   </p>
                 </div>
-                <EventTypeList handle={member.handle} />
+                <EventTypeList handle={activeHandle} />
               </section>
 
               <hr className="border-grove-border/30" />
@@ -105,7 +117,7 @@ export default async function BookPage() {
                     Change the slug at the front of your booking URL.
                   </p>
                 </div>
-                <HandleEditor initialHandle={member.handle} />
+                <HandleEditor initialHandle={activeHandle} />
               </section>
             </>
           )}
