@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, addWeeks, subWeeks, addDays, isBefore, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -31,6 +32,7 @@ interface WeeklyGridProps {
 }
 
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   // Role lives on the Hylo session for Hylo users, but on the members row
   // for Clerk users. useResolvedRole hits /api/profile, which handles both.
@@ -321,6 +323,10 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
             starts_at: event.starts_at,
             ends_at: event.ends_at,
           } as Partial<DisplayEvent>);
+        } else {
+          // Reconcile server-rendered views (list/month/landing) that the
+          // optimistic in-memory update did not touch.
+          router.refresh();
         }
       } catch {
         updateEvent(event.id, {
@@ -329,7 +335,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
         } as Partial<DisplayEvent>);
       }
     },
-    [updateEvent],
+    [updateEvent, router],
   );
 
   // The visible week's start. Captured in a ref so the in-flight drag handlers

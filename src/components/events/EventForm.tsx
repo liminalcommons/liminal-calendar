@@ -614,6 +614,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to update event');
+        router.refresh();
         router.push(`/events/${eventId}`);
       }
     } catch (err) {

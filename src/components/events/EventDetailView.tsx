@@ -123,6 +123,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     try {
       const res = await apiFetch(`/api/events/${event.id}`, { method: 'DELETE' });
       if (res.ok) {
+        router.refresh();
         router.push('/');
       } else {
         const data = await res.json();
