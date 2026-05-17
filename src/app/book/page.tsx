@@ -14,6 +14,7 @@ import { db } from '@/lib/db';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { NavBar } from '@/components/NavBar';
 import { HandleEditor } from '@/components/booking/HandleEditor';
+import { CollapsibleHandleEditor } from '@/components/booking/CollapsibleHandleEditor';
 import { EventTypeList } from '@/components/booking/EventTypeList';
 import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
 import { autoClaimHandle } from '@/lib/booking/auto-claim-handle';
@@ -54,7 +55,12 @@ export default async function BookPage() {
           </header>
 
           {activeHandle ? (
-            <ProfileUrlBanner handle={activeHandle} />
+            <div className="space-y-2">
+              <ProfileUrlBanner handle={activeHandle} />
+              <div className="px-1">
+                <CollapsibleHandleEditor initialHandle={activeHandle} />
+              </div>
+            </div>
           ) : (
             <section className="space-y-3 rounded border border-grove-border bg-grove-surface p-4">
               <div>
@@ -106,19 +112,6 @@ export default async function BookPage() {
                 </Link>
               </section>
 
-              <hr className="border-grove-border/30" />
-
-              <section className="space-y-2">
-                <div>
-                  <h2 className="text-base font-semibold text-grove-text">
-                    Your handle
-                  </h2>
-                  <p className="text-sm text-grove-text-muted">
-                    Change the slug at the front of your booking URL.
-                  </p>
-                </div>
-                <HandleEditor initialHandle={activeHandle} />
-              </section>
             </>
           )}
         </div>

@@ -101,16 +101,19 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
 
   async function toggleMute() {
     if (!event) return;
+    const next = !muted;
+    setMuted(next);
     setMuteLoading(true);
     try {
       const res = await apiFetch(`/api/events/${event.id}/mute`, {
-        method: muted ? 'DELETE' : 'POST',
+        method: next ? 'POST' : 'DELETE',
         headers: { 'Content-Type': 'application/json' },
       });
-      if (res.ok) {
-        const j = await res.json();
-        setMuted(!!j.muted);
+      if (!res.ok) {
+        setMuted(!next);
       }
+    } catch {
+      setMuted(!next);
     } finally {
       setMuteLoading(false);
     }
