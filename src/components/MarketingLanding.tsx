@@ -81,7 +81,7 @@ export async function MarketingLanding() {
           href="/welcome"
           className="text-sm italic underline decoration-grove-accent underline-offset-4 text-grove-text-muted hover:text-grove-text"
         >
-          sign in with Hylo &rarr;
+          sign in &rarr;
         </Link>
       </header>
 
@@ -102,7 +102,7 @@ export async function MarketingLanding() {
               href="/welcome"
               className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text"
             >
-              sign in with Hylo &rarr;
+              sign in &rarr;
             </Link>{' '}
             to RSVP, or just read what&rsquo;s coming.
           </p>
@@ -154,10 +154,10 @@ export async function MarketingLanding() {
           <p>
             Signing in goes through{' '}
             <Term>
-              Hylo
+              Castalia
               <Sidenote>
-                A sister platform for community signals; sign-in is shared
-                so your face is the same in both places.
+                The Liminal Commons identity. One sign-in across the
+                ecosystem &mdash; calendar, commons, and kin.
               </Sidenote>
             </Term>
             . You can claim a{' '}
@@ -233,7 +233,7 @@ export async function MarketingLanding() {
               href="/welcome"
               className="underline decoration-grove-accent underline-offset-4 hover:text-grove-text"
             >
-              sign in with Hylo &rarr;
+              sign in &rarr;
             </Link>
             .
           </p>

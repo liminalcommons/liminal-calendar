@@ -54,34 +54,24 @@ Copy `.env.local.example` to `.env.local` and fill in:
 cp .env.local.example .env.local
 ```
 
-**Clerk (Authentication):**
-1. Go to [clerk.com](https://clerk.com) and create an application
-2. Copy your Publishable Key and Secret Key
+**Castalia (Authentication):**
+Sign-in goes through the Liminal Commons identity at
+[id.castalia.one](https://id.castalia.one), powered by Logto under the hood.
+Register the calendar as an application in the Castalia dev portal at
+[developers.castalia.one](https://developers.castalia.one) and copy the
+OIDC client id, secret, and endpoint into your env file.
 
-**Supabase (Database):**
-1. Go to [supabase.com](https://supabase.com) and create a project
-2. Copy your Project URL and anon key
-3. Run the SQL schema below
+**Neon Postgres (Database):**
+1. Go to [neon.tech](https://neon.tech) and create a project
+2. Copy the connection string into `DATABASE_URL`
 
 ### 3. Database Schema
 
-Run the migrations in your Supabase SQL editor:
+Schema lives in `src/lib/db/schema.ts` (Drizzle ORM). Run migrations:
 
 ```bash
-# First, run the base schema
-migrations/001_event_rsvps.sql
-
-# Then, run the upgrades for new features
-migrations/002_calendar_upgrades.sql
+npx drizzle-kit push
 ```
-
-The migrations add:
-- Users table (timezone tracking)
-- Event RSVPs table (attendance tracking)
-- Recurring events support (series_id, recurrence_rule)
-- Visibility control (public/members_only/invite_only)
-- Event types (general, presentation, workshop, etc.)
-- Email reminders table and triggers
 
 ### 4. Run Development Server
 
@@ -110,8 +100,8 @@ Set `CRON_SECRET` to secure the endpoint.
 ## Tech Stack
 
 - **Next.js 15** - React framework
-- **Clerk** - Authentication
-- **Supabase** - PostgreSQL database
+- **Castalia / Logto** - Authentication (Liminal Commons identity)
+- **Neon Postgres** + **Drizzle ORM** - Database
 - **Tailwind CSS** - Styling
 - **TypeScript** - Type safety
 
