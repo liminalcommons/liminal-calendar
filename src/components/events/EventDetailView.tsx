@@ -18,6 +18,7 @@ import { EventRSVP } from './EventRSVP';
 import { CommentSection } from '@/components/comments/CommentSection';
 import { AttendanceReportSection } from '@/components/attendance-reports/AttendanceReportSection';
 import { EmbedSnippet } from '@/components/embed/EmbedSnippet';
+import { CancelBookingButton } from '@/components/booking/CancelBookingButton';
 
 interface EventDetailViewProps {
   eventId: string;
@@ -215,6 +216,18 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
       )}
 
       <div className="bg-grove-surface border border-grove-border rounded-xl p-6 space-y-6">
+        {/* Cancelled banner — only for booking events that have been cancelled. */}
+        {event.sourceEventTypeId != null && event.cancelledAt && (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-medium">
+              {event.cancelledByName ? `Cancelled by ${event.cancelledByName}` : 'Cancelled'}
+            </p>
+            {event.cancellationReason && (
+              <p className="mt-1 whitespace-pre-wrap text-red-700/90">{event.cancellationReason}</p>
+            )}
+          </div>
+        )}
+
         {/* Title + recurrence badge */}
         <div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -223,11 +236,26 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
                 {recurrenceLabel(event.recurrenceRule)}
               </span>
             )}
+            {event.sourceEventTypeId != null && !event.cancelledAt && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-grove-accent/10 text-grove-accent border border-grove-accent/20 font-medium">
+                1:1 Booking
+              </span>
+            )}
           </div>
-          <h1 className="text-3xl font-serif text-grove-text leading-tight">
+          <h1 className={`text-3xl font-serif text-grove-text leading-tight ${event.cancelledAt ? 'line-through opacity-60' : ''}`}>
             {event.title}
           </h1>
         </div>
+
+        {/* Note from booker — visible to host only (the API filters by viewerIsHost). */}
+        {event.noteFromBooker && (
+          <div className="rounded border border-grove-border bg-grove-bg p-3">
+            <p className="text-[10px] text-grove-text-muted uppercase tracking-wider mb-1">
+              Note from your booker
+            </p>
+            <p className="text-sm text-grove-text whitespace-pre-wrap">{event.noteFromBooker}</p>
+          </div>
+        )}
 
         {/* Host */}
         <div className="flex items-center gap-2">
@@ -339,6 +367,19 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
           startsAt={event.starts_at}
           endsAt={event.ends_at}
         />
+
+        {/* Cancel booking — visible on booking events that haven't started yet
+            and aren't already cancelled. The endpoint re-checks auth (must be
+            host or booker on this event). */}
+        {event.sourceEventTypeId != null && !event.cancelledAt && new Date(event.starts_at).getTime() > Date.now() && (
+          <div className="pt-2 border-t border-grove-border">
+            <CancelBookingButton
+              eventId={Number(event.id)}
+              triggerLabel="Cancel this booking"
+              onCancelled={() => window.location.reload()}
+            />
+          </div>
+        )}
 
         {/* Comments */}
         <div className="pt-2 border-t border-grove-border">

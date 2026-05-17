@@ -16,7 +16,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { apiFetch } from '@/lib/api-fetch';
+import { CancelBookingButton } from './CancelBookingButton';
 
 interface EventTypeMeta {
   id: number;
@@ -111,8 +113,14 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
   const [error, setError] = useState<string | null>(null);
   const [bookingInFlight, setBookingInFlight] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
+  const [cancelled, setCancelled] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedDayOverride, setSelectedDayOverride] = useState<string | null>(null);
+  // Two-step flow state: when the user picks a time pill we move into
+  // 'review' with that slot, an optional note, and an explicit
+  // "Confirm booking" button. Clicking Back returns to 'pick'.
+  const [pendingSlot, setPendingSlot] = useState<Slot | null>(null);
+  const [note, setNote] = useState('');
 
   const tzLabel = useMemo(userTimezoneLabel, []);
   const days = useMemo(() => bucketByDay(slots), [slots]);
@@ -168,10 +176,13 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
     setBookingInFlight(startsAt);
     setToast(null);
     try {
+      const trimmedNote = note.trim();
       const res = await apiFetch(`/api/booking/${handle}/${slug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startsAt }),
+        body: JSON.stringify(
+          trimmedNote ? { startsAt, note: trimmedNote } : { startsAt },
+        ),
       });
       if (res.status === 401) {
         if (typeof window !== 'undefined') {
@@ -181,6 +192,10 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
       }
       if (res.status === 409) {
         setToast('That slot was just taken — refreshing…');
+        // Drop back to the picker so the (now-stale) selection isn't
+        // still on screen, and refetch the latest slots.
+        setPendingSlot(null);
+        setNote('');
         await fetchSlots();
         return;
       }
@@ -240,14 +255,16 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
     return (
       <div
         role="status"
-        className="rounded border border-grove-border bg-grove-bg p-4 space-y-2"
+        className="rounded border border-grove-border bg-grove-bg p-4 space-y-3"
       >
-        <h2 className="text-lg font-semibold text-grove-text">You&apos;re booked.</h2>
+        <h2 className="text-lg font-semibold text-grove-text">
+          {cancelled ? 'Booking cancelled.' : "You're booked."}
+        </h2>
         <p className="text-sm text-grove-text">{confirmed.title}</p>
-        <p className="text-sm text-grove-text-muted">
+        <p className={`text-sm text-grove-text-muted ${cancelled ? 'line-through' : ''}`}>
           {dayLabel} · {timeLabel}
         </p>
-        {confirmed.location && isExternalLocation(confirmed.location) && (
+        {!cancelled && confirmed.location && isExternalLocation(confirmed.location) && (
           <p className="text-sm">
             <a
               href={confirmed.location}
@@ -259,17 +276,107 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
             </a>
           </p>
         )}
-        {confirmed.location && !isExternalLocation(confirmed.location) && (
+        {!cancelled && confirmed.location && !isExternalLocation(confirmed.location) && (
           <p className="text-sm text-grove-text-muted">
             Location: <span className="font-mono">{confirmed.location}</span>
           </p>
         )}
-        <p className="text-xs text-grove-text-muted">A confirmation is in your inbox.</p>
+        {!cancelled && (
+          <p className="text-xs text-grove-text-muted">A confirmation is in your inbox.</p>
+        )}
+        {!cancelled && (
+          <div className="pt-1">
+            <CancelBookingButton
+              eventId={confirmed.id}
+              triggerLabel="Cancel this booking"
+              onCancelled={() => setCancelled(true)}
+            />
+          </div>
+        )}
       </div>
     );
   }
 
   const selectedBucket = days.find((d) => d.key === selectedDay) ?? null;
+
+  // Step 2: review the chosen slot, optionally leave a note, confirm.
+  if (pendingSlot && eventType) {
+    const pendingDate = new Date(pendingSlot.startsAt);
+    const pendingDay = dayLongFmt.format(pendingDate);
+    const pendingTime = timeFmt.format(pendingDate);
+    const pendingEndsAt = new Date(
+      pendingDate.getTime() + eventType.durationMinutes * 60_000,
+    );
+    const pendingEndTime = timeFmt.format(pendingEndsAt);
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => { setPendingSlot(null); setNote(''); setToast(null); }}
+          disabled={bookingInFlight !== null}
+          className="inline-flex items-center gap-1 text-xs text-grove-text-muted hover:text-grove-text disabled:opacity-40"
+        >
+          <ArrowLeft size={12} aria-hidden="true" />
+          Pick a different time
+        </button>
+
+        <div className="rounded border border-grove-border bg-grove-bg p-4 space-y-3">
+          <div>
+            <p className="text-xs text-grove-text-muted">
+              {eventType.durationMinutes} min · {eventType.title}
+              <span className="ml-2 opacity-70">{tzLabel}</span>
+            </p>
+            <p className="text-base font-semibold text-grove-text mt-1">{pendingDay}</p>
+            <p className="text-sm text-grove-text">
+              {pendingTime} – {pendingEndTime}
+            </p>
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-medium text-grove-text">
+              Note (optional, shared with {ownerLabel ?? 'the host'})
+            </span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="What would you like to talk about? Any context that helps?"
+              className="mt-1 w-full px-2 py-1 rounded border border-grove-border bg-white text-sm text-grove-text"
+            />
+            <span className="block text-[10px] text-grove-text-muted mt-0.5">
+              Included in the host's confirmation email. They'll see your note before the meeting.
+            </span>
+          </label>
+
+          {toast && (
+            <div role="status" className="text-sm text-amber-700">
+              {toast}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { setPendingSlot(null); setNote(''); setToast(null); }}
+              disabled={bookingInFlight !== null}
+              className="text-xs text-grove-text-muted hover:text-grove-text disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void bookSlot(pendingSlot.startsAt)}
+              disabled={bookingInFlight !== null}
+              className="px-4 py-2 rounded bg-grove-accent text-white text-sm font-medium hover:bg-grove-accent-deep disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {bookingInFlight === pendingSlot.startsAt ? 'Booking…' : 'Confirm booking'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -344,13 +451,11 @@ export function SlotPicker({ handle, slug, isAuthed = true, ownerLabel }: SlotPi
                       key={s.startsAt}
                       type="button"
                       data-testid="time-slot"
-                      onClick={() => void bookSlot(s.startsAt)}
+                      onClick={() => { setPendingSlot(s); setToast(null); }}
                       disabled={bookingInFlight !== null}
                       className="px-3 py-2 rounded border border-grove-border bg-grove-bg text-sm text-grove-text hover:bg-grove-accent hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
-                      {bookingInFlight === s.startsAt
-                        ? 'Booking…'
-                        : timeFmt.format(new Date(s.startsAt))}
+                      {timeFmt.format(new Date(s.startsAt))}
                     </button>
                   ))}
                 </div>

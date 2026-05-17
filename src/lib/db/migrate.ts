@@ -282,5 +282,23 @@ export async function runMigrations() {
   `;
   await sql`CREATE INDEX IF NOT EXISTS event_mutes_member_idx ON event_mutes(member_id)`;
 
+  // Booking note + cancellation lifecycle. Note from booker travels with
+  // the event forever (visible in emails + event detail). Cancellation
+  // is soft — cancelled_at IS NULL means active. cancelled_by_member_id
+  // is the actor (host or booker, either can cancel). The slot engine
+  // filters cancelled_at IS NULL so cancelled slots return to the host's
+  // availability immediately.
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS note_from_booker TEXT`;
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_by_member_id INTEGER`;
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`;
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE events
+        ADD CONSTRAINT events_cancelled_by_member_id_fkey
+        FOREIGN KEY (cancelled_by_member_id) REFERENCES members(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$
+  `;
+
   return { success: true, message: 'Migrations complete' };
 }

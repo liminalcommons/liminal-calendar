@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events, members } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -82,6 +82,7 @@ export async function GET(
         eq(events.memberId, ownerMemberId),
         gte(events.startsAt, now),
         lte(events.startsAt, horizon),
+        isNull(events.cancelledAt),
       ),
     );
 

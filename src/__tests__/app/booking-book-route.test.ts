@@ -39,6 +39,12 @@ jest.mock('@/lib/notifications/inbox/repo', () => ({
 jest.mock('@/lib/email', () => ({
   sendEmail: jest.fn(async () => ({ success: true })),
 }));
+// next/cache's revalidatePath throws outside a request context; we don't
+// care about its output here.
+jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
+jest.mock('@/lib/cache/revalidate-calendar-views', () => ({
+  revalidateCalendarViews: jest.fn(),
+}));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';

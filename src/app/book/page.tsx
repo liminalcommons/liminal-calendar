@@ -17,7 +17,9 @@ import { HandleEditor } from '@/components/booking/HandleEditor';
 import { CollapsibleHandleEditor } from '@/components/booking/CollapsibleHandleEditor';
 import { EventTypeList } from '@/components/booking/EventTypeList';
 import { ProfileUrlBanner } from '@/components/booking/ProfileUrlBanner';
+import { UpcomingBookingsList } from '@/components/booking/UpcomingBookingsList';
 import { autoClaimHandle } from '@/lib/booking/auto-claim-handle';
+import { listUpcomingBookingsForMember } from '@/lib/booking/upcoming-bookings';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +38,15 @@ export default async function BookPage() {
       email: member.email,
       name: member.name,
     });
+  }
+
+  // Upcoming 1:1s for the durable "manage my bookings" surface.
+  // Best-effort; surface an empty list rather than crashing the page.
+  let upcoming: Awaited<ReturnType<typeof listUpcomingBookingsForMember>> = [];
+  try {
+    upcoming = await listUpcomingBookingsForMember(db, member.id, 60);
+  } catch (err) {
+    console.error('[/book] failed to load upcoming bookings', err);
   }
 
   return (
@@ -78,6 +89,20 @@ export default async function BookPage() {
 
           {activeHandle && (
             <>
+              <section className="space-y-3">
+                <div>
+                  <h2 className="text-base font-semibold text-grove-text">
+                    Your upcoming 1:1s
+                  </h2>
+                  <p className="text-sm text-grove-text-muted">
+                    Meetings you're hosting or attending in the next 60 days.
+                  </p>
+                </div>
+                <UpcomingBookingsList initial={upcoming} />
+              </section>
+
+              <hr className="border-grove-border/30" />
+
               <section className="space-y-3">
                 <div>
                   <h2 className="text-base font-semibold text-grove-text">

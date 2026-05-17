@@ -23,7 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { events, rsvps, members } from '@/lib/db/schema';
 import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
@@ -41,6 +41,9 @@ const MS_PER_DAY = 86_400_000;
 
 const BookInput = z.object({
   startsAt: z.string().datetime(),
+  // Optional note from booker to host. Trimmed + bounded so a giant
+  // pasted blob doesn't blow up the email or break formatting.
+  note: z.string().trim().max(2000).optional(),
 });
 
 /** Resolve a Member to a legacy provider-string id (logto > clerk > hylo > fallback). */
@@ -119,6 +122,7 @@ export async function POST(
         eq(events.memberId, ownerMemberId),
         gte(events.startsAt, now),
         lte(events.startsAt, horizon),
+        isNull(events.cancelledAt),
       ),
     );
 
@@ -182,6 +186,8 @@ export async function POST(
   // path above. Without this, two simultaneous bookers can both pass
   // computeSlots() (since neither has inserted yet) and create duplicate
   // events for the same owner+time.
+  const note = parsed.data.note && parsed.data.note.length > 0 ? parsed.data.note : null;
+
   let createdEvent: { id: number };
   try {
     [createdEvent] = await db
@@ -199,6 +205,7 @@ export async function POST(
         creatorImage: ownerMember.image ?? null,
         visibility: 'private',
         sourceEventTypeId: et.id,
+        noteFromBooker: note,
       })
       .returning();
   } catch (err) {
@@ -237,7 +244,7 @@ export async function POST(
   // 3. Booking-confirmed inbox notifications (owner + booker).
   // Best-effort: log but don't fail the response if fan-out misfires.
   const startsAtIso = requestedStart.toISOString();
-  const payload = { startsAt: startsAtIso, location };
+  const payload = { startsAt: startsAtIso, location, note };
   const ownerTitle = `${et.title} booked by ${bookerMember.name ?? 'Someone'}`;
   const bookerTitle = `${et.title} booked with ${ownerMember.name ?? 'host'}`;
   const url = `/events/${eventId}`;
@@ -297,6 +304,7 @@ export async function POST(
         bookerName,
         recipientTimezone: ownerMember.timezone ?? eventTimezone,
         eventTimezone,
+        noteFromBooker: note,
       });
       const result = await sendEmail(ownerMember.email, subject, html);
       if (!result.success) {

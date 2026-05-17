@@ -62,6 +62,15 @@ export const events = pgTable('events', {
   hyloPostId: text('hylo_post_id'),
   visibility: text('visibility').notNull().default('public'),
   sourceEventTypeId: integer('source_event_type_id'),
+  // Optional note the booker wrote when reserving — null for non-booking
+  // events and for bookings made without a note. Rendered in the owner
+  // email and on /events/[id].
+  noteFromBooker: text('note_from_booker'),
+  // Soft-cancellation lifecycle. null cancelled_at = active. Either party
+  // (host or booker) may cancel; cancelled_by_member_id records who.
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledByMemberId: integer('cancelled_by_member_id').references(() => members.id, { onDelete: 'set null' }),
+  cancellationReason: text('cancellation_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

@@ -13,11 +13,17 @@ function extractUrl(text: string | undefined | null): string | null {
 /**
  * Map a DB event row (with optional RSVPs) to the DisplayEvent interface
  * used by the UI components — no UI changes needed.
+ *
+ * `viewerIsHost`: caller has already determined the viewer is the event
+ * host (events.member_id === viewer.id). Controls whether the
+ * booker's note is included in the response — out of caution we don't
+ * leak it to non-host viewers even if RSVP'd.
  */
 export function dbEventToDisplayEvent(
   event: Event,
   rsvps: Rsvp[] = [],
   currentUserId?: string,
+  viewerIsHost?: boolean,
 ): DisplayEvent {
   const goingCount = rsvps.filter((r) => r.status === 'yes').length;
   const interestedCount = rsvps.filter((r) => r.status === 'interested').length;
@@ -56,5 +62,9 @@ export function dbEventToDisplayEvent(
     },
     imageUrl: event.imageUrl ?? undefined,
     recurrenceRule: event.recurrenceRule ?? undefined,
+    sourceEventTypeId: event.sourceEventTypeId ?? null,
+    cancelledAt: event.cancelledAt ? event.cancelledAt.toISOString() : null,
+    cancellationReason: event.cancellationReason ?? null,
+    noteFromBooker: viewerIsHost ? event.noteFromBooker ?? null : null,
   };
 }

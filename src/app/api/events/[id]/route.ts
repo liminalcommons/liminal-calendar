@@ -3,7 +3,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
 import { canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
-import { events, rsvps } from '@/lib/db/schema';
+import { events, rsvps, members } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -48,7 +48,21 @@ export async function GET(
       .from(rsvps)
       .where(eq(rsvps.eventId, numId));
 
-    return NextResponse.json(dbEventToDisplayEvent(event, eventRsvps, authed?.id));
+    const viewerIsHost = !!(authed?.memberId && event.memberId === authed.memberId);
+
+    // Resolve cancelled-by member's display name for "cancelled by Alice" UI.
+    let cancelledByName: string | null = null;
+    if (event.cancelledByMemberId) {
+      const [actor] = await db
+        .select({ name: members.name })
+        .from(members)
+        .where(eq(members.id, event.cancelledByMemberId))
+        .limit(1);
+      cancelledByName = actor?.name ?? null;
+    }
+
+    const display = dbEventToDisplayEvent(event, eventRsvps, authed?.id, viewerIsHost);
+    return NextResponse.json({ ...display, cancelledByName });
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });

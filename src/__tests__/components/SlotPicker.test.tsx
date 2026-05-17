@@ -100,7 +100,11 @@ test('confirmation card renders on 201', async () => {
   await waitFor(() => {
     expect(screen.getAllByTestId('time-slot').length).toBe(1);
   });
+  // Step 1: select a time → enters the confirm step.
   fireEvent.click(screen.getAllByTestId('time-slot')[0]);
+  const confirmBtn = await screen.findByRole('button', { name: /confirm booking/i });
+  // Step 2: confirm.
+  fireEvent.click(confirmBtn);
 
   await waitFor(() => {
     expect(screen.getByText(/you're booked/i)).toBeInTheDocument();
@@ -126,8 +130,14 @@ test('409 path shows toast and refetches slots', async () => {
     expect(screen.getAllByTestId('time-slot').length).toBe(2);
   });
 
+  // Step 1: select a time.
+  fireEvent.click(screen.getAllByTestId('time-slot')[0]);
+  const confirmBtn = await screen.findByRole('button', { name: /confirm booking/i });
+
+  // Step 2: confirm. The 409 from the book POST surfaces a toast and
+  // sends us back to the time grid via the refetch.
   await act(async () => {
-    fireEvent.click(screen.getAllByTestId('time-slot')[0]);
+    fireEvent.click(confirmBtn);
   });
 
   await waitFor(() => {
