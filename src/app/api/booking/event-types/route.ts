@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db';
 import { eventTypes, type Member } from '@/lib/db/schema';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
@@ -70,6 +71,12 @@ export async function POST(request: NextRequest) {
         ...parsed.data,
       })
       .returning();
+
+    revalidatePath('/book');
+    if (member.handle) {
+      revalidatePath(`/${member.handle}`);
+    }
+
     return NextResponse.json(created, { status: 201 });
   } catch (e: unknown) {
     // Postgres SQLSTATE 23505 = unique_violation. neon-http surfaces the code

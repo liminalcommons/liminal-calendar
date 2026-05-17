@@ -12,6 +12,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { eventTypes } from '@/lib/db/schema';
@@ -85,6 +86,13 @@ export async function PATCH(
       .set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(eventTypes.id, id))
       .returning();
+
+    revalidatePath('/book');
+    if (member.handle) {
+      revalidatePath(`/${member.handle}`);
+      revalidatePath(`/${member.handle}/${updated.slug}`);
+    }
+
     return NextResponse.json(updated);
   } catch (e: unknown) {
     // Mirror the POST handler: PG SQLSTATE 23505 takes priority; constraint
@@ -132,5 +140,12 @@ export async function DELETE(
     .set({ active: false, updatedAt: new Date() })
     .where(eq(eventTypes.id, id))
     .returning();
+
+  revalidatePath('/book');
+  if (member.handle) {
+    revalidatePath(`/${member.handle}`);
+    revalidatePath(`/${member.handle}/${row.slug}`);
+  }
+
   return new NextResponse(null, { status: 204 });
 }
