@@ -1,13 +1,30 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 
 /**
  * Run database migrations — creates tables if they don't exist.
  * Uses raw SQL since Drizzle Kit push/migrate requires CLI or node adapter.
+ *
+ * Idempotent — every CREATE / ALTER uses IF NOT EXISTS or DO-block guards.
+ * Safe to call against either a fresh DB (bootstraps everything) or a
+ * partially-migrated DB (skips already-present objects).
  */
 export async function runMigrations() {
-  const url = process.env.DATABASE_URL || process.env.calender_DATABASE_URL || process.env.POSTGRES_URL || process.env.calender_POSTGRES_URL;
+  const url =
+    process.env.DATABASE_URL ||
+    process.env.calender_DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.calender_POSTGRES_URL;
   if (!url) throw new Error('No database URL found');
-  const sql = neon(url);
+  const sql = postgres(url, { ssl: 'require', max: 1, connect_timeout: 10 });
+  try {
+    return await runMigrationsInner(sql);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function runMigrationsInner(sql: any) {
 
   // Create events table
   await sql`

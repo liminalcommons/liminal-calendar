@@ -10,7 +10,7 @@ import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from
 import { ImageUpload } from '@/components/ImageUpload';
 import { InviteePicker, type Invitee } from './InviteePicker';
 import { apiFetch } from '@/lib/api-fetch';
-import { INVITEE_CAP_MEMBER } from '@/lib/events/invitations-repo';
+import { INVITEE_CAP_MEMBER } from '@/lib/events/invitations-types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 

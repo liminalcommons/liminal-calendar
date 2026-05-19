@@ -2,10 +2,9 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { eventInvitations } from '@/lib/db/schema';
 import { resolveMemberId } from '@/lib/auth/resolve-member-id';
+import { INVITEE_CAP_MEMBER, type Invitee } from './invitations-types';
 
-export const INVITEE_CAP_MEMBER = 10;
-
-export type Invitee = { userId: string; name: string; image?: string | null };
+export { INVITEE_CAP_MEMBER, type Invitee };
 
 /**
  * Dedupes invitees by userId (last-wins) and throws INVITEE_CAP_EXCEEDED

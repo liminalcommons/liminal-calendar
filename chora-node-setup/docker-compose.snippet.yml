@@ -1,0 +1,72 @@
+# Append these two services to the existing `services:` block in
+# D:\projects\docker-compose.yml on chora-node.
+#
+# Requires CALENDAR_DB_PASSWORD set in chora-node's environment (or
+# D:\projects\.env). Generate one with:
+#   openssl rand -base64 36 | tr -d '\n='
+#
+# Also requires a Cloudflare DNS A record (proxy=OFF / gray cloud):
+#   db.liminalcalendar.com  →  <chora-node public IP>
+
+services:
+  postgres-calendar:
+    # Postgres 16 alpine — minimal footprint, official image.
+    image: postgres:16-alpine
+    container_name: postgres-calendar
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: calendar
+      POSTGRES_PASSWORD: ${CALENDAR_DB_PASSWORD:?CALENDAR_DB_PASSWORD must be set}
+      POSTGRES_DB: calendar
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres-calendar-data:/var/lib/postgresql/data
+      # First-run hook generates a self-signed TLS cert and enables ssl=on.
+      - ./postgres-calendar/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      # Public exposure for Vercel Functions. SSL-required + scram-sha-256
+      # password is the security floor; combine with a strong password and
+      # the Cloudflare DNS-only A record points only at this host.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calendar -d calendar"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    # Resource caps so a runaway query can't OOM the host. Tune up if needed.
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  postgres-calendar-backup:
+    # Battle-tested pg_dump scheduler. Rotates daily/weekly/monthly snapshots
+    # with retention. No remote upload — that's a separate `rclone` cron the
+    # user adds to send backups offsite (see README §Resilience).
+    image: prodrigestivill/postgres-backup-local:16
+    container_name: postgres-calendar-backup
+    restart: unless-stopped
+    depends_on:
+      postgres-calendar:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres-calendar
+      POSTGRES_DB: calendar
+      POSTGRES_USER: calendar
+      POSTGRES_PASSWORD: ${CALENDAR_DB_PASSWORD:?CALENDAR_DB_PASSWORD must be set}
+      # Daily at 02:00 chora-node-local. Adjust if a different RPO is wanted.
+      SCHEDULE: "@daily"
+      # Retention: 14 daily, 8 weekly, 12 monthly. ~34 snapshots resident,
+      # ~100MB each at calendar's data scale = ~3-4 GB on disk. Trivial.
+      BACKUP_KEEP_DAYS: 14
+      BACKUP_KEEP_WEEKS: 8
+      BACKUP_KEEP_MONTHS: 12
+      # pg_dump in custom format (-Fc) = smaller files + parallel restore
+      # support. Default is plaintext SQL.
+      POSTGRES_EXTRA_OPTS: "-Fc -Z6"
+    volumes:
+      - ./postgres-calendar/backups:/backups
+
+volumes:
+  postgres-calendar-data:

@@ -20,7 +20,11 @@ async function checkRateLimit(userId: string): Promise<{ allowed: boolean; error
     FROM image_generations
     WHERE user_id = ${userId}
   `)
-  const row = result.rows[0] as any
+  // drizzle-orm postgres-js adapter: result is the row array directly,
+  // not wrapped in { rows: ... } like the Neon HTTP driver returned.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (result as unknown as { rows?: unknown[] }).rows ?? (result as unknown as unknown[])
+  const row = (rows as any[])[0] as any
   if (!row) return { allowed: true }
 
   if (Number(row.daily) >= LIMITS.daily) return { allowed: false, error: `Daily limit reached (${LIMITS.daily}/day)` }

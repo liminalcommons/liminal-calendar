@@ -1,11 +1,9 @@
-import { auth } from '../../auth';
+// Pure helpers — no `auth` import, so this module stays client-safe.
+// Server-only auth() callers should import directly from `@/auth`.
 
 export type UserRole = 'member' | 'host' | 'admin';
 
-export async function getServerSession() {
-  return await auth();
-}
-
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getUserRole(session: any): UserRole {
   const role = session?.user?.role;
   if (role === 'admin') return 'admin';
