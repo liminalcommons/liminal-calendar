@@ -19,6 +19,7 @@
  */
 
 import { eq } from 'drizzle-orm';
+import type { Session } from 'next-auth';
 import { auth as nextAuth } from '../../../auth';
 import { auth as clerkAuth } from '@clerk/nextjs/server';
 import { members, type Member } from '@/lib/db/schema';
@@ -27,29 +28,51 @@ import { syncClerkMemberOnRead } from '@/lib/auth/sync-clerk-member-on-read';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getCurrentMember(db: any): Promise<Member | null> {
-  // Castalia (Logto via NextAuth) session takes precedence.
-  const nextAuthSession = await nextAuth();
+  // Castalia (Logto via NextAuth) session takes precedence. nextAuth() can
+  // throw on a malformed / stale session cookie — catch and fall through
+  // to Clerk so a bad cookie doesn't crash every render.
+  let nextAuthSession: Session | null = null;
+  try {
+    nextAuthSession = (await nextAuth()) as Session | null;
+  } catch (err) {
+    console.error('[getCurrentMember] nextAuth() threw:', err instanceof Error ? err.message : String(err));
+  }
   const logtoUserId = (nextAuthSession?.user as { logtoUserId?: string } | undefined)?.logtoUserId;
   if (logtoUserId) {
-    const [member] = await db
-      .select()
-      .from(members)
-      .where(eq(members.logtoId, logtoUserId))
-      .limit(1);
-    if (member) return member;
+    try {
+      const [member] = await db
+        .select()
+        .from(members)
+        .where(eq(members.logtoId, logtoUserId))
+        .limit(1);
+      if (member) return member;
+    } catch (err) {
+      console.error('[getCurrentMember] logto member lookup failed:', err instanceof Error ? err.message : String(err));
+    }
   }
 
   // Fall through to Clerk session.
-  const { userId } = await clerkAuth();
+  let userId: string | null | undefined = null;
+  try {
+    const result = await clerkAuth();
+    userId = result.userId;
+  } catch (err) {
+    console.error('[getCurrentMember] clerkAuth() threw:', err instanceof Error ? err.message : String(err));
+  }
   if (userId) {
-    let member = await findMemberByClerkId(db, userId);
-    if (!member) {
-      // Webhook never fired (or fired and failed). Provision now and
-      // re-query so the caller sees a valid row on this same request.
-      await syncClerkMemberOnRead(db, userId);
-      member = await findMemberByClerkId(db, userId);
+    try {
+      let member = await findMemberByClerkId(db, userId);
+      if (!member) {
+        // Webhook never fired (or fired and failed). Provision now and
+        // re-query so the caller sees a valid row on this same request.
+        await syncClerkMemberOnRead(db, userId);
+        member = await findMemberByClerkId(db, userId);
+      }
+      return member ?? null;
+    } catch (err) {
+      console.error('[getCurrentMember] clerk member lookup/sync failed:', err instanceof Error ? err.message : String(err));
+      return null;
     }
-    return member ?? null;
   }
 
   return null;

@@ -1,7 +1,7 @@
-import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { getAuthedUser, type AuthedUser } from '@/lib/auth/get-authed-user';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { db } from '@/lib/db';
-import { events, rsvps } from '@/lib/db/schema';
+import { events, rsvps, type Member } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { asc } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
@@ -19,12 +19,27 @@ import type { DisplayEvent } from '@/lib/display-event';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const authed = await getAuthedUser();
+  // Defensive: any throw inside getAuthedUser / getCurrentMember (e.g. a stale
+  // session cookie that decodes to an unexpected shape, a transient DB blip,
+  // or a Clerk SDK init issue) used to crash the Server Components render
+  // with a generic "Application error" digest. Fall through to MarketingLanding
+  // instead so the public landing page is always reachable.
+  let authed: AuthedUser | null = null;
+  try {
+    authed = await getAuthedUser();
+  } catch (err) {
+    console.error('[HomePage] getAuthedUser failed:', err instanceof Error ? err.message : String(err));
+  }
   if (!authed) {
     return <MarketingLanding />;
   }
   const currentUserId = authed?.id;
-  const member = await getCurrentMember(db);
+  let member: Member | null = null;
+  try {
+    member = await getCurrentMember(db);
+  } catch (err) {
+    console.error('[HomePage] getCurrentMember failed:', err instanceof Error ? err.message : String(err));
+  }
   const showBookingNudge = !!member && !member.handle;
   const memberHandle = member?.handle ?? null;
 

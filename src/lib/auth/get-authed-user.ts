@@ -10,9 +10,10 @@
  */
 
 import { eq } from 'drizzle-orm';
+import type { Session } from 'next-auth';
 import { auth as nextAuth } from '../../../auth';
 import { db } from '@/lib/db';
-import { members } from '@/lib/db/schema';
+import { members, type Member } from '@/lib/db/schema';
 import { getCurrentMember } from './get-current-member';
 import type { UserRole } from '@/lib/auth-helpers';
 
@@ -42,8 +43,15 @@ async function lookupMemberIdByLogtoId(logtoId: string): Promise<number | null> 
 }
 
 export async function getAuthedUser(): Promise<AuthedUser | null> {
-  // Castalia (Logto via NextAuth) path
-  const session = await nextAuth();
+  // Castalia (Logto via NextAuth) path. nextAuth() can throw on a malformed
+  // or stale session cookie — catch and fall through to Clerk so a single
+  // bad cookie doesn't crash every Server Component render.
+  let session: Session | null = null;
+  try {
+    session = (await nextAuth()) as Session | null;
+  } catch (err) {
+    console.error('[getAuthedUser] nextAuth() threw:', err instanceof Error ? err.message : String(err));
+  }
   if (session?.user) {
     const u = session.user as {
       logtoUserId?: string;
@@ -70,7 +78,12 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
   }
 
   // Clerk path — getCurrentMember handles defensive provisioning.
-  const member = await getCurrentMember(db);
+  let member: Member | null = null;
+  try {
+    member = await getCurrentMember(db);
+  } catch (err) {
+    console.error('[getAuthedUser] getCurrentMember threw:', err instanceof Error ? err.message : String(err));
+  }
   if (!member) return null;
   const role: UserRole =
     member.role === 'admin' ? 'admin' : member.role === 'host' ? 'host' : 'member';
