@@ -98,7 +98,6 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
     (profile?.hyloId && profile.hyloId === event.creator_id)
     || (profile?.clerkId && profile.clerkId === event.creator_id)
     || session?.user?.id === event.creator_id
-    || session?.user?.hyloId === event.creator_id
   );
   const canEdit = canEditEvent(role, isCreator);
   const canDelete = canDeleteEvent(role, isCreator);

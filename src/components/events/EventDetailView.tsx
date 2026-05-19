@@ -149,8 +149,8 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     (profile?.hyloId && String(profile.hyloId) === String(event.creator_id))
     || (profile?.clerkId && String(profile.clerkId) === String(event.creator_id))
     || (profile?.userId && String(profile.userId) === String(event.creator_id))
-    // Legacy Hylo-only fallback for sessions where /api/profile fails.
-    || (!profile && user && String(user.hyloId || user.id) === String(event.creator_id))
+    // Fallback when /api/profile fails (rare).
+    || (!profile && user && String(user.id) === String(event.creator_id))
   );
   const isAdmin = isLoaded && role === 'admin';
   const canEdit = isOwner;

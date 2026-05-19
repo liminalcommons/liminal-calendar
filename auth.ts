@@ -2,53 +2,14 @@ import NextAuth from 'next-auth';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { resolveRole, resolveSessionRole } from '@/lib/auth/role';
-import { syncMember } from '@/lib/auth/member-sync';
 import { applyRedirectPolicy } from '@/lib/auth/redirect-policy';
 
-interface HyloProfile {
-  id: string;
-  name: string;
-  email?: string;
-  avatarUrl?: string;
-}
-
-interface HyloMembership {
-  hasModeratorRole?: boolean;
-  group: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-}
-
 const isProduction = process.env.NODE_ENV === 'production';
-
-// Browser-facing OAuth host for Hylo — direct to www.hylo.com.
-// (The hylo-login.castalia.one proxy was an attempted mobile-hijack dodge but
-// is not in use; the SPA bundle hardcodes api.hylo.com cookie bootstrapping
-// which the proxy doesn't cover. Override with HYLO_OAUTH_BROWSER_HOST.)
-const HYLO_BROWSER_HOST = process.env.HYLO_OAUTH_BROWSER_HOST?.trim() || 'www.hylo.com';
-
-// Liminal Commons Hylo group ID
-const LIMINAL_COMMONS_GROUP_ID = '41955';
-
-// Admin allowlist — Hylo IDs that get 'admin' role regardless of Hylo group role.
-// Hylo only exposes hasModeratorRole, no distinct admin field.
-// Source of truth: ADMIN_HYLO_IDS env var (comma-separated). Falls back to the
-// historical inline list so an unset env var in dev doesn't lock out existing
-// admins; production should always set the env var explicitly.
-const DEFAULT_ADMIN_HYLO_IDS = ['67402', '69224', '55015', '69655']; // victor, psygenlab, danielle johnson, erik h
-const ADMIN_HYLO_IDS_FROM_ENV = (process.env.ADMIN_HYLO_IDS ?? '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
-const ADMIN_HYLO_IDS = ADMIN_HYLO_IDS_FROM_ENV.length > 0 ? ADMIN_HYLO_IDS_FROM_ENV : DEFAULT_ADMIN_HYLO_IDS;
 
 // Castalia identity provider — self-hosted Logto at id.castalia.one.
 // Lets users who already have a Castalia identity (auto-enrolled when they
 // sign into castalia.one) sign in to liminalcalendar.com without a separate
-// account.
+// account. Members can also sign in via Clerk (handled outside NextAuth).
 const LOGTO_ISSUER = process.env.LOGTO_ISSUER?.trim() || 'https://id.castalia.one/oidc';
 
 interface LogtoOidcProfile {
@@ -78,109 +39,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     },
-    {
-      id: 'hylo',
-      name: 'Hylo',
-      type: 'oauth',
-      // Required so Auth.js v5 / oauth4webapi accepts the `iss` query parameter
-      // that Hylo includes on the callback (RFC 9207). Without this, the callback
-      // throws `unexpected "iss" (issuer) response parameter value` because the
-      // expected issuer defaults to the `https://authjs.dev` sentinel and Hylo
-      // returns `https://www.hylo.com`.
-      issuer: 'https://www.hylo.com',
-      authorization: {
-        url: `https://${HYLO_BROWSER_HOST}/noo/oauth/auth`,
-        params: {
-          scope: 'openid email profile offline_access',
-          response_type: 'code',
-          // web_only=true prevents Hylo from triggering its broken JS wallet code
-          web_only: 'true',
-        },
-      },
-      token: 'https://www.hylo.com/noo/oauth/token',
-      userinfo: {
-        // url is required by @auth/core assertConfig validation even when request() is provided
-        url: 'https://www.hylo.com/noo/graphql',
-        async request(context: { tokens: { access_token?: string } }) {
-          const res = await fetch('https://www.hylo.com/noo/graphql', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${context.tokens.access_token}`,
-            },
-            body: JSON.stringify({
-              // Hylo's GraphQL schema returns `memberships` as a list of
-              // Membership directly (NOT a connection with an `items` array).
-              // The legacy `memberships { items { ... } }` query throws:
-              //   "Cannot query field \"items\" on type \"Membership\"."
-              query: '{ me { id name email avatarUrl memberships { hasModeratorRole group { id name slug } } } }',
-            }),
-          });
-
-          // Surface the raw response when the shape isn't what we expect, so
-          // OAuth callback errors aren't opaque "Cannot read properties of
-          // undefined (reading 'me')" stacks. We log status, content-type, and
-          // a body excerpt so the next cycle can see exactly why Hylo rejected
-          // the userinfo call (token-format mismatch, GraphQL `errors` array,
-          // HTML login page from session-based auth, etc.).
-          const body = await res.text();
-          let parsed: unknown;
-          try {
-            parsed = JSON.parse(body);
-          } catch {
-            parsed = null;
-          }
-          const payload = parsed as
-            | { data?: { me?: HyloProfile & { memberships?: HyloMembership[] } }; errors?: unknown }
-            | null;
-
-          if (!payload || !payload.data || !payload.data.me) {
-            console.error('[auth][userinfo] Hylo /noo/graphql did not return expected { data: { me } } shape', {
-              status: res.status,
-              statusText: res.statusText,
-              contentType: res.headers.get('content-type'),
-              gqlErrors: payload?.errors,
-              bodyExcerpt: body.slice(0, 1000),
-              tokenPresent: Boolean(context.tokens.access_token),
-              tokenLength: context.tokens.access_token?.length,
-            });
-            throw new Error(
-              `Hylo userinfo failed: status=${res.status} ${res.statusText}; ` +
-                `body shape lacks data.me (gqlErrors=${JSON.stringify(payload?.errors ?? null)})`,
-            );
-          }
-
-          return payload.data.me;
-        },
-      },
-      profile(profile: HyloProfile) {
-        return {
-          id: profile.id,
-          name: profile.name,
-          email: profile.email ?? null,
-          image: profile.avatarUrl ?? null,
-        };
-      },
-      checks: ['pkce', 'state'],
-      clientId: process.env.HYLO_CLIENT_ID?.trim(),
-      clientSecret: process.env.HYLO_CLIENT_SECRET?.trim(),
-    },
   ],
   session: { strategy: 'jwt' },
-  // Surface the underlying cause of CallbackRouteError (and friends) so the
-  // back-leg of the OAuth flow doesn't silently 500 with `error=Configuration`.
-  // Auth.js v5 wraps the real error in a generic CallbackRouteError unless a
-  // custom logger is supplied. Gated `debug` via AUTH_DEBUG keeps prod logs
-  // quiet while still allowing on-demand verbosity.
   logger: {
     error(error: Error & { cause?: unknown; type?: string; kind?: string }) {
-      // Auth.js v5 nests the original error variously: error.cause.err, error.cause,
-      // or just error.message. Dump everything we can to find the actual cause.
-      const safeStringify = (obj: unknown, depth = 3): string => {
+      const safeStringify = (obj: unknown): string => {
         const seen = new WeakSet();
         return JSON.stringify(
           obj,
-          (key, value) => {
+          (_key, value) => {
             if (typeof value === 'object' && value !== null) {
               if (seen.has(value)) return '[Circular]';
               seen.add(value);
@@ -215,28 +82,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
-    // Auth.js v5 default rejects cross-origin redirects, which traps the user on
-    // auth.liminalcalendar.com after the Hylo callback. Allow hops within the
-    // *.liminalcalendar.com family and fall back to the apex otherwise.
     async redirect({ url, baseUrl }) {
       return applyRedirectPolicy({ url, baseUrl });
     },
     async jwt({ token, account, profile }) {
-      // First sign-in: persist tokens from the OAuth exchange
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
-        // expires_at is seconds since epoch (set by NextAuth from expires_in)
         token.accessTokenExpires = account.expires_at
           ? account.expires_at * 1000
-          : Date.now() + (account.expires_in as number ?? 3600) * 1000;
+          : Date.now() + ((account.expires_in as number) ?? 3600) * 1000;
       }
 
-      // Logto-provider sign-in: Castalia identity. Email-based account
-      // linking — if an existing `members` row matches the Logto userinfo
-      // email, carry its hyloId/role/name into the token so the user's
-      // existing Hylo identity (admin, host, etc.) survives the Logto
-      // sign-in. Persist logtoId on the linked row for future signins.
+      // Logto sign-in: email-based account linking — if an existing
+      // `members` row matches the Logto userinfo email, carry its role
+      // into the token so the user's persisted role (admin, host, etc.)
+      // survives the Logto sign-in. Persist logtoId on the linked row.
       if (account?.provider === 'logto' && profile) {
         const p = profile as LogtoOidcProfile;
         token.logtoUserId = p.sub;
@@ -252,7 +113,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               .where(eq(members.email, p.email))
               .limit(1);
             if (existing) {
-              if (existing.hyloId) token.hyloId = existing.hyloId;
               if (existing.role) token.role = existing.role;
               linkedName = existing.name ?? null;
               if (!existing.logtoId) {
@@ -267,91 +127,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
 
-        // Name precedence: Logto profile > linked member row > email local part
         const emailLocal = p.email ? p.email.split('@')[0] : null;
         token.name = p.name || linkedName || emailLocal;
         if (!token.role) token.role = 'member';
-        return token;
       }
-
-      if (profile) {
-        const p = profile as HyloProfile & {
-          memberships?: HyloMembership[];
-        };
-        token.hyloId = p.id;
-        token.picture = p.avatarUrl ?? token.picture;
-
-        // Determine role based on Liminal Commons group membership (3-tier)
-        const memberships = p.memberships ?? [];
-        const lcMembership = memberships.find(
-          (m) => m.group.id === LIMINAL_COMMONS_GROUP_ID
-        );
-        token.role = resolveRole({
-          hyloId: p.id,
-          isLiminalCommonsMember: Boolean(lcMembership),
-          hasModeratorRole: Boolean(lcMembership?.hasModeratorRole),
-          adminAllowlist: ADMIN_HYLO_IDS,
-        });
-      }
-
-      // Upsert member record on first sign-in only (jwt callback with account).
-      // Fire-and-forget: the sign-in flow must not block on DB availability.
-      if (account && token.hyloId) {
-        syncMember(db, {
-          hyloId: token.hyloId as string,
-          name: token.name as string | null | undefined,
-          email: token.email as string | null | undefined,
-          image: token.picture as string | null | undefined,
-          role: token.role as string | null | undefined,
-        }).catch(() => {});
-      }
-
-      // Token refresh is handled by auth.castalia.one (the auth gateway).
-      // This app reads the shared .castalia.one cookie — do NOT refresh or
-      // invalidate tokens here. The gateway manages the token lifecycle.
 
       return token;
     },
     async session({ session, token }) {
       const user = session.user as unknown as Record<string, unknown>;
-      if (token.hyloId) user.hyloId = token.hyloId;
       if (token.logtoUserId) user.logtoUserId = token.logtoUserId;
       if (token.picture) user.image = token.picture;
-
-      const hyloId = token.hyloId as string | undefined;
-
-      // Role priority: 1) DB members table override, 2) admin allowlist, 3) Hylo role, 4) 'member'
-      let dbRole: string | undefined;
-      if (hyloId) {
-        try {
-          const [dbMember] = await db
-            .select({ role: members.role })
-            .from(members)
-            .where(eq(members.hyloId, hyloId))
-            .limit(1);
-          dbRole = dbMember?.role;
-        } catch {
-          // DB not ready or members table doesn't exist yet — fall through
-        }
-      }
-      user.role = resolveSessionRole({
-        hyloId,
-        dbRole,
-        tokenRole: token.role as string | undefined,
-        adminAllowlist: ADMIN_HYLO_IDS,
-      });
-
-      // Expose access token for server-side helpers
-      (session as any).accessToken = token.accessToken;
+      user.role = (token.role as string | undefined) || 'member';
+      (session as unknown as { accessToken?: unknown }).accessToken = token.accessToken;
       return session;
     },
   },
   // Cookie scoping: scope sessionToken + callbackUrl to `.liminalcalendar.com`
-  // so a session set during the Hylo OAuth callback (which lands on
-  // auth.liminalcalendar.com — the only Hylo-allowlisted redirect URI we
-  // control) is visible on the liminalcalendar.com root where the app lives.
-  // csrfToken stays host-only (`__Host-` prefix mandates it) — that's fine
-  // because CSRF is single-flight within auth.liminalcalendar.com only.
+  // so a session set during an auth-subdomain OAuth callback is visible on
+  // the liminalcalendar.com root where the app lives. csrfToken stays
+  // host-only (`__Host-` prefix mandates it) — CSRF is single-flight within
+  // the originating host only.
   cookies: isProduction
     ? {
         sessionToken: {
@@ -379,8 +175,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
     signIn: '/',
   },
-  // Sign-in is handled in-app via NextAuth's standard signIn('hylo') flow:
-  // the user is redirected to the Hylo authorize URL on www.hylo.com, logs in,
-  // and Hylo redirects back to /api/auth/callback/hylo on whichever host
-  // initiated. NextAuth processes the callback and sets the session cookie.
 });

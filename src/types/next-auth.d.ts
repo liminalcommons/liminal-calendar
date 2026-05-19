@@ -7,7 +7,7 @@ declare module 'next-auth' {
       name?: string | null;
       email?: string | null;
       image?: string | null;
-      hyloId?: string;
+      logtoUserId?: string;
       role?: 'member' | 'host' | 'admin';
     };
   }
@@ -15,7 +15,7 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
   interface JWT {
-    hyloId?: string;
+    logtoUserId?: string;
     role?: 'member' | 'host' | 'admin';
   }
 }

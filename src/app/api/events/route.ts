@@ -77,7 +77,6 @@ export async function POST(request: NextRequest) {
   }
   const role = authed.role;
   const user = {
-    hyloId: authed.hyloId,
     clerkId: authed.clerkId,
     id: authed.id,
     name: authed.name,
@@ -146,7 +145,7 @@ export async function POST(request: NextRequest) {
         imageUrl: v.imageUrl,
         recurrenceRule: v.recurrenceRule,
         visibility: v.visibility,
-        creatorId: user.hyloId ?? user.clerkId ?? user.id ?? 'unknown',
+        creatorId: user.clerkId ?? user.id ?? 'unknown',
         memberId: authed.memberId,
         creatorName: user.name ?? 'Unknown',
         creatorImage: user.image ?? null,
@@ -164,7 +163,7 @@ export async function POST(request: NextRequest) {
       // A5 fan-out: one invitation.received notification per invitee.
       // Best-effort; never fails the POST response.
       try {
-        const actorId = (user as Record<string, unknown>).hyloId as string ?? user.id ?? null;
+        const actorId = user.clerkId ?? user.id ?? null;
         const actorName = (user.name as string | undefined) ?? null;
         await fanoutInvitationReceived(
           db,

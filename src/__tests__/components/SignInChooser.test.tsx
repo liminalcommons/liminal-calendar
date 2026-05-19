@@ -6,7 +6,7 @@ describe('SignInChooser', () => {
   it('renders both auth path options', () => {
     render(<SignInChooser />);
     expect(
-      screen.getByRole('button', { name: /Continue with Liminal Commons \(Hylo\)/i }),
+      screen.getByRole('button', { name: /Sign in with Castalia/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /Continue with email or Google/i }),
@@ -19,37 +19,5 @@ describe('SignInChooser', () => {
       name: /Continue with email or Google/i,
     });
     expect(clerkLink).toHaveAttribute('href', '/sign-in');
-  });
-
-  it('Hylo button redirects to auth.liminalcalendar.com /start-hylo-signin handoff page', () => {
-    const originalLocation = window.location;
-    const hrefSetter = jest.fn();
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        get origin() {
-          return 'https://liminalcalendar.com';
-        },
-        set href(v: string) {
-          hrefSetter(v);
-        },
-      },
-    });
-
-    render(<SignInChooser />);
-    const hyloBtn = screen.getByRole('button', {
-      name: /Continue with Liminal Commons \(Hylo\)/i,
-    });
-    hyloBtn.click();
-
-    expect(hrefSetter).toHaveBeenCalledTimes(1);
-    expect(hrefSetter).toHaveBeenCalledWith(
-      'https://auth.liminalcalendar.com/start-hylo-signin?callbackUrl=https%3A%2F%2Fliminalcalendar.com%2F',
-    );
-
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: originalLocation,
-    });
   });
 });

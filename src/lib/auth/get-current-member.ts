@@ -1,9 +1,8 @@
 /**
  * Resolve the current request's identity to a Member row.
  *
- * Tries the Hylo session first (existing users — keeps Hylo flow
- * byte-identical). If no Hylo identity is found, falls through to the
- * Clerk session.
+ * Tries the Castalia (Logto / NextAuth) session first. If no Logto
+ * identity is found, falls through to the Clerk session.
  *
  * Defensive provisioning: when a valid Clerk session has no matching
  * Member row, calls syncClerkMemberOnRead to provision via the Clerk
@@ -13,13 +12,14 @@
  * blocking-await: the user sees themselves on the very first request.
  *
  * Returns null when no session is active OR when the matching Member
- * row could not be provisioned (Clerk getUser failed). The Hylo path
- * has no defensive sync (Hylo session population already runs syncMember
- * in auth.ts's jwt callback — the row is created at signin, not on read).
+ * row could not be provisioned (Clerk getUser failed). The Logto path
+ * has no defensive sync (Logto session population runs the email-match
+ * link in auth.ts's jwt callback — the row is linked at signin, not on
+ * read).
  */
 
 import { eq } from 'drizzle-orm';
-import { auth as hyloAuth } from '../../../auth';
+import { auth as nextAuth } from '../../../auth';
 import { auth as clerkAuth } from '@clerk/nextjs/server';
 import { members, type Member } from '@/lib/db/schema';
 import { findMemberByClerkId } from '@/lib/auth/find-member-by-clerk-id';
@@ -27,16 +27,16 @@ import { syncClerkMemberOnRead } from '@/lib/auth/sync-clerk-member-on-read';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getCurrentMember(db: any): Promise<Member | null> {
-  // Hylo session takes precedence — existing users see no flow change.
-  const hyloSession = await hyloAuth();
-  const hyloId = (hyloSession?.user as { hyloId?: string } | undefined)?.hyloId;
-  if (hyloId) {
+  // Castalia (Logto via NextAuth) session takes precedence.
+  const nextAuthSession = await nextAuth();
+  const logtoUserId = (nextAuthSession?.user as { logtoUserId?: string } | undefined)?.logtoUserId;
+  if (logtoUserId) {
     const [member] = await db
       .select()
       .from(members)
-      .where(eq(members.hyloId, hyloId))
+      .where(eq(members.logtoId, logtoUserId))
       .limit(1);
-    return member ?? null;
+    if (member) return member;
   }
 
   // Fall through to Clerk session.
