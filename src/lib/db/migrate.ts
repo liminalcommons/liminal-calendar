@@ -9,13 +9,22 @@ import postgres from 'postgres';
  * partially-migrated DB (skips already-present objects).
  */
 export async function runMigrations() {
+  // Prefer non-pooling for DDL — direct connection, no pgbouncer in the
+  // middle. Pooled URLs still work with `prepare: false`, but DDL belongs
+  // on a real session.
   const url =
+    process.env.POSTGRES_URL_NON_POOLING ||
     process.env.DATABASE_URL ||
-    process.env.calender_DATABASE_URL ||
     process.env.POSTGRES_URL ||
+    process.env.calender_DATABASE_URL ||
     process.env.calender_POSTGRES_URL;
   if (!url) throw new Error('No database URL found');
-  const sql = postgres(url, { ssl: 'require', max: 1, connect_timeout: 10 });
+  const sql = postgres(url, {
+    ssl: 'require',
+    max: 1,
+    connect_timeout: 10,
+    prepare: false,
+  });
   try {
     return await runMigrationsInner(sql);
   } finally {
