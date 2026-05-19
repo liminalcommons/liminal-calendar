@@ -270,6 +270,26 @@ async function runMigrationsInner(sql: any) {
   await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_facebook BOOLEAN NOT NULL DEFAULT FALSE`;
   await sql`CREATE INDEX IF NOT EXISTS topic_submissions_status_created_idx ON topic_submissions(status, created_at DESC)`;
 
+  // Columns historically added by prior migrations; bootstrap path
+  // (CREATE TABLE above) doesn't include them, so a fresh DB needs them
+  // added before the unique index below can reference them.
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'`;
+  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS source_event_type_id INTEGER`;
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS feed_token TEXT`;
+  await sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'members_feed_token_key'
+          AND conrelid = 'members'::regclass
+      ) THEN
+        ALTER TABLE members
+          ADD CONSTRAINT members_feed_token_key UNIQUE (feed_token);
+      END IF;
+    END $$
+  `;
+
   // Booking-event race guard. Without this, two simultaneous POST /book
   // calls for the same slot can both pass the application-layer
   // computeSlots() re-validation (neither has inserted yet) and create
@@ -324,6 +344,89 @@ async function runMigrationsInner(sql: any) {
         ADD CONSTRAINT events_cancelled_by_member_id_fkey
         FOREIGN KEY (cancelled_by_member_id) REFERENCES members(id) ON DELETE SET NULL;
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
+  `;
+
+  await sql`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS remind_me BOOLEAN DEFAULT FALSE`;
+  await sql`ALTER TABLE event_comments ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE attendance_reports ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE CASCADE`;
+  await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notification_log (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      sent_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT notification_log_unique UNIQUE (event_id, user_id, type)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS notification_preferences (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      member_id INTEGER REFERENCES members(id) ON DELETE CASCADE,
+      push_1h BOOLEAN NOT NULL DEFAULT TRUE,
+      push_15min BOOLEAN NOT NULL DEFAULT TRUE,
+      push_at_start BOOLEAN NOT NULL DEFAULT TRUE,
+      email_24h BOOLEAN NOT NULL DEFAULT FALSE,
+      email_1h BOOLEAN NOT NULL DEFAULT FALSE,
+      email_15min BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS event_types (
+      id SERIAL PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      owner_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      slug TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      duration_minutes INTEGER NOT NULL,
+      location_kind TEXT NOT NULL,
+      location_value TEXT,
+      buffer_before_minutes INTEGER NOT NULL DEFAULT 0,
+      buffer_after_minutes INTEGER NOT NULL DEFAULT 0,
+      min_notice_minutes INTEGER NOT NULL DEFAULT 60,
+      max_days_ahead INTEGER NOT NULL DEFAULT 30,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT event_types_owner_slug_unique UNIQUE (owner_id, slug)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS bookable_windows (
+      id SERIAL PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      owner_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      day_of_week INTEGER NOT NULL,
+      start_minute INTEGER NOT NULL,
+      end_minute INTEGER NOT NULL,
+      timezone TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS event_invitations (
+      id SERIAL PRIMARY KEY,
+      event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+      invitee_user_id TEXT NOT NULL,
+      member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      invitee_name TEXT NOT NULL,
+      invitee_image TEXT,
+      invited_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT event_invitations_event_invitee_unique UNIQUE (event_id, invitee_user_id)
+    )
   `;
 
   return { success: true, message: 'Migrations complete' };
