@@ -92,6 +92,21 @@ async function runMigrationsInner(sql: any) {
   // Clerk identity column — nullable so existing Hylo-only rows are unaffected.
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
 
+  // Handle — optional public-facing username, unique when present.
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS handle TEXT`;
+  await sql`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'members_handle_key'
+          AND conrelid = 'members'::regclass
+      ) THEN
+        ALTER TABLE members
+          ADD CONSTRAINT members_handle_key UNIQUE (handle);
+      END IF;
+    END $$
+  `;
+
   // Unique constraint on clerk_id. Postgres allows multiple NULLs in a
   // regular UNIQUE column by default, so this gives us the same
   // multi-NULL tolerance as the prior partial unique index — but
