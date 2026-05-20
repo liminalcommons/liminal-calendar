@@ -8,7 +8,6 @@ import { SubscribePrompt } from "@/components/SubscribePrompt";
 import { MobileRedirect } from "@/components/MobileRedirect";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { MigrationBanner } from "@/components/MigrationBanner";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -41,7 +40,6 @@ export default function RootLayout({
       <body>
         <ClerkProvider>
           <Providers>
-            <MigrationBanner />
             {children}
             <MobileRedirect />
             <SubscribePrompt />
