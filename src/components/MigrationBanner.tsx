@@ -51,7 +51,7 @@ export function MigrationBanner() {
         notification settings may briefly appear missing while we restore ~50
         days of history from our previous database. New events and RSVPs are
         saved normally. Push reminders may pause until restore completes —
-        you can re-enable them once it's done. Sorry for the inconvenience.
+        you can re-enable them once restore completes. Sorry for the inconvenience.
       </span>
       <button
         type="button"
