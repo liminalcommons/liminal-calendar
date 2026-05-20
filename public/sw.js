@@ -2,9 +2,10 @@
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request));
-});
+// Intentionally no 'fetch' handler. A passthrough `event.respondWith(fetch(event.request))`
+// breaks Chrome OAuth callbacks: the SW re-fetches the navigation request and the 302
+// + Set-Cookie response handling diverges from Firefox, dropping the session cookie.
+// Push + notificationclick below do not require fetch interception.
 
 // Handle incoming push notifications
 self.addEventListener('push', (event) => {
