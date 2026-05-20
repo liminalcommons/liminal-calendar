@@ -45,7 +45,7 @@ export type ComputedSlot = {
   endsAt: Date;
 };
 
-type Interval = { start: Date; end: Date };
+type Interval = { start: Date; end: Date; gridAnchor: Date };
 
 const MS_PER_MIN = 60_000;
 const MS_PER_DAY = 86_400_000;
@@ -107,7 +107,7 @@ export function computeSlots(args: {
       const isectEnd = endUtc.getTime() > latest.getTime() ? latest : endUtc;
       if (isectEnd.getTime() <= isectStart.getTime()) continue;
 
-      intervals.push({ start: isectStart, end: isectEnd });
+      intervals.push({ start: isectStart, end: isectEnd, gridAnchor: startUtc });
     }
   }
 
@@ -117,7 +117,14 @@ export function computeSlots(args: {
   const slots: ComputedSlot[] = [];
 
   for (const interval of intervals) {
-    let cursor = interval.start.getTime();
+    // Slots are anchored to the window's true start (gridAnchor), not to the
+    // clamped `interval.start`. Otherwise, when `earliest = now + minNotice`
+    // falls mid-grid (e.g. now is 15:57), slots drift off the canonical grid
+    // and render as 15:57, 16:57, 17:57… instead of 16:00, 17:00, 18:00.
+    const anchorMs = interval.gridAnchor.getTime();
+    const offset = Math.max(0, interval.start.getTime() - anchorMs);
+    const stepsFromAnchor = Math.ceil(offset / slotMs);
+    let cursor = anchorMs + stepsFromAnchor * slotMs;
     while (cursor + slotMs <= interval.end.getTime()) {
       const slotStart = cursor;
       const slotEnd = cursor + slotMs;

@@ -78,6 +78,30 @@ describe('computeSlots — basics', () => {
     expect(slots[0].startsAt.toISOString()).toBe('2026-06-01T11:00:00.000Z');
   });
 
+  test('today: slots stay on the window grid even when `now` is mid-slot', () => {
+    // Reported bug: with window 09:00–22:00 and 60-min slots, "today" started
+    // at 15:57 (raw `now`) instead of 16:00 (next grid point).
+    const now = new Date('2026-06-01T15:57:00Z'); // Mon 15:57 UTC
+    const windows: WindowConfig[] = [
+      { dayOfWeek: MON, startMinute: 9 * 60, endMinute: 22 * 60, timezone: 'UTC' },
+    ];
+    const slots = computeSlots({
+      now,
+      eventType: et({ durationMinutes: 60, maxDaysAhead: 1, minNoticeMinutes: 0 }),
+      windows,
+      blockingEvents: [],
+    });
+    const starts = slots.map((s) => s.startsAt.toISOString());
+    expect(starts).toEqual([
+      '2026-06-01T16:00:00.000Z',
+      '2026-06-01T17:00:00.000Z',
+      '2026-06-01T18:00:00.000Z',
+      '2026-06-01T19:00:00.000Z',
+      '2026-06-01T20:00:00.000Z',
+      '2026-06-01T21:00:00.000Z',
+    ]);
+  });
+
   test('maxDaysAhead caps the horizon', () => {
     const now = new Date('2026-06-01T00:00:00Z'); // Mon
     // Window on Tue 09-10 UTC only.
