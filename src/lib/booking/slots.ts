@@ -45,7 +45,8 @@ export type ComputedSlot = {
   endsAt: Date;
 };
 
-type Interval = { start: Date; end: Date; gridAnchor: Date };
+type Interval = { start: Date; end: Date };
+type SlotInterval = Interval & { gridAnchor: Date };
 
 const MS_PER_MIN = 60_000;
 const MS_PER_DAY = 86_400_000;
@@ -82,7 +83,7 @@ export function computeSlots(args: {
   const endDayUtc = utcMidnight(latest);
   const dayCount = Math.ceil((endDayUtc.getTime() - startDayUtc.getTime()) / MS_PER_DAY) + 2;
 
-  const intervals: Interval[] = [];
+  const intervals: SlotInterval[] = [];
 
   for (let i = -1; i <= dayCount; i++) {
     const utcDay = new Date(startDayUtc.getTime() + i * MS_PER_DAY);
