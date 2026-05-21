@@ -46,14 +46,13 @@ const BookInput = z.object({
   note: z.string().trim().max(2000).optional(),
 });
 
-/** Resolve a Member to a legacy provider-string id (logto > clerk > hylo > fallback). */
+/** Resolve a Member to a legacy provider-string id (logto > clerk > fallback). */
 function legacyIdFor(m: {
   id: number;
   logtoId: string | null;
   clerkId: string | null;
-  hyloId: string | null;
 }): string {
-  return m.logtoId ?? m.clerkId ?? m.hyloId ?? String(m.id);
+  return m.logtoId ?? m.clerkId ?? String(m.id);
 }
 
 export async function POST(

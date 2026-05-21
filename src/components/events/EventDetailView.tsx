@@ -146,7 +146,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
   // Role + identity must come from /api/profile for Clerk parity.
   const role = profile?.role ?? user?.role ?? 'member';
   const isOwner = isLoaded && event && (
-    (profile?.hyloId && String(profile.hyloId) === String(event.creator_id))
+    (profile?.logtoId && String(profile.logtoId) === String(event.creator_id))
     || (profile?.clerkId && String(profile.clerkId) === String(event.creator_id))
     || (profile?.userId && String(profile.userId) === String(event.creator_id))
     // Fallback when /api/profile fails (rare).

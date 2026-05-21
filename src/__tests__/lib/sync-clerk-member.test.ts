@@ -61,7 +61,7 @@ describe('syncClerkMember', () => {
     expect((v.feedToken as string).startsWith('feed_')).toBe(true);
   });
 
-  it('conflict target is members.clerkId (not members.hyloId)', async () => {
+  it('conflict target is members.clerkId', async () => {
     const { db, inserts } = makeFakeDb();
     await syncClerkMember(db, {
       clerkId: 'u-1',
@@ -100,18 +100,6 @@ describe('syncClerkMember', () => {
     const v = inserts[0].values as Record<string, unknown>;
     expect(v.name).toBe('Unknown');
     expect(v.role).toBe('member');
-  });
-
-  it('does NOT set hyloId — Clerk-only rows have null hyloId', async () => {
-    const { db, inserts } = makeFakeDb();
-    await syncClerkMember(db, {
-      clerkId: 'u-x',
-      name: 'X',
-      email: null,
-      image: null,
-    });
-    const v = inserts[0].values as Record<string, unknown>;
-    expect('hyloId' in v).toBe(false);
   });
 
   it('each call produces a unique feedToken', async () => {

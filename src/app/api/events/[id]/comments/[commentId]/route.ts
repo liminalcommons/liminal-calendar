@@ -30,7 +30,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
   }
 
-  const callerId = member.hyloId ?? member.clerkId ?? null;
+  const callerId = member.logtoId ?? member.clerkId ?? null;
   const isAuthor = callerId !== null && comment.authorId === callerId;
   const isAdmin = member.role === 'admin';
   if (!isAuthor && !isAdmin) {

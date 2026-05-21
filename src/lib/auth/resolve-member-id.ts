@@ -1,14 +1,10 @@
 /**
- * Map a legacy provider-string id (hyloId or clerkId) to its canonical
- * `members.id`. Used by INSERT sites during the Phase 2 dual-write
- * window so that any code path that has a string identifier (an invitee,
- * a notification recipient, a push subscription owner) can carry the
- * matching FK alongside the legacy column.
+ * Map a legacy provider-string id (clerkId or logtoId) to its canonical
+ * `members.id`. Used by INSERT sites that carry a string identifier
+ * alongside the canonical FK.
  *
  * Returns null when no `members` row carries that string id — the
- * INSERT proceeds with member_id=NULL, which is harmless under the
- * Phase 1 nullable schema. Phase 4 will tighten this when reads have
- * fully migrated to member_id.
+ * INSERT proceeds with member_id=NULL.
  *
  * Takes `db` as a parameter (matching the rest of the repo layer)
  * so that tests can inject a fake without dragging the Neon client
@@ -27,14 +23,13 @@ export async function resolveMemberId(
 ): Promise<number | null> {
   if (!providerId) return null;
   // try/catch is intentional: a malformed or partial test-fake `db` should
-  // not blow up the dual-write callsite — it should fall back to writing
-  // member_id=NULL (still safe under the Phase 1 nullable schema). In
-  // production the query is fully supported and always succeeds.
+  // not blow up the callsite — it should fall back to writing
+  // member_id=NULL. In production the query is fully supported.
   try {
     const [row] = await db
       .select({ id: members.id })
       .from(members)
-      .where(or(eq(members.hyloId, providerId), eq(members.clerkId, providerId)))
+      .where(or(eq(members.clerkId, providerId), eq(members.logtoId, providerId)))
       .limit(1);
     return row?.id ?? null;
   } catch {
@@ -57,12 +52,12 @@ export async function resolveMemberIds(
   if (unique.length === 0) return out;
   try {
     const rows = await db
-      .select({ id: members.id, hyloId: members.hyloId, clerkId: members.clerkId })
+      .select({ id: members.id, clerkId: members.clerkId, logtoId: members.logtoId })
       .from(members)
-      .where(or(inArray(members.hyloId, unique), inArray(members.clerkId, unique)));
+      .where(or(inArray(members.clerkId, unique), inArray(members.logtoId, unique)));
     for (const r of rows) {
-      if (r.hyloId && unique.includes(r.hyloId)) out.set(r.hyloId, r.id);
       if (r.clerkId && unique.includes(r.clerkId)) out.set(r.clerkId, r.id);
+      if (r.logtoId && unique.includes(r.logtoId)) out.set(r.logtoId, r.id);
     }
   } catch {
     /* fall through with empty map — see resolveMemberId comment */

@@ -160,8 +160,6 @@ describe('fanoutAttendanceNegative', () => {
     imageUrl: null,
     recurrenceRule: null,
     creatorImage: null,
-    hyloGroupId: null,
-    hyloPostId: null,
     createdAt: null,
     updatedAt: null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

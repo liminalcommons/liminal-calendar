@@ -23,9 +23,10 @@ interface DayColumnProps {
   spawningIds: Set<string>;
   onCellClick?: (day: Date, hour: number, rect: DOMRect) => void;
   onEventClick: (event: DisplayEvent, rect: DOMRect) => void;
-  /** Hylo ID (or `null` if unauthenticated) of the viewing user. Threads
-   *  through to EventBlock as `isOwner = String(creator_id) === String(currentUserId)`.
-   *  WeeklyGrid is the source of truth — it pulls from the session. */
+  /** User identifier (logtoId or clerkId, or `null` if unauthenticated)
+   *  of the viewing user. Threads through to EventBlock as
+   *  `isOwner = String(creator_id) === String(currentUserId)`.
+   *  WeeklyGrid is the source of truth — it pulls from /api/profile. */
   currentUserId?: string | null;
   /** Forwarded to EventBlock.onDragStart. WeeklyGrid owns the drag lifecycle. */
   onEventDragStart?: (event: DisplayEvent, e: React.PointerEvent<HTMLDivElement>) => void;

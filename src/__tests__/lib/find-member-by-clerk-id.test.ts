@@ -27,8 +27,8 @@ describe('findMemberByClerkId', () => {
   it('returns the matching member when one exists', async () => {
     const member = {
       id: 1,
-      hyloId: null,
       clerkId: 'clerk_user_xyz',
+      logtoId: null,
       name: 'Alice',
       email: 'a@x.y',
       role: 'member',

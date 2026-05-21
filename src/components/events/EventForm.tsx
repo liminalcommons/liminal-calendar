@@ -292,7 +292,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   }, [title, description, startTime, endTime, recurrence, imageUrl, meetingLink, onValuesChange])
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  // Hylo session carries role; Clerk users have role on members row only.
+  // Role comes from /api/profile (members row).
   const { role: clerkAwareRole } = useResolvedRole();
   const userRole: string = useMemo(
     () => clerkAwareRole
@@ -475,12 +475,11 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   }, [mode, eventId]);
 
   // ── Role guard: only hosts and admins can host events.
-  // Resolves role from /api/profile so the gate works for both Hylo (role on
-  // session) and Clerk users (role on members row, not on session).
+  // Resolves role from /api/profile (role on members row).
   useEffect(() => {
     if (session === undefined || !clerkLoaded) return; // still resolving
-    const hyloSignedIn = !!session?.user;
-    if (!hyloSignedIn && !clerkSignedIn) {
+    const sessionSignedIn = !!session?.user;
+    if (!sessionSignedIn && !clerkSignedIn) {
       router.replace('/');
       return;
     }

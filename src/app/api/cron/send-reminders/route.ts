@@ -111,34 +111,33 @@ export async function GET(request: Request) {
 
     const sentSet = new Set(alreadySent.map((s) => `${s.eventId}:${s.userId}`));
 
-    // Gather member emails + timezones. RSVP rows carry either hyloId
-    // (existing Hylo users) or clerkId (Clerk-only users) in user_id —
-    // look members up by either identity column. The map is keyed by
-    // whichever id matched so memberMap.get(due.userId) below works
-    // regardless of which provider the user signed in with.
+    // Gather member emails + timezones. RSVP rows carry either clerkId
+    // or logtoId in user_id — look members up by either identity column.
+    // The map is keyed by whichever id matched so memberMap.get(due.userId)
+    // below works regardless of which provider the user signed in with.
     const userIds = [...new Set(dueEvents.map((e) => e.userId))];
     const memberRows =
       userIds.length > 0
         ? await db
             .select({
-              hyloId: members.hyloId,
               clerkId: members.clerkId,
+              logtoId: members.logtoId,
               email: members.email,
               timezone: members.timezone,
             })
             .from(members)
             .where(
               or(
-                inArray(members.hyloId, userIds),
                 inArray(members.clerkId, userIds),
+                inArray(members.logtoId, userIds),
               ),
             )
         : [];
     const userIdSet = new Set(userIds);
     const memberMap = new Map<string, (typeof memberRows)[number]>();
     for (const m of memberRows) {
-      if (m.hyloId && userIdSet.has(m.hyloId)) memberMap.set(m.hyloId, m);
       if (m.clerkId && userIdSet.has(m.clerkId)) memberMap.set(m.clerkId, m);
+      if (m.logtoId && userIdSet.has(m.logtoId)) memberMap.set(m.logtoId, m);
     }
 
     for (const due of dueEvents) {

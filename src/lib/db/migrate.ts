@@ -50,8 +50,6 @@ async function runMigrationsInner(sql: any) {
       creator_id TEXT NOT NULL,
       creator_name TEXT NOT NULL,
       creator_image TEXT,
-      hylo_group_id TEXT,
-      hylo_post_id TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
@@ -75,7 +73,6 @@ async function runMigrationsInner(sql: any) {
   await sql`
     CREATE TABLE IF NOT EXISTS members (
       id SERIAL PRIMARY KEY,
-      hylo_id TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       email TEXT,
       image TEXT,
@@ -134,11 +131,6 @@ async function runMigrationsInner(sql: any) {
   `;
   await sql`DROP INDEX IF EXISTS idx_members_clerk_id_unique`;
 
-  // Make hyloId nullable so Clerk-only sign-ups can insert without a Hylo
-  // identity. Idempotent in PG ≥9.x — DROP NOT NULL on already-nullable
-  // column is a no-op (no error).
-  await sql`ALTER TABLE members ALTER COLUMN hylo_id DROP NOT NULL`;
-
   // Newsletter opt-in list — populated from RSVP, signup, or admin actions.
   // Independent of members table so non-member visitors can subscribe.
   await sql`
@@ -150,20 +142,8 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  // Defense-in-depth: enforce the (hyloId || clerkId) Member invariant
-  // at the DB level. Helpers (syncMember, syncClerkMember,
-  // syncClerkMemberWithMerge) already enforce at app level — this
-  // guards against future code (or direct SQL) that bypasses them.
-  // Idempotent via DO block + pg_constraint check, since PostgreSQL
-  // lacks `ADD CONSTRAINT IF NOT EXISTS` for CHECK constraints.
-  // Existing rows satisfy the constraint: pre-S3.1 rows have non-null
-  // hyloId; S3.2+ rows come through helpers that always set one or
-  // both columns. Constraint addition will only fail if orphan rows
-  // exist with both columns null — none should in normal flow.
-  // Logto column: third identity provider (Castalia is migrating to
-  // Logto as canonical signin). Additive — existing rows keep their
-  // hylo_id / clerk_id; first Logto signin attaches logto_id to the
-  // matching row by email.
+  // Logto identity column. First Logto signin attaches logto_id to an
+  // existing row by email match, or creates a new Logto-only row.
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS logto_id TEXT`;
   await sql`
     DO $$
@@ -180,22 +160,11 @@ async function runMigrationsInner(sql: any) {
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_members_logto_id ON members(logto_id)`;
 
-  // Identity CHECK constraint — broadened to allow logto_id as the
-  // sole non-null identity. Drop+recreate so re-runs converge on the
-  // current 3-way predicate even if an older 2-way version exists.
-  await sql`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
-  await sql`
-    ALTER TABLE members
-      ADD CONSTRAINT chk_members_identity
-      CHECK (hylo_id IS NOT NULL OR clerk_id IS NOT NULL OR logto_id IS NOT NULL)
-  `;
-
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_event_id ON rsvps(event_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_user_id ON rsvps(user_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_members_hylo_id ON members(hylo_id)`;
 
   // Event comments — flat list, soft-deletable. See
   // src/lib/db/migrations/event-comments-reports.sql for the canonical
@@ -292,6 +261,7 @@ async function runMigrationsInner(sql: any) {
   await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'`;
   await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS source_event_type_id INTEGER`;
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS feed_token TEXT`;
+  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ`;
   await sql`
     DO $$ BEGIN
       IF NOT EXISTS (
@@ -443,6 +413,16 @@ async function runMigrationsInner(sql: any) {
       CONSTRAINT event_invitations_event_invitee_unique UNIQUE (event_id, invitee_user_id)
     )
   `;
+
+  // Hylo removal — drop the identity CHECK (Hylo-only rows are retained
+  // for outreach but no longer carry any identity), drop the hylo_id
+  // column on members, and drop hylo_group_id / hylo_post_id on events.
+  // IF EXISTS keeps this idempotent on databases already migrated.
+  await sql`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
+  await sql`DROP INDEX IF EXISTS idx_members_hylo_id`;
+  await sql`ALTER TABLE members DROP COLUMN IF EXISTS hylo_id`;
+  await sql`ALTER TABLE events DROP COLUMN IF EXISTS hylo_group_id`;
+  await sql`ALTER TABLE events DROP COLUMN IF EXISTS hylo_post_id`;
 
   return { success: true, message: 'Migrations complete' };
 }

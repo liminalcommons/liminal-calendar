@@ -49,11 +49,10 @@ export async function POST(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  // userId: hyloId for Hylo Members, clerkId for Clerk-only Members.
-  // Slight semantic ambiguity (the column name is "user_id" but carries
-  // either provider's id); avoids a schema migration. Will be cleaned up
-  // when rsvps gains a member_id FK in a future cycle.
-  const userId = member.hyloId ?? member.clerkId ?? 'unknown';
+  // userId: logtoId or clerkId. Slight semantic ambiguity (the column
+  // name is "user_id" but carries either provider's id); avoids a schema
+  // migration. Will be cleaned up when rsvps gains a member_id FK.
+  const userId = member.logtoId ?? member.clerkId ?? 'unknown';
 
   try {
     const remindMeValue = typeof remindMe === 'boolean' ? remindMe : undefined;

@@ -7,6 +7,15 @@ const nextConfig: NextConfig = {
   // as a server-external package so webpack doesn't try to bundle it for
   // the client edge — Next.js loads it at runtime on the Node side only.
   serverExternalPackages: ['postgres'],
+  env: {
+    // Surface the deploy commit + branch to the client so bug reports can
+    // pin the GitHub issue to a specific build. Vercel sets the underlying
+    // VERCEL_GIT_* vars; we re-export them as NEXT_PUBLIC_* so they're
+    // inlined into the client bundle at build time.
+    NEXT_PUBLIC_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? '',
+    NEXT_PUBLIC_COMMIT_REF: process.env.VERCEL_GIT_COMMIT_REF ?? '',
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? '',
+  },
 };
 
 export default nextConfig;

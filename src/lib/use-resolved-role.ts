@@ -8,7 +8,7 @@ import type { UserRole } from '@/lib/auth-helpers';
  * Resolve the current viewer's role + identifiers from /api/profile.
  *
  * Why not useSession().user: NextAuth session.user is populated only for
- * Hylo sessions. Clerk-only members carry their role + clerkId on the DB
+ * Logto sessions. Clerk-only members carry their role + clerkId on the DB
  * row — client gates must hit /api/profile to read them.
  *
  * Module-level cache keeps a tab to one fetch per session.
@@ -16,8 +16,8 @@ import type { UserRole } from '@/lib/auth-helpers';
 
 export type ResolvedProfile = {
   role: UserRole;
-  hyloId: string | null;
   clerkId: string | null;
+  logtoId: string | null;
   /** Canonical id for ownership comparisons against events.creator_id. */
   userId: string | null;
 };
@@ -35,14 +35,14 @@ async function fetchProfile(): Promise<ResolvedProfile | null> {
       const p = await res.json();
       const role: UserRole =
         p.role === 'admin' ? 'admin' : p.role === 'host' ? 'host' : 'member';
-      // Identity precedence mirrors getAuthedUser: hyloId first, then
+      // Identity precedence mirrors getAuthedUser: logtoId first, then
       // clerkId. This must match what POST /api/events stored in
       // events.creator_id at creation time.
       const profile: ResolvedProfile = {
         role,
-        hyloId: p.hyloId ?? null,
         clerkId: p.clerkId ?? null,
-        userId: p.hyloId ?? p.clerkId ?? null,
+        logtoId: p.logtoId ?? null,
+        userId: p.logtoId ?? p.clerkId ?? null,
       };
       cached = profile;
       return profile;

@@ -36,7 +36,7 @@ describe('getUserRole', () => {
 
 describe('getUserRole — member default', () => {
   it('returns member when session has no role claim', () => {
-    const session = { user: { hyloId: '69147' } };
+    const session = { user: { logtoUserId: '69147' } };
     expect(getUserRole(session)).toBe('member');
   });
   it('returns member explicitly when role=member', () => {

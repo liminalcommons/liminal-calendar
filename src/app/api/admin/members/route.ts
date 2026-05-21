@@ -35,16 +35,14 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { hyloId, clerkId, role } = body as Record<string, unknown>;
+  const { logtoId, clerkId, role } = body as Record<string, unknown>;
 
-  // Caller must identify the target by exactly one of hyloId or clerkId.
-  // Clerk-only members have null hyloId, so the original hyloId-only
-  // contract excluded them from role updates.
-  const hasHyloId = typeof hyloId === 'string' && hyloId.length > 0;
+  // Caller must identify the target by exactly one of logtoId or clerkId.
+  const hasLogtoId = typeof logtoId === 'string' && logtoId.length > 0;
   const hasClerkId = typeof clerkId === 'string' && clerkId.length > 0;
-  if (!hasHyloId && !hasClerkId) {
+  if (!hasLogtoId && !hasClerkId) {
     return NextResponse.json(
-      { error: 'hyloId or clerkId is required' },
+      { error: 'logtoId or clerkId is required' },
       { status: 400 },
     );
   }
@@ -53,8 +51,8 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const predicate = hasHyloId
-      ? eq(members.hyloId, hyloId as string)
+    const predicate = hasLogtoId
+      ? eq(members.logtoId, logtoId as string)
       : eq(members.clerkId, clerkId as string);
 
     const [updated] = await db
@@ -85,16 +83,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { hyloId, clerkId, name, image, role } = body as Record<string, unknown>;
+  const { logtoId, clerkId, name, image, role } = body as Record<string, unknown>;
 
   // Mirror the PATCH contract: caller identifies the new row by exactly
-  // one of hyloId or clerkId. Both nullable in schema but the
-  // chk_members_identity CHECK requires at least one non-null per row.
-  const hasHyloId = typeof hyloId === 'string' && hyloId.length > 0;
+  // one of logtoId or clerkId.
+  const hasLogtoId = typeof logtoId === 'string' && logtoId.length > 0;
   const hasClerkId = typeof clerkId === 'string' && clerkId.length > 0;
-  if (!hasHyloId && !hasClerkId) {
+  if (!hasLogtoId && !hasClerkId) {
     return NextResponse.json(
-      { error: 'hyloId or clerkId is required' },
+      { error: 'logtoId or clerkId is required' },
       { status: 400 },
     );
   }
@@ -111,7 +108,7 @@ export async function POST(request: NextRequest) {
       name,
       image: imageValue,
       role: assignRole,
-      ...(hasHyloId ? { hyloId: hyloId as string } : {}),
+      ...(hasLogtoId ? { logtoId: logtoId as string } : {}),
       ...(hasClerkId ? { clerkId: clerkId as string } : {}),
     };
     const conflictSet = {
@@ -120,7 +117,7 @@ export async function POST(request: NextRequest) {
       role: assignRole,
       updatedAt: new Date(),
     };
-    const conflictTarget = hasHyloId ? members.hyloId : members.clerkId;
+    const conflictTarget = hasLogtoId ? members.logtoId : members.clerkId;
 
     const [created] = await db
       .insert(members)

@@ -107,7 +107,7 @@ export async function POST(
     );
   }
 
-  const reporterId = member.hyloId ?? member.clerkId ?? 'unknown';
+  const reporterId = member.logtoId ?? member.clerkId ?? 'unknown';
 
   try {
     const result = await upsertAttendanceReport(db, {
@@ -165,7 +165,7 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
 
-  const reporterId = member.hyloId ?? member.clerkId ?? 'unknown';
+  const reporterId = member.logtoId ?? member.clerkId ?? 'unknown';
   try {
     const row = await getAttendanceReportForUser(db, numId, reporterId);
     return NextResponse.json({ report: row ?? null });

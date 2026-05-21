@@ -11,7 +11,7 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const userId = member.hyloId ?? member.clerkId ?? 'unknown';
+  const userId = member.logtoId ?? member.clerkId ?? 'unknown';
   try {
     const marked = await markAllSeen(db, userId);
     return NextResponse.json({ marked });

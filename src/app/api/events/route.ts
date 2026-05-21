@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
     const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
 
     // Resolve identity once — used for both visibility filtering and myResponse.
-    // getAuthedUser handles Hylo + Clerk; for Clerk-only users it reads role
-    // and identifiers from the members row.
+    // getAuthedUser handles Logto + Clerk and reads role/identifiers from
+    // the members row.
     const authed = await getAuthedUser();
     const currentUserId = authed?.id;
 

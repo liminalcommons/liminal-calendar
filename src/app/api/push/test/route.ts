@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function userIdFromSession(session: any): string | undefined {
-  return session?.user?.hyloId || session?.user?.id;
+  return session?.user?.logtoUserId || session?.user?.id;
 }
 
 export async function POST(request: Request) {

@@ -82,7 +82,7 @@ export async function POST(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  const authorId = member.hyloId ?? member.clerkId ?? 'unknown';
+  const authorId = member.logtoId ?? member.clerkId ?? 'unknown';
 
   try {
     const comment = await createComment(db, {

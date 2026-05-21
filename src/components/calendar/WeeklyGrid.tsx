@@ -34,27 +34,23 @@ interface WeeklyGridProps {
 export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const router = useRouter();
   const { data: session } = useSession();
-  // Role lives on the Hylo session for Hylo users, but on the members row
-  // for Clerk users. useResolvedRole hits /api/profile, which handles both.
+  // useResolvedRole hits /api/profile to read role from the members row.
   const { role: resolvedRole } = useResolvedRole();
   const userRole = resolvedRole ?? (session?.user?.role as 'member'|'host'|'admin' | undefined) ?? 'member';
   const canCreate = canCreateEvents(userRole);
   const { events, dissolvingIds, spawningIds, addEvent, removeEvent, updateEvent } = useEvents(serverEvents);
   // Identify the viewing user — DayColumn compares this against each event's
-  // creator_id to decide drag affordance. Hylo ID is the canonical identity
+  // creator_id to decide drag affordance. logtoId is the canonical identity
   // (matches event.creator_id); falls back to user.id (NextAuth user id) if
   // the session shape varies. `null` = unauthenticated → no drag anywhere.
-  const sessionUser = session?.user as { hyloId?: string; clerkId?: string; id?: string } | undefined;
-  // Clerk users carry their identity on members.clerkId, not the NextAuth
-  // session. WeeklyGrid receives events with creator_id = whichever provider
-  // id was used at creation; useResolvedRole's profile fetch already runs,
-  // so we hit the same /api/profile here for the canonical identifier.
+  const sessionUser = session?.user as { logtoUserId?: string; clerkId?: string; id?: string } | undefined;
+  // Hit /api/profile for the canonical identifier (logtoId or clerkId).
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     apiFetch('/api/profile').then(r => r.ok ? r.json() : null).then(p => {
       if (cancelled || !p) return;
-      setResolvedUserId(p.hyloId ?? p.clerkId ?? null);
+      setResolvedUserId(p.logtoId ?? p.clerkId ?? null);
     }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -88,7 +84,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
     }
     return () => { channel?.close(); };
   }, []);
-  const currentUserId = resolvedUserId ?? sessionUser?.hyloId ?? sessionUser?.id ?? null;
+  const currentUserId = resolvedUserId ?? sessionUser?.logtoUserId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();
 
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>

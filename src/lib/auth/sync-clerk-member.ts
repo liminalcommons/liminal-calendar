@@ -1,19 +1,14 @@
 /**
- * Member row upsert keyed by Clerk identity. Companion to syncMember()
- * (which is keyed by Hylo identity).
+ * Member row upsert keyed by Clerk identity.
  *
  * Behavior:
  *   - Insert (clerkId, name, email, image, role='member', feedToken) on
- *     first Clerk sign-in. hyloId is left null — this is a Clerk-only
- *     Member row until/unless account linking (S6) attaches a Hylo id.
+ *     first Clerk sign-in.
  *   - On conflict (returning Clerk user): update name/email/image/updatedAt
  *     but preserve role (DB may have manual edits) and feedToken
  *     (ICS subscription tokens must remain stable).
  *   - Backfill: if any existing row matched by clerkId still has a null
- *     feedToken, generate one. Mirrors syncMember.
- *
- * Email-merge with existing Hylo-only Members is NOT performed here. That
- * security-sensitive logic lives in S3 part 3 (or S6 account linking).
+ *     feedToken, generate one.
  *
  * Fire-and-forget: caller should not block on DB availability.
  */

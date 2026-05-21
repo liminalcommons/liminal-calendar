@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
       ilike(members.email, likeQ),
     );
 
-    // Exclude requesting user: skip rows where hyloId or clerkId equals currentUserId
+    // Exclude requesting user: skip rows where logtoId or clerkId equals currentUserId
     const excludeFilter =
       currentUserId !== null
         ? not(
             or(
-              eq(members.hyloId, currentUserId),
+              eq(members.logtoId, currentUserId),
               eq(members.clerkId, currentUserId),
             )!,
           )
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     const rows = await db
       .select({
-        hyloId: members.hyloId,
+        logtoId: members.logtoId,
         clerkId: members.clerkId,
         name: members.name,
         handle: members.handle,
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       .limit(limit);
 
     const result = rows.map((r) => ({
-      userId: r.hyloId ?? r.clerkId ?? '',
+      userId: r.logtoId ?? r.clerkId ?? '',
       name: r.name,
       handle: r.handle,
       image: r.image,

@@ -95,7 +95,7 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
   const { profile } = useResolvedProfile();
   const role = profile?.role ?? getUserRole(session);
   const isCreator = !!(
-    (profile?.hyloId && profile.hyloId === event.creator_id)
+    (profile?.logtoId && profile.logtoId === event.creator_id)
     || (profile?.clerkId && profile.clerkId === event.creator_id)
     || session?.user?.id === event.creator_id
   );

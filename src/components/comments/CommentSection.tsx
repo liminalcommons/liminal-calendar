@@ -17,17 +17,17 @@ export function CommentSection({ eventId }: Props) {
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
 
-  // session.user.hyloId / clerkId may be present depending on provider
+  // session.user.logtoUserId / clerkId may be present depending on provider
   type SessionUser = {
     name?: string | null;
-    hyloId?: string | null;
+    logtoUserId?: string | null;
     clerkId?: string | null;
     role?: string;
   };
   const user = (session?.user ?? null) as SessionUser | null;
   const isAuthenticated = status === 'authenticated';
   const isAdmin = user?.role === 'admin';
-  const currentUserId = user?.hyloId ?? user?.clerkId ?? null;
+  const currentUserId = user?.logtoUserId ?? user?.clerkId ?? null;
 
   useEffect(() => {
     let cancelled = false;

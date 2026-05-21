@@ -4,10 +4,6 @@
  * Returns undefined when no member is found (e.g., the Clerk user has not
  * yet been synced to the members table). Caller decides whether to provision
  * a new row or treat the user as unknown.
- *
- * Companion to syncMember() (which handles Hylo identity). When account
- * linking lands in S6, both lookups will be consulted to find any existing
- * row that should be reused/merged.
  */
 
 import { eq } from 'drizzle-orm';

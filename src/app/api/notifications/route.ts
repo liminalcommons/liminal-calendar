@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const userId = member.hyloId ?? member.clerkId ?? 'unknown';
+  const userId = member.logtoId ?? member.clerkId ?? 'unknown';
   const url = new URL(request.url);
   const limitParam = url.searchParams.get('limit');
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;

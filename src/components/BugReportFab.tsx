@@ -3,13 +3,15 @@
 import { useState, useEffect } from 'react';
 import { Bug, X, Send, Check, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useUser } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { installConsoleInterceptors, getRecentLogsAsString } from '@/lib/client-logger';
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function BugReportFab() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
+  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
   const pathname = usePathname();
   const isEmbed = pathname?.startsWith('/embed/') ?? false;
 
@@ -40,14 +42,37 @@ export function BugReportFab() {
           title: title.trim(),
           description: description.trim() || undefined,
           type,
-          clientLogs: getRecentLogsAsString(100),
+          clientLogs: getRecentLogsAsString(150),
           metadata: {
             url: window.location.href,
+            referrer: document.referrer || null,
             reporter: user?.name || 'Anonymous',
+            reporterEmail: user?.email ?? null,
             screenSize: `${window.innerWidth}x${window.innerHeight}`,
+            screenPhysical: `${window.screen.width}x${window.screen.height}`,
+            devicePixelRatio: window.devicePixelRatio,
             userAgent: navigator.userAgent,
+            language: navigator.language,
+            online: navigator.onLine,
+            cookieEnabled: navigator.cookieEnabled,
+            colorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
             theme: document.documentElement.classList.contains('dark') ? 'Dark' : 'Light',
             timestamp: new Date().toISOString(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            // Client-side auth signal — the server resolves authoritative
+            // identity, but knowing what the *client* thought it was is
+            // diagnostic on its own (mismatch ⇒ session-bridging bug).
+            auth: {
+              nextAuth: sessionStatus,
+              hasNextAuthUser: !!session?.user,
+              clerkLoaded,
+              clerkSignedIn: !!clerkSignedIn,
+            },
+            build: {
+              commitSha: process.env.NEXT_PUBLIC_COMMIT_SHA || null,
+              commitRef: process.env.NEXT_PUBLIC_COMMIT_REF || null,
+              vercelEnv: process.env.NEXT_PUBLIC_VERCEL_ENV || null,
+            },
           },
         }),
       });

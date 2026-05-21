@@ -39,9 +39,8 @@ function legacyIdFor(m: {
   id: number;
   logtoId: string | null;
   clerkId: string | null;
-  hyloId: string | null;
 }): string {
-  return m.logtoId ?? m.clerkId ?? m.hyloId ?? String(m.id);
+  return m.logtoId ?? m.clerkId ?? String(m.id);
 }
 
 export async function PATCH(

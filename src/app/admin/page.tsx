@@ -13,9 +13,6 @@ import { TopicSubmissionsPanel } from '@/components/admin/TopicSubmissionsPanel'
 
 interface Member {
   id: number;
-  // Clerk-only members carry null hyloId; Hylo-only members carry null clerkId.
-  // The DB CHECK constraint guarantees at least one is non-null per row.
-  hyloId: string | null;
   clerkId: string | null;
   logtoId: string | null;
   name: string;
@@ -37,14 +34,13 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 function ProviderBadge({ member }: { member: Member }) {
-  // Castalia (Logto) is the canonical identity once provisioned. Hylo/Clerk
-  // are kept visible as origin hints in case an admin needs to know where
-  // the row first came from, but the primary "this user can sign in via
-  // Castalia magic-link" signal is the gold Castalia chip.
+  // Castalia (Logto) is the canonical identity once provisioned. Clerk is
+  // kept visible as an origin hint in case an admin needs to know where the
+  // row first came from. Members with neither identity are kept on the
+  // table for outreach (they previously had a Hylo identity that was
+  // removed).
   const hasLogto = Boolean(member.logtoId);
-  const hasHylo = Boolean(member.hyloId);
   const hasClerk = Boolean(member.clerkId);
-  const origins = [hasHylo && 'Hylo', hasClerk && 'Clerk'].filter(Boolean) as string[];
 
   if (hasLogto) {
     return (
@@ -52,34 +48,25 @@ function ProviderBadge({ member }: { member: Member }) {
         <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-accent/30 text-grove-accent-deep border border-grove-accent/50 font-medium">
           Castalia
         </span>
-        {origins.length > 0 && (
+        {hasClerk && (
           <span className="text-[9px] uppercase tracking-wide text-grove-text-dim">
-            ({origins.join(' + ')})
+            (Clerk)
           </span>
         )}
       </span>
     );
   }
 
-  // Legacy fallback for rows that haven't been provisioned in Logto yet
-  // (e.g. Hylo-only members with no email — see migrate-members-to-logto.mjs).
-  if (hasHylo && hasClerk) {
+  if (hasClerk) {
     return (
-      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-border/30 text-grove-text-muted border border-grove-border/50">
-        Hylo + Clerk
-      </span>
-    );
-  }
-  if (hasHylo) {
-    return (
-      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-border/30 text-grove-text-muted border border-grove-border/50">
-        Hylo
+      <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-blue-900/20 text-blue-300 border border-blue-700/40">
+        Clerk
       </span>
     );
   }
   return (
-    <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-blue-900/20 text-blue-300 border border-blue-700/40">
-      Clerk
+    <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-wide rounded bg-grove-border/30 text-grove-text-muted border border-grove-border/50">
+      Email only
     </span>
   );
 }
@@ -104,13 +91,10 @@ function AdminPageInner() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
-  // Was previously keyed by `hyloId` — Clerk-only members have null hyloId
-  // and would collide on `null` (only one would be expandable at a time).
   const [updating, setUpdating] = useState<number | null>(null);
   const [expandedMember, setExpandedMember] = useState<number | null>(null);
 
-  // Resolve the caller's role from /api/profile so the gate works for both
-  // Hylo (role on session) and Clerk (role on members row, no Hylo session).
+  // Resolve the caller's role from /api/profile.
   useEffect(() => {
     let cancelled = false;
     apiFetch('/api/profile')
@@ -147,9 +131,8 @@ function AdminPageInner() {
     setUpdating(member.id);
     try {
       // Identify the row via whichever provider id the member carries.
-      // Schema invariant: at least one of (hyloId, clerkId) is non-null.
-      const identity = member.hyloId
-        ? { hyloId: member.hyloId }
+      const identity = member.logtoId
+        ? { logtoId: member.logtoId }
         : { clerkId: member.clerkId };
       const res = await apiFetch('/api/admin/members', {
         method: 'PATCH',

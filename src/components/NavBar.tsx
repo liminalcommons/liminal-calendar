@@ -35,8 +35,8 @@ export function NavBar() {
     window.location.href = '/welcome';
   };
 
-  const hyloUser = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
-  const user = hyloUser ?? (clerkSignedIn ? {
+  const sessionUser = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
+  const user = sessionUser ?? (clerkSignedIn ? {
     name: clerkUser?.fullName ?? clerkUser?.username ?? null,
     email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
     image: clerkUser?.imageUrl ?? null,

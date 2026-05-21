@@ -3,7 +3,7 @@
  *
  * SECURITY GATE: only merges when Clerk's email is VERIFIED. Without
  * verification, an attacker controlling a Clerk identity with someone
- * else's email could auto-merge into their existing Hylo Member row,
+ * else's email could auto-merge into another user's existing Member row,
  * inheriting role and event history.
  *
  * Decision tree:
@@ -14,24 +14,18 @@
  *      on the merge UPDATE.
  *   2. If `emailVerified` is false OR email is missing → no merge attempt;
  *      delegate to plain syncClerkMember (creates a separate Clerk row).
- *   3. Look up a Hylo-only Member (clerkId IS NULL) with matching email.
- *      Email comparison is case-insensitive (LOWER(email) on both sides)
- *      since users may sign up with mixed case across providers.
- *      The isNull-clerkId predicate ensures we never overwrite a row that
- *      already has a Clerk identity.
- *   4. If found: UPDATE the existing row's clerkId. Preserve role,
- *      feedToken, hyloId. Update name/image only if input provides values.
+ *   3. Look up a Member without a clerkId (clerkId IS NULL) with matching
+ *      email. Email comparison is case-insensitive (LOWER(email) on both
+ *      sides). The isNull-clerkId predicate ensures we never overwrite a
+ *      row that already has a Clerk identity.
+ *   4. If found: UPDATE the existing row's clerkId. Preserve role and
+ *      feedToken. Update name/image only if input provides values.
  *      The UPDATE's WHERE includes isNull(clerkId) for concurrent-merge
  *      safety. If the UPDATE matches zero rows (another concurrent merge
  *      beat us), the function returns silently — caller's
  *      findMemberByClerkId(input.clerkId) will return undefined,
  *      signalling retry or escalation is needed.
  *   5. If not found: delegate to plain syncClerkMember (creates separate row).
- *
- * Companion to syncMember (Hylo) and syncClerkMember (Clerk-only). This
- * is the wrapper a caller in the auth path should use; the basic
- * syncClerkMember remains as a building block for tests and for callers
- * that have already resolved the merge decision.
  */
 
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -92,7 +86,6 @@ export async function syncClerkMemberWithMerge(
     }
   }
 
-  // Step 5: no merge possible → plain Clerk upsert (new Clerk-only row,
-  // null hyloId).
+  // Step 5: no merge possible → plain Clerk upsert (new Clerk-only row).
   return syncClerkMember(db, input);
 }

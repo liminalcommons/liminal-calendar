@@ -15,19 +15,13 @@ import {
 // forward-reference dance that Drizzle would otherwise require.
 export const members = pgTable('members', {
   id: serial('id').primaryKey(),
-  // Hylo user id — now nullable. Clerk-only Members have null hyloId.
-  // The UNIQUE constraint still prevents duplicate non-null hyloIds.
-  // Invariant (enforced by app layer until S6 adds a CHECK constraint):
-  // at least one of (hyloId, clerkId) must be non-null on every row.
-  hyloId: text('hylo_id').unique(),
-  // Clerk user id — nullable. Hylo-only Members have null clerkId.
-  // S6 will allow same row to carry both (account linking).
+  // Clerk user id — nullable. Logto-only or legacy email-only Members
+  // have null clerkId. Account linking may attach a clerkId to an
+  // existing Logto row.
   clerkId: text('clerk_id').unique(),
   // Logto user id (subject claim from Castalia/Logto JWT). Nullable.
   // First Logto signin attaches this to an existing row by email
-  // match, or creates a new Logto-only row. CHECK constraint
-  // `chk_members_identity` requires at least one of (hyloId, clerkId,
-  // logtoId) per row.
+  // match, or creates a new Logto-only row.
   logtoId: text('logto_id').unique(),
   name: text('name').notNull(),
   email: text('email'),
@@ -37,6 +31,10 @@ export const members = pgTable('members', {
   timezone: text('timezone').default('UTC'),
   availability: text('availability').default('[]'), // JSON array of UTC slot indices 0-335
   feedToken: text('feed_token').unique(), // Per-user ICS subscription token
+  // Set when /api/admin/hylo-nudge sends a re-signup invitation to this
+  // member's email. Null = never nudged. Used to deduplicate against
+  // accidental re-runs of the admin endpoint.
+  nudgedAt: timestamp('nudged_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -58,8 +56,6 @@ export const events = pgTable('events', {
   memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
   creatorName: text('creator_name').notNull(),
   creatorImage: text('creator_image'),
-  hyloGroupId: text('hylo_group_id'),
-  hyloPostId: text('hylo_post_id'),
   visibility: text('visibility').notNull().default('public'),
   sourceEventTypeId: integer('source_event_type_id'),
   // Optional note the booker wrote when reserving — null for non-booking

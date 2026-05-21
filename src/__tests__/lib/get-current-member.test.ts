@@ -9,12 +9,12 @@ jest.mock('@/lib/auth/sync-clerk-member-on-read', () => ({
   syncClerkMemberOnRead: jest.fn(),
 }));
 
-import { auth as hyloAuth } from '../../../auth';
+import { auth as nextAuth } from '../../../auth';
 import { auth as clerkAuth } from '@clerk/nextjs/server';
 import { syncClerkMemberOnRead } from '@/lib/auth/sync-clerk-member-on-read';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 
-const mockHyloAuth = hyloAuth as unknown as jest.Mock;
+const mockNextAuth = nextAuth as unknown as jest.Mock;
 const mockClerkAuth = clerkAuth as unknown as jest.Mock;
 const mockSyncOnRead = syncClerkMemberOnRead as unknown as jest.Mock;
 
@@ -69,38 +69,38 @@ describe('getCurrentMember', () => {
     jest.clearAllMocks();
   });
 
-  it('returns Member matching Hylo session.user.hyloId (Hylo path takes precedence)', async () => {
-    const member = { id: 1, hyloId: 'h-1', clerkId: null, name: 'Alice' };
-    mockHyloAuth.mockResolvedValue({ user: { hyloId: 'h-1' } });
+  it('returns Member matching Logto session.user.logtoUserId (Logto path takes precedence)', async () => {
+    const member = { id: 1, logtoId: 'logto-1', clerkId: null, name: 'Alice' };
+    mockNextAuth.mockResolvedValue({ user: { logtoUserId: 'logto-1' } });
     mockClerkAuth.mockResolvedValue({ userId: 'clerk_should_be_ignored' });
     const { db } = makeFakeDb([member]);
 
     const result = await getCurrentMember(db);
 
     expect(result).toBe(member);
-    // Hylo path took precedence — Clerk session not consulted.
+    // Logto path took precedence — Clerk session not consulted.
     expect(mockClerkAuth).not.toHaveBeenCalled();
     expect(mockSyncOnRead).not.toHaveBeenCalled();
   });
 
-  it('falls through to Clerk session when no Hylo session is active', async () => {
-    const member = { id: 2, hyloId: null, clerkId: 'clerk_42', name: 'Bob' };
-    mockHyloAuth.mockResolvedValue(null);
+  it('falls through to Clerk session when no Logto session is active', async () => {
+    const member = { id: 2, logtoId: null, clerkId: 'clerk_42', name: 'Bob' };
+    mockNextAuth.mockResolvedValue(null);
     mockClerkAuth.mockResolvedValue({ userId: 'clerk_42' });
     const { db } = makeFakeDb([member]);
 
     const result = await getCurrentMember(db);
 
     expect(result).toBe(member);
-    expect(mockHyloAuth).toHaveBeenCalled();
+    expect(mockNextAuth).toHaveBeenCalled();
     expect(mockClerkAuth).toHaveBeenCalled();
     // Row already present → no need to defensively sync.
     expect(mockSyncOnRead).not.toHaveBeenCalled();
   });
 
-  it('falls through to Clerk session when Hylo session has no hyloId', async () => {
-    const member = { id: 2, hyloId: null, clerkId: 'clerk_x', name: 'C' };
-    mockHyloAuth.mockResolvedValue({ user: {} });
+  it('falls through to Clerk session when Logto session has no logtoUserId', async () => {
+    const member = { id: 2, logtoId: null, clerkId: 'clerk_x', name: 'C' };
+    mockNextAuth.mockResolvedValue({ user: {} });
     mockClerkAuth.mockResolvedValue({ userId: 'clerk_x' });
     const { db } = makeFakeDb([member]);
 
@@ -110,7 +110,7 @@ describe('getCurrentMember', () => {
   });
 
   it('returns null when neither session is active', async () => {
-    mockHyloAuth.mockResolvedValue(null);
+    mockNextAuth.mockResolvedValue(null);
     mockClerkAuth.mockResolvedValue({ userId: null });
     const { db } = makeFakeDb([]);
 
@@ -122,11 +122,11 @@ describe('getCurrentMember', () => {
   it('defensively syncs missing Clerk member, then returns the freshly-provisioned row', async () => {
     const member = {
       id: 99,
-      hyloId: null,
+      logtoId: null,
       clerkId: 'clerk_new',
       name: 'Florin Test',
     };
-    mockHyloAuth.mockResolvedValue(null);
+    mockNextAuth.mockResolvedValue(null);
     mockClerkAuth.mockResolvedValue({ userId: 'clerk_new' });
 
     const { db, setRows } = makeMutableFakeDb();
@@ -144,7 +144,7 @@ describe('getCurrentMember', () => {
   });
 
   it('returns null when defensive sync runs but provisioning still fails', async () => {
-    mockHyloAuth.mockResolvedValue(null);
+    mockNextAuth.mockResolvedValue(null);
     mockClerkAuth.mockResolvedValue({ userId: 'clerk_unfixable' });
 
     const { db } = makeMutableFakeDb();
@@ -158,14 +158,14 @@ describe('getCurrentMember', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null when Hylo session has hyloId but no Member row exists', async () => {
-    mockHyloAuth.mockResolvedValue({ user: { hyloId: 'h-orphan' } });
+  it('returns null when Logto session has logtoUserId but no Member row exists', async () => {
+    mockNextAuth.mockResolvedValue({ user: { logtoUserId: 'logto-orphan' } });
+    mockClerkAuth.mockResolvedValue({ userId: null });
     const { db } = makeFakeDb([]);
 
     const result = await getCurrentMember(db);
     expect(result).toBeNull();
-    // Hylo path matched — Clerk session not consulted, no defensive sync.
-    expect(mockClerkAuth).not.toHaveBeenCalled();
+    // After Logto miss, falls through to Clerk; Clerk has no user, no sync.
     expect(mockSyncOnRead).not.toHaveBeenCalled();
   });
 });

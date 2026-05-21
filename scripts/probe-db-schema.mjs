@@ -66,17 +66,17 @@ console.log('\n=== members row counts ===');
 const counts = await sql`
   SELECT
     COUNT(*) AS total,
-    COUNT(*) FILTER (WHERE hylo_id IS NOT NULL) AS with_hylo_id,
     COUNT(*) FILTER (WHERE clerk_id IS NOT NULL) AS with_clerk_id,
-    COUNT(*) FILTER (WHERE hylo_id IS NULL) AS without_hylo_id,
-    COUNT(*) FILTER (WHERE clerk_id IS NULL) AS without_clerk_id
+    COUNT(*) FILTER (WHERE logto_id IS NOT NULL) AS with_logto_id,
+    COUNT(*) FILTER (WHERE clerk_id IS NULL) AS without_clerk_id,
+    COUNT(*) FILTER (WHERE logto_id IS NULL) AS without_logto_id
   FROM members
 `;
 console.log(counts[0]);
 
 console.log('\n=== rows with clerk_id (current 3) ===');
 const clerks = await sql`
-  SELECT id, hylo_id, clerk_id, email, role, created_at, updated_at
+  SELECT id, clerk_id, logto_id, email, role, created_at, updated_at
   FROM members
   WHERE clerk_id IS NOT NULL
   ORDER BY id
@@ -95,7 +95,7 @@ try {
       VALUES ('test_probe_only_will_rollback', 'Probe', 'probe@example.invalid', NULL, 'member', 'feed_probe_rollback')
       ON CONFLICT (clerk_id) DO UPDATE
       SET name = 'Probe', updated_at = NOW()
-      RETURNING id, clerk_id, hylo_id
+      RETURNING id, clerk_id, logto_id
     `;
     console.log('  INSERT succeeded:', insertResult);
     // Force rollback by throwing.

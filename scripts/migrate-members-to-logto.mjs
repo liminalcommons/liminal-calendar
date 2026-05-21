@@ -98,7 +98,7 @@ async function logtoCreate(email, name) {
 const sql = neon(DB_URL);
 
 const rows = await sql`
-  SELECT id, hylo_id, clerk_id, logto_id, name, email
+  SELECT id, clerk_id, logto_id, name, email
   FROM members
   WHERE email IS NOT NULL AND logto_id IS NULL
   ORDER BY id ASC

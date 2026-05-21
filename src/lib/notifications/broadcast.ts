@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, or, isNotNull } from 'drizzle-orm';
 import { members, eventMutes, pushSubscriptions, notificationLog } from '@/lib/db/schema';
 
 export const BROADCAST_ENABLED = process.env.BROADCAST_ENABLED === 'true';
@@ -26,11 +26,20 @@ export interface BroadcastRecipient {
 export async function computeBroadcastRecipients(db: any, event: BroadcastEvent): Promise<BroadcastRecipient[]> {
   if (event.visibility === 'private') return [];
 
+  // Pull every (memberId, push subscription userId) pairing. The push
+  // subscription's user_id is whichever identity (logtoId or clerkId)
+  // was current when the subscription was created.
   const allMembers = await db
-    .select({ memberId: members.id, hyloId: members.hyloId })
+    .select({ memberId: members.id, userId: pushSubscriptions.userId })
     .from(members)
-    .innerJoin(pushSubscriptions, eq(pushSubscriptions.userId, members.hyloId))
-    .where(isNotNull(members.hyloId));
+    .innerJoin(
+      pushSubscriptions,
+      or(
+        eq(pushSubscriptions.userId, members.logtoId),
+        eq(pushSubscriptions.userId, members.clerkId),
+      ),
+    )
+    .where(or(isNotNull(members.logtoId), isNotNull(members.clerkId)));
 
   if (allMembers.length === 0) return [];
 
@@ -48,12 +57,12 @@ export async function computeBroadcastRecipients(db: any, event: BroadcastEvent)
 
   const out: BroadcastRecipient[] = [];
   const seen = new Set<number>();
-  for (const m of allMembers as { memberId: number; hyloId: string }[]) {
+  for (const m of allMembers as { memberId: number; userId: string }[]) {
     if (seen.has(m.memberId)) continue;
     if (mutedSet.has(m.memberId)) continue;
-    if (sentSet.has(m.hyloId)) continue;
+    if (sentSet.has(m.userId)) continue;
     seen.add(m.memberId);
-    out.push({ memberId: m.memberId, userId: m.hyloId });
+    out.push({ memberId: m.memberId, userId: m.userId });
   }
   return out;
 }

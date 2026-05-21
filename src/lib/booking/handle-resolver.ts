@@ -5,8 +5,8 @@
  * Task 1 of Plan 3 (1:1 Booking). Used by booking links (`/book/:handle`)
  * to look up the host record from a URL slug. Returns `members.id`
  * (the internal PK), NOT a provider-string id — booking entities are
- * joined on members.id so that hyloId/clerkId/logtoId can be
- * canonicalized later without touching booking rows.
+ * joined on members.id so that clerkId/logtoId can be canonicalized
+ * later without touching booking rows.
  *
  * Returns null for empty input (cheap fast-path) or when no row
  * matches. Lowercase comparison is done in SQL so the unique-index

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Suspense } from "react";
 import "@/styles/globals.css";
 import "@/styles/glitch-effects.css";
 import { Providers } from "@/components/providers/Providers";
@@ -8,6 +9,7 @@ import { SubscribePrompt } from "@/components/SubscribePrompt";
 import { MobileRedirect } from "@/components/MobileRedirect";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { RouteHistoryTracker } from "@/components/RouteHistoryTracker";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -40,6 +42,10 @@ export default function RootLayout({
       <body>
         <ClerkProvider>
           <Providers>
+            {/* Suspense boundary required by useSearchParams in App Router. */}
+            <Suspense fallback={null}>
+              <RouteHistoryTracker />
+            </Suspense>
             {children}
             <MobileRedirect />
             <SubscribePrompt />

@@ -15,8 +15,8 @@ export async function GET() {
 
   try {
     return NextResponse.json({
-      hyloId: member.hyloId,
       clerkId: member.clerkId,
+      logtoId: member.logtoId,
       name: member.name,
       email: member.email,
       image: member.image,
@@ -50,8 +50,7 @@ export async function PATCH(request: NextRequest) {
   const updates = validation.updates;
 
   try {
-    // Update by primary key — works for both Hylo and Clerk Members
-    // (the previous WHERE hyloId = X pattern only worked for Hylo users).
+    // Update by primary key — works for Logto and Clerk Members alike.
     const [updated] = await db
       .update(members)
       .set(updates)
@@ -67,7 +66,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({
-      hyloId: updated.hyloId,
+      clerkId: updated.clerkId,
+      logtoId: updated.logtoId,
       name: updated.name,
       timezone: updated.timezone,
       availability: JSON.parse(updated.availability ?? '[]'),

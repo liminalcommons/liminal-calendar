@@ -55,8 +55,8 @@ function makeFakeDb(opts: {
 }
 
 describe('syncClerkMemberWithMerge', () => {
-  it('MERGES when emailVerified + matching Hylo-only Member exists', async () => {
-    const candidate = { id: 7, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y' };
+  it('MERGES when emailVerified + matching no-clerkId Member exists', async () => {
+    const candidate = { id: 7, clerkId: null, logtoId: null, name: 'Alice', email: 'a@x.y' };
     const { db, calls } = makeFakeDb({ candidate });
 
     await syncClerkMemberWithMerge(db, {
@@ -83,7 +83,7 @@ describe('syncClerkMemberWithMerge', () => {
 
   it('SKIPS merge when emailVerified is false (creates separate Clerk row)', async () => {
     // Even if a candidate would match by email, unverified email must NOT merge.
-    const candidate = { id: 7, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y' };
+    const candidate = { id: 7, clerkId: null, logtoId: null, name: 'Alice', email: 'a@x.y' };
     const { db, calls } = makeFakeDb({ candidate });
 
     await syncClerkMemberWithMerge(db, {
@@ -104,7 +104,6 @@ describe('syncClerkMemberWithMerge', () => {
     // The insert is keyed by clerkId, NOT merging into Alice's row.
     const v = calls.inserts[0].values as Record<string, unknown>;
     expect(v.clerkId).toBe('clerk_attacker');
-    expect('hyloId' in v).toBe(false);
   });
 
   it('SKIPS merge when no email is provided', async () => {
@@ -124,7 +123,7 @@ describe('syncClerkMemberWithMerge', () => {
     expect(calls.updates).toHaveLength(1);
   });
 
-  it('CREATES new Clerk row when verified email has no Hylo-only match', async () => {
+  it('CREATES new Clerk row when verified email has no matching no-clerkId member', async () => {
     const { db, calls } = makeFakeDb({ candidate: null });
 
     await syncClerkMemberWithMerge(db, {
@@ -146,8 +145,8 @@ describe('syncClerkMemberWithMerge', () => {
     // Returning Clerk user — Member row already has this clerkId. Even if a
     // matching Hylo-only email candidate would exist, the wrapper must NOT
     // try to merge (would otherwise hit a unique-violation on clerkId).
-    const existing = { id: 5, hyloId: null, clerkId: 'clerk_returning', name: 'X', email: 'x@x.y' };
-    const candidate = { id: 7, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'x@x.y' };
+    const existing = { id: 5, clerkId: 'clerk_returning', logtoId: null, name: 'X', email: 'x@x.y' };
+    const candidate = { id: 7, clerkId: null, logtoId: null, name: 'Alice', email: 'x@x.y' };
     const { db, calls } = makeFakeDb({ byClerkId: existing, candidate });
 
     await syncClerkMemberWithMerge(db, {
@@ -172,9 +171,9 @@ describe('syncClerkMemberWithMerge', () => {
   it("MERGE preserves candidate's existing name when input.name is missing", async () => {
     const candidate = {
       id: 9,
-      hyloId: 'h-9',
       clerkId: null,
-      name: 'Original Hylo Name',
+      logtoId: null,
+      name: 'Original Name',
       email: 'h@x.y',
       image: 'old.png',
     };
@@ -189,8 +188,8 @@ describe('syncClerkMemberWithMerge', () => {
     });
 
     const set = calls.updates[0].set as Record<string, unknown>;
-    expect(set.name).toBe('Original Hylo Name'); // fallback to existing
-    expect(set.image).toBe('old.png');           // fallback to existing
+    expect(set.name).toBe('Original Name'); // fallback to existing
+    expect(set.image).toBe('old.png');      // fallback to existing
     expect(set.clerkId).toBe('clerk_z');
   });
 });

@@ -25,13 +25,13 @@ export async function GET(request: NextRequest) {
     let _memberId: number | null = null;
     if (token) {
       const [member] = await db
-        .select({ id: members.id, hyloId: members.hyloId, clerkId: members.clerkId })
+        .select({ id: members.id, clerkId: members.clerkId, logtoId: members.logtoId })
         .from(members)
         .where(eq(members.feedToken, token))
         .limit(1);
       if (member) {
         _memberId = member.id;
-        _userId = member.hyloId ?? member.clerkId;
+        _userId = member.logtoId ?? member.clerkId;
       }
       // Invalid token: fall through to universal feed (backward compatible)
     }

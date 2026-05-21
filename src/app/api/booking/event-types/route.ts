@@ -10,8 +10,8 @@
  * ownerId (legacy text column) to satisfy the existing unique
  * constraint `event_types_owner_slug_unique` on (owner_id, slug). The
  * legacy ownerId derives from the member's first non-null provider
- * identifier (logtoId / clerkId / hyloId) with stringified member.id
- * as a last-resort fallback. Reads use ownerMemberId.
+ * identifier (logtoId / clerkId) with stringified member.id as a
+ * last-resort fallback. Reads use ownerMemberId.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,12 +22,7 @@ import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { EventTypeInput, listMyEventTypes } from '@/lib/booking/event-types-repo';
 
 function legacyOwnerIdOf(member: Member): string {
-  return (
-    member.logtoId ??
-    member.clerkId ??
-    member.hyloId ??
-    String(member.id)
-  );
+  return member.logtoId ?? member.clerkId ?? String(member.id);
 }
 
 export async function GET() {

@@ -6,11 +6,11 @@ export interface SchedulingSuggestion {
   endTime: string;       // "15:30" UTC
   available: number;
   total: number;
-  missing: { name: string; hyloId: string }[];
+  missing: { name: string; userId: string }[];
 }
 
 interface MemberAvailability {
-  hyloId: string;
+  userId: string;
   name: string;
   availability: number[]; // UTC slot indices
 }
@@ -90,7 +90,7 @@ export function findBestTimes(
     const endSlot = startSlot + slotsNeeded - 1;
 
     // Find who's missing (not available for ALL slots in the window)
-    const missing: { name: string; hyloId: string }[] = [];
+    const missing: { name: string; userId: string }[] = [];
     let availCount = 0;
     for (let mi = 0; mi < membersAvail.length; mi++) {
       const avSet = availSets[mi];
@@ -101,7 +101,7 @@ export function findBestTimes(
       if (allAvail) {
         availCount++;
       } else {
-        missing.push({ name: membersAvail[mi].name, hyloId: membersAvail[mi].hyloId });
+        missing.push({ name: membersAvail[mi].name, userId: membersAvail[mi].userId });
       }
     }
 

@@ -3,7 +3,7 @@ import { canCreateEvents } from '@/lib/auth-helpers';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
-import { inArray } from 'drizzle-orm';
+import { inArray, or } from 'drizzle-orm';
 import { findBestTimes } from '@/lib/scheduling';
 
 export async function POST(request: NextRequest) {
@@ -30,22 +30,25 @@ export async function POST(request: NextRequest) {
   const duration = typeof durationMinutes === 'number' ? durationMinutes : 60;
 
   try {
+    const ids = inviteeIds as string[];
     const invitees = await db.select({
-      hyloId: members.hyloId,
+      clerkId: members.clerkId,
+      logtoId: members.logtoId,
       name: members.name,
       availability: members.availability,
-    }).from(members).where(inArray(members.hyloId, inviteeIds as string[]));
+    }).from(members).where(or(inArray(members.clerkId, ids), inArray(members.logtoId, ids)));
 
-    // hyloId is now nullable on members; the inArray() clause above
-    // filters at the DB level, but TS doesn't infer that. Filter
-    // defensively so the rest of the pipeline keeps its non-null contract.
     const membersAvail = invitees
-      .filter((m): m is typeof m & { hyloId: string } => m.hyloId !== null)
-      .map(m => ({
-        hyloId: m.hyloId,
-        name: m.name,
-        availability: JSON.parse(m.availability ?? '[]') as number[],
-      }));
+      .map(m => {
+        const userId = m.logtoId ?? m.clerkId;
+        if (!userId) return null;
+        return {
+          userId,
+          name: m.name,
+          availability: JSON.parse(m.availability ?? '[]') as number[],
+        };
+      })
+      .filter((m): m is { userId: string; name: string; availability: number[] } => m !== null);
 
     const suggestions = findBestTimes(membersAvail, duration);
     return NextResponse.json(suggestions);
