@@ -61,10 +61,48 @@
   animation: glitch-shimmer-keyframes 600ms ease-in-out both;
 }
 
+/* ── Liminal Web constellation ────────────────────────────────────────────
+   The Liminal Web is canonically pictured as a network map of interlinked
+   sensemaking communities. The landing backdrop renders that as a slow,
+   breathing node-graph: nodes pulse on staggered delays, the whole web
+   drifts almost imperceptibly. Deterministic SVG (fixed coords) — no
+   per-render randomness, so it stays hydration-safe. */
+@keyframes liminal-node-pulse {
+  0%, 100% { opacity: 0.25; r: 2.5; }
+  50%      { opacity: 0.9;  r: 4; }
+}
+
+@keyframes liminal-edge-breathe {
+  0%, 100% { opacity: 0.10; }
+  50%      { opacity: 0.28; }
+}
+
+@keyframes liminal-web-drift {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%  { transform: translate3d(0, -10px, 0) rotate(0.4deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+
+.liminal-web-drift {
+  animation: liminal-web-drift 38s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+.liminal-node {
+  animation: liminal-node-pulse 7s ease-in-out infinite;
+}
+
+.liminal-edge {
+  animation: liminal-edge-breathe 11s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glitch-spawn,
   .glitch-dissolve,
-  .glitch-shimmer {
+  .glitch-shimmer,
+  .liminal-web-drift,
+  .liminal-node,
+  .liminal-edge {
     animation: none;
   }
 }

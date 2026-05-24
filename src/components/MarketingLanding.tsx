@@ -3,16 +3,34 @@
  * visitors. Liminal Calendar is the public face / contact surface of
  * Liminal Commons. Signed-in users see the WeeklyGrid (handled upstream).
  *
- * Copy authored by Erik (2026-05-24).
+ * Copy authored by Erik (2026-05-24). The backdrop is a breathing node-graph
+ * echoing the Liminal Web's community-map symbolism (see LiminalWebBackdrop).
  */
 
 import Link from 'next/link';
 import { RuneAccent } from './RuneAccent';
+import { MoonPhase } from './MoonPhase';
+import { LiminalWebBackdrop } from './LiminalWebBackdrop';
+
+/** Runic hairline divider — a glyph flanked by fading rules, marking a turn
+ *  between movements of the text. */
+function GlyphDivider({ seed }: { seed: number }) {
+  return (
+    <div className="flex items-center justify-center gap-3 py-1" aria-hidden="true">
+      <span className="h-px w-16 bg-gradient-to-r from-transparent to-grove-border" />
+      <RuneAccent size="sm" seed={seed} className="!opacity-40" />
+      <span className="h-px w-16 bg-gradient-to-l from-transparent to-grove-border" />
+    </div>
+  );
+}
 
 export function MarketingLanding() {
   return (
-    <div className="min-h-screen bg-grove-bg text-grove-text font-liminal flex flex-col">
-      <header className="flex items-center justify-between px-6 py-5 border-b border-grove-border">
+    <div className="relative min-h-screen overflow-hidden bg-grove-bg text-grove-text font-liminal flex flex-col">
+      {/* Living constellation behind everything */}
+      <LiminalWebBackdrop className="absolute inset-0 h-full w-full opacity-50" />
+
+      <header className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-grove-border/60">
         <div className="flex items-center gap-2">
           <RuneAccent size="md" seed={2} />
           <span className="text-sm tracking-wide italic">Liminal Commons</span>
@@ -27,13 +45,22 @@ export function MarketingLanding() {
 
       <main
         data-testid="liminal-landing"
-        className="flex-1 flex items-start justify-center px-6 py-12 sm:py-16"
+        className="relative z-10 flex-1 flex items-start justify-center px-6 py-12 sm:py-16"
       >
         <div className="max-w-2xl space-y-5 text-grove-text">
-          <h1 className="text-3xl sm:text-4xl leading-snug italic text-center">
-            Welcome to the Liminal Calendar.
-          </h1>
+          {/* Hero: lunar threshold mark + title */}
+          <div className="flex flex-col items-center gap-2 pb-2">
+            <span className="flex items-center gap-2 opacity-70">
+              <RuneAccent size="sm" seed={4} />
+              <MoonPhase />
+              <RuneAccent size="sm" seed={1} />
+            </span>
+            <h1 className="text-3xl sm:text-4xl leading-snug italic text-center">
+              Welcome to the Liminal Calendar.
+            </h1>
+          </div>
 
+          {/* Movement I — the invitation */}
           <p className="text-base sm:text-lg leading-relaxed">
             Here you will find a variety of events &mdash; different people,
             different time zones, different styles and modalities.
@@ -44,6 +71,10 @@ export function MarketingLanding() {
             connect people in new and exciting ways, to encourage us to relate,
             explore and collaborate with each other more deeply.
           </p>
+
+          <GlyphDivider seed={3} />
+
+          {/* Movement II — crossing the threshold */}
           <p className="text-base sm:text-lg leading-relaxed">
             You are free to explore the calendar and its contents, but if you
             wish to participate you will need to sign up. Doing this will not
@@ -56,6 +87,10 @@ export function MarketingLanding() {
             Please feel free to be yourself and to get the most out of the rich
             and varied experiences available here.
           </p>
+
+          <GlyphDivider seed={5} />
+
+          {/* Movement III — the send-off */}
           <p className="text-base sm:text-lg leading-relaxed">
             If you do encounter anything that puzzles or troubles you, there is
             an onboarding and feedback session scheduled every Tuesday which is
@@ -69,7 +104,7 @@ export function MarketingLanding() {
             </a>{' '}
             if you are unable to get there.
           </p>
-          <p className="text-base sm:text-lg leading-relaxed italic">
+          <p className="text-lg sm:text-xl leading-relaxed italic text-center text-grove-accent">
             Enjoy your ride.
           </p>
 
