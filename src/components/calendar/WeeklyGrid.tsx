@@ -87,24 +87,23 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const currentUserId = resolvedUserId ?? sessionUser?.logtoUserId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();
 
-  // SSR-safe initial state. Both server and the very first client render
-  // produce identical output (the 1970-epoch week, slot 0). Hydration then
-  // succeeds because the rendered DOM matches. The useEffect below switches
-  // to the viewer's actual current week + slot post-mount — the user sees a
-  // sub-frame transition, not a hydration mismatch. Prior code called
-  // `new Date()` directly in the useState initializer, which yields the
-  // server's UTC clock during SSR and the browser's local clock during
-  // hydration: those disagree (different hours, possibly different days),
-  // producing React #418 and a forced client-side subtree regeneration.
+  // NOTE — React #418 still fires here on first hydration: server's UTC
+  // `new Date()` and the client's local-tz `new Date()` produce values that
+  // can disagree on hour/day, which sometimes mismatches the rendered DOM
+  // and forces React to regenerate this subtree client-side. The cycle-5
+  // attempt to fix that via a 1970-epoch placeholder caused a visible
+  // "Dec 1969 → May 2026" SSR flash on every page load — worse UX than the
+  // silent regeneration we're going back to. Real fix is to opt this
+  // component out of SSR via a [mounted] gate with a skeleton, or to pass
+  // the server's "now" as a prop from page.tsx. Queued for follow-up;
+  // for now the user-visible behavior is correct.
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
-    getWeekStart(new Date(0))
+    getWeekStart(new Date())
   );
-  const [currentSlot, setCurrentSlot] = useState<number>(0);
-  useEffect(() => {
-    setCurrentWeekStart(getWeekStart(new Date()));
+  const [currentSlot, setCurrentSlot] = useState<number>(() => {
     const now = new Date();
-    setCurrentSlot(now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0));
-  }, []);
+    return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
+  });
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
   // Set true on a successful drag (pointer moved past threshold) so the
