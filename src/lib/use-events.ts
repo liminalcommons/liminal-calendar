@@ -25,10 +25,23 @@ export function useEvents(initialEvents: DisplayEvent[]) {
     return () => { mounted.current = false; };
   }, []);
 
-  // Intentionally do NOT sync `events` from `initialEvents` on every prop change.
-  // `useState(initialEvents)` seeds state once on mount; subsequent server-prop
-  // re-renders would otherwise wipe optimistic RSVP/edit updates before the
-  // user's change reaches the DB. Use `refetch` to pull fresh server state.
+  // Reconcile from `initialEvents` whenever the server-rendered prop reference
+  // changes. The earlier version of this hook explicitly skipped this sync to
+  // protect in-flight optimistic updates — but the consequence was that
+  // `router.refresh()` after a mutation (which DOES deliver a fresh prop)
+  // never reached the grid, leaving the UI stale after RSVPs, edits, creates,
+  // and back-navigation from /events/[id]. The 25-site `revalidatePath` work
+  // from the prior loop was therefore inert at the consumer.
+  //
+  // The original "clobbers optimistic state" concern is bounded: every
+  // optimistic-update path here calls `setTimeout(refetch, 1200)` (or its
+  // equivalent), so even if a prop sync briefly reverts an in-flight optimistic
+  // patch, the refetch within ~1.2s pulls confirmed server state. The end
+  // state is correct; only a sub-second visual flicker is possible, and only
+  // when `router.refresh()` lands inside the optimistic window.
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
 
   const refetch = useCallback(async () => {
     try {
