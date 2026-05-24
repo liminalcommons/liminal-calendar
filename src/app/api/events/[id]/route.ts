@@ -5,6 +5,8 @@ import { canEditEvent, canDeleteEvent } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { events, rsvps, members } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
+import { expandRecurringEvents } from '@/lib/recurrence-expander';
+import type { DisplayEvent } from '@/lib/display-event';
 import { and, eq } from 'drizzle-orm';
 import {
   diffEventForNotification,
@@ -18,12 +20,55 @@ import {
   type Invitee,
 } from '@/lib/events/invitations-repo';
 
+/**
+ * Split a (possibly suffixed) event id into its base numeric part and an
+ * optional `YYYYMMDD` occurrence key. "41-20260524" → ["41", "20260524"];
+ * "41" → ["41", null].
+ */
+function splitInstanceId(id: string): [string, string | null] {
+  const m = id.match(/^(\d+)-(\d{8})$/);
+  return m ? [m[1], m[2]] : [id, null];
+}
+
+/**
+ * Resolve the specific occurrence's starts_at/ends_at for a recurring event,
+ * delegating entirely to expandRecurringEvents so the timezone-deterministic
+ * date math lives in exactly one place. Expands a window wide enough to contain
+ * the requested date, then picks the instance whose id matches the suffix.
+ * Returns null if the event isn't recurring or the occurrence can't be found.
+ */
+function resolveOccurrence(
+  display: DisplayEvent,
+  fullId: string,
+  occurrenceSuffix: string,
+): { starts_at: string; ends_at: string | null } | null {
+  if (!display.recurrenceRule) return null;
+
+  const year = Number(occurrenceSuffix.slice(0, 4));
+  const month = Number(occurrenceSuffix.slice(4, 6));
+  const day = Number(occurrenceSuffix.slice(6, 8));
+  // Bracket the target day generously (UTC) so the occurrence falls inside the
+  // range regardless of timezone offset. expandRecurringEvents tags each
+  // instance id as `${baseId}-${YYYYMMDD}`.
+  const rangeStart = new Date(Date.UTC(year, month - 1, day - 2));
+  const rangeEnd = new Date(Date.UTC(year, month - 1, day + 2));
+
+  const instances = expandRecurringEvents([display], rangeStart, rangeEnd);
+  const match = instances.find((inst) => inst.id === fullId);
+  return match ? { starts_at: match.starts_at, ends_at: match.ends_at } : null;
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const numId = parseInt(id, 10);
+  // Recurring instances carry a `-YYYYMMDD` suffix (e.g. "41-20260524"); the
+  // base row is keyed by the numeric prefix only. Split explicitly rather than
+  // relying on parseInt truncation so the intent is obvious. `occurrenceSuffix`
+  // is the 8-digit date key when this is a specific occurrence request, else null.
+  const [baseIdPart, occurrenceSuffix] = splitInstanceId(id);
+  const numId = parseInt(baseIdPart, 10);
   if (isNaN(numId)) {
     return NextResponse.json({ error: 'Invalid event ID' }, { status: 400 });
   }
@@ -62,7 +107,19 @@ export async function GET(
     }
 
     const display = dbEventToDisplayEvent(event, eventRsvps, authed?.id, viewerIsHost);
-    return NextResponse.json({ ...display, cancelledByName });
+
+    // For a recurring-instance request, the base row still holds the ORIGINAL
+    // starts_at/ends_at. Override them with this specific occurrence's date by
+    // reusing the calendar grid's expansion logic — never re-implementing the
+    // timezone-sensitive date math (the expander is the single source of truth).
+    const occurrence = occurrenceSuffix
+      ? resolveOccurrence(display, id, occurrenceSuffix)
+      : null;
+    const resolved = occurrence
+      ? { ...display, id, starts_at: occurrence.starts_at, ends_at: occurrence.ends_at }
+      : display;
+
+    return NextResponse.json({ ...resolved, cancelledByName });
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });
