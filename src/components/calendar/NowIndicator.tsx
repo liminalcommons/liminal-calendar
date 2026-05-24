@@ -13,15 +13,22 @@ function getNowMinutes(): number {
 }
 
 export function NowIndicator({ hourHeights, hourOffsets }: NowIndicatorProps) {
-  const [nowMinutes, setNowMinutes] = useState<number>(getNowMinutes);
+  // SSR / first-client-render: render nothing. Server has no notion of the
+  // viewer's local minutes, so any non-null initial value would produce a
+  // server-vs-client position mismatch and trip React #418 (hydration
+  // regenerates the parent subtree, costing fresh data). Compute the real
+  // value only after mount.
+  const [nowMinutes, setNowMinutes] = useState<number | null>(null);
 
   useEffect(() => {
+    setNowMinutes(getNowMinutes());
     const interval = setInterval(() => {
       setNowMinutes(getNowMinutes());
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
 
+  if (nowMinutes === null) return null;
   if (nowMinutes < 0 || nowMinutes > 24 * 60) return null;
 
   // Map minutes to 30-min slot system

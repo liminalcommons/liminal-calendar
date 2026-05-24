@@ -87,13 +87,24 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
   const currentUserId = resolvedUserId ?? sessionUser?.logtoUserId ?? sessionUser?.id ?? null;
   const userTz = useUserTimezone();
 
+  // SSR-safe initial state. Both server and the very first client render
+  // produce identical output (the 1970-epoch week, slot 0). Hydration then
+  // succeeds because the rendered DOM matches. The useEffect below switches
+  // to the viewer's actual current week + slot post-mount — the user sees a
+  // sub-frame transition, not a hydration mismatch. Prior code called
+  // `new Date()` directly in the useState initializer, which yields the
+  // server's UTC clock during SSR and the browser's local clock during
+  // hydration: those disagree (different hours, possibly different days),
+  // producing React #418 and a forced client-side subtree regeneration.
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() =>
-    getWeekStart(new Date())
+    getWeekStart(new Date(0))
   );
-  const [currentSlot, setCurrentSlot] = useState<number>(() => {
+  const [currentSlot, setCurrentSlot] = useState<number>(0);
+  useEffect(() => {
+    setCurrentWeekStart(getWeekStart(new Date()));
     const now = new Date();
-    return now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0);
-  });
+    setCurrentSlot(now.getHours() * 2 + (now.getMinutes() >= 30 ? 1 : 0));
+  }, []);
   const [expansion, setExpansion] = useState<{ event: DisplayEvent; rect: DOMRect } | null>(null);
   const [quickCreate, setQuickCreate] = useState<{ day: Date; hour: number; rect: DOMRect } | null>(null);
   // Set true on a successful drag (pointer moved past threshold) so the
