@@ -119,7 +119,28 @@ export async function GET(
       ? { ...display, id, starts_at: occurrence.starts_at, ends_at: occurrence.ends_at }
       : display;
 
-    return NextResponse.json({ ...resolved, cancelledByName });
+    // For recurring events, surface the next occurrences as a schedule. Expand
+    // from the BASE projection (`display`, original starts_at) so the generated
+    // ids are canonical `${baseId}-${YYYYMMDD}` instances. Window is [now, +10wk]
+    // — wide enough for ~5-6 weekly occurrences; daily events overshoot, so cap
+    // at the first 6 occurrences at or after `now`.
+    let upcomingOccurrences:
+      | { id: string; starts_at: string; ends_at: string | null }[]
+      = [];
+    if (display.recurrenceRule) {
+      const now = new Date();
+      const rangeEnd = new Date(now.getTime() + 70 * 86400000);
+      upcomingOccurrences = expandRecurringEvents([display], now, rangeEnd)
+        .filter((inst) => new Date(inst.starts_at) >= now)
+        .slice(0, 6)
+        .map((inst) => ({
+          id: inst.id,
+          starts_at: inst.starts_at,
+          ends_at: inst.ends_at,
+        }));
+    }
+
+    return NextResponse.json({ ...resolved, cancelledByName, upcomingOccurrences });
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });

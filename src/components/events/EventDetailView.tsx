@@ -11,7 +11,7 @@ import {
   formatTimeInTimezone,
   formatDateInTimezone,
 } from '@/lib/timezone-utils';
-import { formatDuration } from '@/lib/calendar-utils';
+import { formatDuration, getWeekStart } from '@/lib/calendar-utils';
 import { downloadICS } from '@/lib/ics-generator';
 import { apiFetch } from '@/lib/api-fetch';
 import { EventRSVP } from './EventRSVP';
@@ -41,12 +41,34 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+interface UpcomingOccurrence {
+  id: string;
+  starts_at: string;
+  ends_at: string | null;
+}
+
+/**
+ * Relative-week chip ("This week" / "Next week" / null) for an occurrence,
+ * computed client-side in the viewer's timezone. Both `now` and the occurrence
+ * date are bucketed by Monday-start week via getWeekStart, so the comparison is
+ * a plain week-boundary equality rather than a brittle day-difference.
+ */
+function weekChip(occStart: Date, now: Date): string | null {
+  const occWeek = getWeekStart(occStart).getTime();
+  const thisWeek = getWeekStart(now).getTime();
+  const nextWeek = getWeekStart(new Date(now.getTime() + 7 * 86400000)).getTime();
+  if (occWeek === thisWeek) return 'This week';
+  if (occWeek === nextWeek) return 'Next week';
+  return null;
+}
+
 export function EventDetailView({ eventId }: EventDetailViewProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const user = session?.user;
 
   const [event, setEvent] = useState<DisplayEvent | null>(null);
+  const [upcomingOccurrences, setUpcomingOccurrences] = useState<UpcomingOccurrence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -76,6 +98,9 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
         if (res.ok && (data.id || data.event?.id)) {
           // API returns the event directly (not nested under .event)
           setEvent(data.id ? data : data.event);
+          setUpcomingOccurrences(
+            Array.isArray(data.upcomingOccurrences) ? data.upcomingOccurrences : [],
+          );
           // Fetch initial mute state from preferences
           try {
             const prefsRes = await apiFetch('/api/preferences/notifications/muted');
@@ -275,23 +300,85 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
           </span>
         </div>
 
-        {/* Date & time */}
-        <div className="p-4 bg-grove-bg border border-grove-border rounded-lg space-y-1">
-          <p className="text-sm font-semibold text-grove-text">
-            {formatDateInTimezone(startDate, timezone)}
-          </p>
-          <p className="text-lg font-mono text-grove-text">
-            {formatTimeInTimezone(startDate, timezone)}
-            {endDate && ` – ${formatTimeInTimezone(endDate, timezone)}`}
-          </p>
-          {duration && (
-            <p className="text-xs text-grove-text-muted">{duration}</p>
-          )}
-          <p className="text-xs text-grove-text-muted">
-            Your timezone: {timezone.split('/').pop()?.replace(/_/g, ' ')}
-          </p>
-
-        </div>
+        {/* Date & time — recurring events present a schedule of upcoming
+            occurrences (a single pinned date is meaningless for a series);
+            non-recurring events keep the single date/time box. */}
+        {event.recurrenceRule && upcomingOccurrences.length > 0 ? (
+          (() => {
+            // All occurrences share the same wall-clock time; use the first to
+            // render the constant time-of-day line.
+            const firstStart = new Date(upcomingOccurrences[0].starts_at);
+            const firstEnd = upcomingOccurrences[0].ends_at
+              ? new Date(upcomingOccurrences[0].ends_at)
+              : null;
+            const seriesDuration = formatDuration(
+              upcomingOccurrences[0].starts_at,
+              upcomingOccurrences[0].ends_at,
+            );
+            const now = new Date();
+            return (
+              <div className="space-y-3">
+                <div className="p-4 bg-grove-bg border border-grove-border rounded-lg space-y-1">
+                  <p className="text-lg font-mono text-grove-text">
+                    {formatTimeInTimezone(firstStart, timezone)}
+                    {firstEnd && ` – ${formatTimeInTimezone(firstEnd, timezone)}`}
+                  </p>
+                  {seriesDuration && (
+                    <p className="text-xs text-grove-text-muted">{seriesDuration}</p>
+                  )}
+                  <p className="text-xs text-grove-text-muted">
+                    Your timezone: {timezone.split('/').pop()?.replace(/_/g, ' ')}
+                  </p>
+                </div>
+                <h2 className="text-sm font-semibold text-grove-text uppercase tracking-wider">
+                  Upcoming
+                </h2>
+                <ul className="space-y-2">
+                  {upcomingOccurrences.map((occ) => {
+                    const occStart = new Date(occ.starts_at);
+                    const chip = weekChip(occStart, now);
+                    const isCurrent = occ.id === event.id;
+                    return (
+                      <li key={occ.id}>
+                        <Link
+                          href={`/events/${occ.id}`}
+                          className={`flex items-center justify-between gap-3 p-3 bg-grove-bg border rounded-lg hover:border-grove-accent/40 transition-colors ${
+                            isCurrent ? 'border-grove-accent/60' : 'border-grove-border'
+                          }`}
+                        >
+                          <span className="text-sm font-medium text-grove-text">
+                            {formatDateInTimezone(occStart, timezone)}
+                          </span>
+                          {chip && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-grove-accent/10 text-grove-accent border border-grove-accent/20 font-medium">
+                              {chip}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })()
+        ) : (
+          <div className="p-4 bg-grove-bg border border-grove-border rounded-lg space-y-1">
+            <p className="text-sm font-semibold text-grove-text">
+              {formatDateInTimezone(startDate, timezone)}
+            </p>
+            <p className="text-lg font-mono text-grove-text">
+              {formatTimeInTimezone(startDate, timezone)}
+              {endDate && ` – ${formatTimeInTimezone(endDate, timezone)}`}
+            </p>
+            {duration && (
+              <p className="text-xs text-grove-text-muted">{duration}</p>
+            )}
+            <p className="text-xs text-grove-text-muted">
+              Your timezone: {timezone.split('/').pop()?.replace(/_/g, ' ')}
+            </p>
+          </div>
+        )}
 
         {/* Description */}
         {event.description && (
