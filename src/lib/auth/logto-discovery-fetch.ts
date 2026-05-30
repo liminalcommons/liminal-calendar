@@ -33,10 +33,13 @@ export function makeLogtoDiscoveryFetch(baseFetch: typeof fetch = fetch): typeof
       const meta = await res.clone().json();
       if (meta && typeof meta === 'object') {
         delete (meta as Record<string, unknown>).authorization_response_iss_parameter_supported;
-        return Response.json(meta, {
+        // Construct a CLEAN response. Reusing the upstream headers would carry
+        // content-encoding/content-length that no longer match the rewritten
+        // (decoded, shorter) body and can corrupt downstream parsing.
+        return new Response(JSON.stringify(meta), {
           status: res.status,
           statusText: res.statusText,
-          headers: res.headers,
+          headers: { 'content-type': 'application/json' },
         });
       }
     } catch {
