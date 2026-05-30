@@ -15,6 +15,7 @@ import { auth as nextAuth } from '../../../auth';
 import { db } from '@/lib/db';
 import { members, type Member } from '@/lib/db/schema';
 import { getCurrentMember } from './get-current-member';
+import { syncLogtoMemberOnRead } from './sync-logto-member-on-read';
 import type { UserRole } from '@/lib/auth-helpers';
 
 export type AuthedUser = {
@@ -64,7 +65,18 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
     if (u.logtoUserId) {
       const role: UserRole =
         u.role === 'admin' ? 'admin' : u.role === 'host' ? 'host' : 'member';
-      const memberId = await lookupMemberIdByLogtoId(u.logtoUserId);
+      let memberId = await lookupMemberIdByLogtoId(u.logtoUserId);
+      if (memberId === null) {
+        // Provision on read so a fresh Castalia user gets a canonical
+        // memberId on their first request instead of memberId:null — which
+        // would 401 every API call and bounce protected pages to the landing.
+        await syncLogtoMemberOnRead(db, {
+          logtoUserId: u.logtoUserId,
+          email: u.email ?? null,
+          name: u.name ?? null,
+        });
+        memberId = await lookupMemberIdByLogtoId(u.logtoUserId);
+      }
       return {
         memberId,
         id: u.logtoUserId,
