@@ -34,10 +34,12 @@ export async function GET(request: NextRequest) {
   try {
     const likeQ = `%${q}%`;
 
+    // Match on name + handle ONLY — never email. Matching on email turns this
+    // endpoint into a membership oracle ("is this address registered?") and lets
+    // any signed-in user enumerate the directory by email.
     const matchFilter = or(
       ilike(members.name, likeQ),
       ilike(members.handle, likeQ),
-      ilike(members.email, likeQ),
     );
 
     // Exclude requesting user: skip rows where logtoId or clerkId equals currentUserId
