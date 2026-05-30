@@ -1,17 +1,8 @@
-import NextAuth, { customFetch } from 'next-auth';
+import NextAuth from 'next-auth';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { applyRedirectPolicy } from '@/lib/auth/redirect-policy';
-import { makeLogtoDiscoveryFetch } from '@/lib/auth/logto-discovery-fetch';
-
-// Logto advertises `authorization_response_iss_parameter_supported: true` in its
-// OIDC discovery document but does NOT emit the `iss` parameter on the
-// authorization-response redirect, so Auth.js v5 (oauth4webapi) enforces
-// RFC-9207 and every Castalia callback fails with `?error=Configuration`.
-// makeLogtoDiscoveryFetch strips that flag from the discovery doc. See the
-// helper for the full rationale and removal condition.
-const logtoFetch = makeLogtoDiscoveryFetch();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -35,13 +26,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: 'Castalia',
       type: 'oidc',
       issuer: LOGTO_ISSUER,
-      authorization: { params: { scope: 'openid email profile' } },
+      // Skip OIDC discovery and declare the endpoints explicitly. Logto's
+      // discovery doc advertises `authorization_response_iss_parameter_supported:
+      // true` but Logto never emits `iss` on the callback redirect, so Auth.js
+      // (oauth4webapi) enforced RFC-9207 and every Castalia callback failed with
+      // `?error=Configuration`. With `wellKnown: null` Auth.js fabricates the
+      // authorization-server metadata from these endpoints instead of reading
+      // the misadvertised flag, so the `iss` check is correctly skipped.
+      wellKnown: null,
+      authorization: { url: `${LOGTO_ISSUER}/auth`, params: { scope: 'openid email profile' } },
+      token: `${LOGTO_ISSUER}/token`,
+      userinfo: `${LOGTO_ISSUER}/me`,
+      jwks_endpoint: `${LOGTO_ISSUER}/jwks`,
       checks: ['pkce', 'state'],
       clientId: process.env.LOGTO_CLIENT_ID?.trim(),
       clientSecret: process.env.LOGTO_CLIENT_SECRET?.trim(),
-      // Strip Logto's misadvertised `iss`-support flag from discovery so
-      // Auth.js stops enforcing RFC-9207 on a callback Logto never stamps.
-      [customFetch]: logtoFetch,
       profile(profile: LogtoOidcProfile) {
         return {
           id: profile.sub,
