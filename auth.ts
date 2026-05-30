@@ -1,8 +1,17 @@
-import NextAuth from 'next-auth';
+import NextAuth, { customFetch } from 'next-auth';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { applyRedirectPolicy } from '@/lib/auth/redirect-policy';
+import { makeLogtoDiscoveryFetch } from '@/lib/auth/logto-discovery-fetch';
+
+// Logto advertises `authorization_response_iss_parameter_supported: true` in its
+// OIDC discovery document but does NOT emit the `iss` parameter on the
+// authorization-response redirect, so Auth.js v5 (oauth4webapi) enforces
+// RFC-9207 and every Castalia callback fails with `?error=Configuration`.
+// makeLogtoDiscoveryFetch strips that flag from the discovery doc. See the
+// helper for the full rationale and removal condition.
+const logtoFetch = makeLogtoDiscoveryFetch();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -30,6 +39,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       checks: ['pkce', 'state'],
       clientId: process.env.LOGTO_CLIENT_ID?.trim(),
       clientSecret: process.env.LOGTO_CLIENT_SECRET?.trim(),
+      // Strip Logto's misadvertised `iss`-support flag from discovery so
+      // Auth.js stops enforcing RFC-9207 on a callback Logto never stamps.
+      [customFetch]: logtoFetch,
       profile(profile: LogtoOidcProfile) {
         return {
           id: profile.sub,
