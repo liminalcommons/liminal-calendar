@@ -1,44 +1,71 @@
 /**
- * Regression guard for the email-reminder "unsubscribe from this event" link.
- * The link carries an HMAC-based token; if verification regresses to a trivial
- * equality check or an un-salted hash, any recipient could unsubscribe any
- * other recipient. Lock the current behavior.
+ * @jest-environment node
  */
 
-process.env.REMINDER_HMAC_SECRET = 'test-secret-for-stop-reminder';
+// Stable secret so token output is deterministic across the test run.
+process.env.CRON_SECRET = 'test-secret-for-hmac';
 
 import { stopReminderToken, verifyStopToken } from '@/lib/notifications/reminders';
 
 describe('stopReminderToken / verifyStopToken', () => {
-  it('a generated token validates for its own (eventId, userId) pair', () => {
+  it('produces a 32-char hex token', () => {
+    const token = stopReminderToken(42, 'user-A');
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(token).toHaveLength(32);
+  });
+
+  it('verifies a correct token', () => {
     const token = stopReminderToken(42, 'user-A');
     expect(verifyStopToken(42, 'user-A', token)).toBe(true);
   });
 
-  it('token is a 32-char hex string', () => {
+  it('rejects a tampered token', () => {
     const token = stopReminderToken(42, 'user-A');
-    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    expect(verifyStopToken(42, 'user-A', token.slice(0, 31) + '0')).toBe(false);
   });
 
-  it('same inputs produce the same token (deterministic)', () => {
-    expect(stopReminderToken(1, 'x')).toBe(stopReminderToken(1, 'x'));
-  });
-
-  it("a token for (42, 'A') does NOT validate for (42, 'B')", () => {
+  it('binds the token to (eventId, userId)', () => {
     const token = stopReminderToken(42, 'A');
+    expect(verifyStopToken(42, 'A', token)).toBe(true);
+    expect(verifyStopToken(99, 'A', token)).toBe(false);
     expect(verifyStopToken(42, 'B', token)).toBe(false);
   });
 
-  it("a token for (42, 'A') does NOT validate for (43, 'A')", () => {
-    const token = stopReminderToken(42, 'A');
-    expect(verifyStopToken(43, 'A', token)).toBe(false);
-  });
-
-  it('rejects an empty token', () => {
+  it('rejects a wrong-length token without throwing (timingSafeEqual guard)', () => {
     expect(verifyStopToken(42, 'A', '')).toBe(false);
+    expect(verifyStopToken(42, 'A', 'short')).toBe(false);
+    expect(verifyStopToken(42, 'A', 'a'.repeat(64))).toBe(false);
   });
 
-  it('rejects an obviously-wrong token', () => {
-    expect(verifyStopToken(42, 'A', 'z'.repeat(32))).toBe(false);
+  it('prefers STOP_TOKEN_SECRET over CRON_SECRET when set', () => {
+    const cronToken = stopReminderToken(7, 'u');
+    const prev = process.env.STOP_TOKEN_SECRET;
+    process.env.STOP_TOKEN_SECRET = 'a-different-dedicated-secret';
+    try {
+      const dedicatedToken = stopReminderToken(7, 'u');
+      expect(dedicatedToken).not.toBe(cronToken);
+      // A token minted under CRON_SECRET must NOT verify once a dedicated
+      // secret is in force.
+      expect(verifyStopToken(7, 'u', cronToken)).toBe(false);
+      expect(verifyStopToken(7, 'u', dedicatedToken)).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.STOP_TOKEN_SECRET;
+      else process.env.STOP_TOKEN_SECRET = prev;
+    }
+  });
+
+  it('fail-closed: throws when no signing secret is configured (no dev-secret fallback)', () => {
+    const cron = process.env.CRON_SECRET;
+    const stop = process.env.STOP_TOKEN_SECRET;
+    delete process.env.CRON_SECRET;
+    delete process.env.STOP_TOKEN_SECRET;
+    try {
+      expect(() => stopReminderToken(1, 'x')).toThrow(/secret/i);
+      // verify must never authorize when it can't compute the expected token.
+      expect(verifyStopToken(1, 'x', 'anything')).toBe(false);
+    } finally {
+      if (cron !== undefined) process.env.CRON_SECRET = cron;
+      if (stop !== undefined) process.env.STOP_TOKEN_SECRET = stop;
+    }
   });
 });

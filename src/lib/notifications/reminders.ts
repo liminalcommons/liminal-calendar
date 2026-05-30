@@ -1,8 +1,28 @@
 import { format, toZonedTime } from 'date-fns-tz';
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://calendar.castalia.one';
-const HMAC_SECRET = process.env.CRON_SECRET || 'dev-secret';
+
+/**
+ * HMAC key for email unsubscribe ("stop reminder") tokens.
+ *
+ * Prefers a dedicated STOP_TOKEN_SECRET so this signing key is not the same
+ * value as the cron-auth / db-migration CRON_SECRET (one leak should not span
+ * unrelated trust domains). Falls back to CRON_SECRET for graceful migration
+ * while STOP_TOKEN_SECRET is being provisioned.
+ *
+ * Fail-closed: there is NO literal default. A previous `|| 'dev-secret'`
+ * fallback meant that if neither var was set, every stop-token was forgeable
+ * with a publicly-known key. Now a missing secret throws, so a misconfigured
+ * deploy fails loudly instead of emitting forgeable unsubscribe links.
+ */
+function getStopTokenSecret(): string {
+  const secret = process.env.STOP_TOKEN_SECRET?.trim() || process.env.CRON_SECRET?.trim();
+  if (!secret) {
+    throw new Error('STOP_TOKEN_SECRET (or CRON_SECRET) must be set to sign reminder stop-tokens');
+  }
+  return secret;
+}
 
 export type ReminderType = '24hr' | '1hr' | '15min';
 
@@ -23,7 +43,7 @@ interface ReminderRecipient {
 }
 
 export function stopReminderToken(eventId: number, userId: string): string {
-  return createHmac('sha256', HMAC_SECRET)
+  return createHmac('sha256', getStopTokenSecret())
     .update(`${eventId}:${userId}`)
     .digest('hex')
     .slice(0, 32);
@@ -35,7 +55,20 @@ function stopReminderUrl(eventId: number, userId: string): string {
 }
 
 export function verifyStopToken(eventId: number, userId: string, token: string): boolean {
-  return stopReminderToken(eventId, userId) === token;
+  // Constant-time comparison to avoid leaking the expected token via response
+  // timing. timingSafeEqual requires equal-length buffers; the length check is
+  // safe to short-circuit because the token length (32) is public, not secret.
+  let expected: string;
+  try {
+    expected = stopReminderToken(eventId, userId);
+  } catch {
+    // Missing signing secret — never authorize, never throw into the handler.
+    return false;
+  }
+  const a = Buffer.from(expected);
+  const b = Buffer.from(token);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function formatEventTime(date: Date, tz: string): string {
