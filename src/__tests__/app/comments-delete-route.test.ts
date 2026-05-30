@@ -99,23 +99,25 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
   });
 
   it('returns 403 when caller is neither the author nor an admin', async () => {
+    // Different member.id than the comment's memberId → not the author.
     mockGetCurrentMember.mockResolvedValue({
-      id: 2, hyloId: 'someone-else', clerkId: null, name: 'B', email: null, image: null, role: 'member',
+      id: 2, logtoId: 'someone-else', clerkId: null, name: 'B', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue({
-      id: 99, eventId: 5, authorId: 'h-author', deletedAt: null,
+      id: 99, eventId: 5, memberId: 1, authorId: 'h-author', deletedAt: null,
     });
     const res = await DELETE(makeReq(), goodParams);
     expect(res.status).toBe(403);
     expect(mockSoftDelete).not.toHaveBeenCalled();
   });
 
-  it('soft-deletes when caller IS the author (Hylo)', async () => {
+  it('soft-deletes when caller IS the author (matched by canonical memberId)', async () => {
+    // Authorship keys on member.id === comment.memberId, NOT the provider string.
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-author', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-author', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue({
-      id: 99, eventId: 5, authorId: 'h-author', deletedAt: null,
+      id: 99, eventId: 5, memberId: 1, authorId: 'legacy-string-mismatch', deletedAt: null,
     });
     const res = await DELETE(makeReq(), goodParams);
     expect(res.status).toBe(200);
@@ -123,24 +125,26 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
     expect(mockSoftDelete.mock.calls[0][1]).toBe(99);
   });
 
-  it('soft-deletes when caller IS the author (Clerk-only)', async () => {
+  it('returns 403 when the comment has a null memberId (cannot prove authorship)', async () => {
+    // A legacy comment with no canonical memberId must NOT be deletable by a
+    // non-admin, even if provider strings happen to align — fail closed.
     mockGetCurrentMember.mockResolvedValue({
-      id: 2, hyloId: null, clerkId: 'clerk_x', name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-author', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue({
-      id: 99, eventId: 5, authorId: 'clerk_x', deletedAt: null,
+      id: 99, eventId: 5, memberId: null, authorId: 'logto-author', deletedAt: null,
     });
     const res = await DELETE(makeReq(), goodParams);
-    expect(res.status).toBe(200);
-    expect(mockSoftDelete).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(403);
+    expect(mockSoftDelete).not.toHaveBeenCalled();
   });
 
   it('soft-deletes when caller is admin (any author)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 3, hyloId: 'h-admin', clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
+      id: 3, logtoId: 'logto-admin', clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
     });
     mockGetComment.mockResolvedValue({
-      id: 99, eventId: 5, authorId: 'someone-else', deletedAt: null,
+      id: 99, eventId: 5, memberId: 2, authorId: 'someone-else', deletedAt: null,
     });
     const res = await DELETE(makeReq(), goodParams);
     expect(res.status).toBe(200);
