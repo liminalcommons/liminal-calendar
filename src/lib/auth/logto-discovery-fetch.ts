@@ -26,9 +26,12 @@ function requestUrl(input: RequestInfo | URL): string {
 export function makeLogtoDiscoveryFetch(baseFetch: typeof fetch = fetch): typeof fetch {
   return async (input, init) => {
     const res = await baseFetch(input as RequestInfo, init);
-    if (!requestUrl(input).includes('/.well-known/openid-configuration') || !res.ok) {
+    const u = requestUrl(input);
+    console.log('[logtoFetch] called url=', u, 'ok=', res.ok);
+    if (!u.includes('/.well-known/openid-configuration') || !res.ok) {
       return res;
     }
+    console.log('[logtoFetch] rewriting discovery, stripping iss flag');
     try {
       const meta = await res.clone().json();
       if (meta && typeof meta === 'object') {
