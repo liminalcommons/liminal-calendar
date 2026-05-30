@@ -1,0 +1,356 @@
+     1	/**
+     2	 * POST /api/booking/[handle]/[slug]/book — Task 6 of Plan 3 (1:1 Booking).
+     3	 *
+     4	 * The booking endpoint. Atomic-ish across:
+     5	 *   1. events row (visibility=private, sourceEventTypeId set)
+     6	 *   2. 2 rsvps rows (owner=yes, booker=yes) — dual-write
+     7	 *   3. 2 booking.confirmed notifications (owner + booker)
+     8	 *
+     9	 * neon-http has no `db.transaction()`. Inserts are sequential. If a later
+    10	 * insert fails, earlier rows persist (a known project-wide constraint).
+    11	 *
+    12	 * Slot re-validation: we re-run `computeSlots(...)` with the exact same
+    13	 * inputs the slots-endpoint uses, and require the requested startsAt to
+    14	 * match one of the engine's outputs (millisecond-precise). This is the
+    15	 * race-safety check — between the GET /slots and the POST /book, the
+    16	 * owner may have created a conflicting event.
+    17	 *
+    18	 * Auth: `getCurrentMember(db)`. Self-booking (booker === owner) is 400.
+    19	 *
+    20	 * Next.js 15: `params` is async; await it.
+    21	 */
+    22	
+    23	import { NextRequest, NextResponse } from 'next/server';
+    24	import { revalidatePath } from 'next/cache';
+    25	import { z } from 'zod';
+    26	import { and, eq, gte, isNull, lte } from 'drizzle-orm';
+    27	import { db } from '@/lib/db';
+    28	import { events, rsvps, members } from '@/lib/db/schema';
+    29	import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
+    30	import { getCurrentMember } from '@/lib/auth/get-current-member';
+    31	import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
+    32	import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
+    33	import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
+    34	import { computeSlots } from '@/lib/booking/slots';
+    35	import { mintCastaliaRoomUrl } from '@/lib/booking/castalia-room';
+    36	import { createNotification } from '@/lib/notifications/inbox/repo';
+    37	import { sendEmail } from '@/lib/email';
+    38	import { buildBookingConfirmedEmail } from '@/lib/notifications/booking-emails';
+    39	
+    40	const MS_PER_DAY = 86_400_000;
+    41	
+    42	const BookInput = z.object({
+    43	  startsAt: z.string().datetime(),
+    44	  // Optional note from booker to host. Trimmed + bounded so a giant
+    45	  // pasted blob doesn't blow up the email or break formatting.
+    46	  note: z.string().trim().max(2000).optional(),
+    47	});
+    48	
+    49	/** Resolve a Member to a legacy provider-string id (logto > clerk > fallback). */
+    50	function legacyIdFor(m: {
+    51	  id: number;
+    52	  logtoId: string | null;
+    53	  clerkId: string | null;
+    54	}): string {
+    55	  return m.logtoId ?? m.clerkId ?? String(m.id);
+    56	}
+    57	
+    58	export async function POST(
+    59	  request: NextRequest,
+    60	  context: { params: Promise<{ handle: string; slug: string }> },
+    61	) {
+    62	  const bookerMember = await getCurrentMember(db);
+    63	  if (!bookerMember) {
+    64	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    65	  }
+    66	
+    67	  let raw: unknown;
+    68	  try {
+    69	    raw = await request.json();
+    70	  } catch {
+    71	    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    72	  }
+    73	
+    74	  const parsed = BookInput.safeParse(raw);
+    75	  if (!parsed.success) {
+    76	    return NextResponse.json({ error: 'Invalid body: startsAt must be ISO datetime' }, { status: 400 });
+    77	  }
+    78	  const requestedStart = new Date(parsed.data.startsAt);
+    79	
+    80	  const { handle, slug } = await context.params;
+    81	
+    82	  const ownerMemberId = await resolveHandleToMemberId(handle);
+    83	  if (ownerMemberId === null) {
+    84	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    85	  }
+    86	
+    87	  if (ownerMemberId === bookerMember.id) {
+    88	    return NextResponse.json({ error: 'Cannot book yourself' }, { status: 400 });
+    89	  }
+    90	
+    91	  const et = await getEventTypeBySlug(ownerMemberId, slug);
+    92	  if (!et) {
+    93	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    94	  }
+    95	
+    96	  // Slot re-validation reads owner's availability heatmap (same source as
+    97	  // GET /slots and the /profile editor — keep them in sync).
+    98	  const [ownerRow] = await db
+    99	    .select({ availability: members.availability, timezone: members.timezone })
+   100	    .from(members)
+   101	    .where(eq(members.id, ownerMemberId))
+   102	    .limit(1);
+   103	
+   104	  let availSlots: number[] = [];
+   105	  if (ownerRow?.availability) {
+   106	    try {
+   107	      const parsedAvail = JSON.parse(ownerRow.availability);
+   108	      if (Array.isArray(parsedAvail)) availSlots = parsedAvail.filter((n) => Number.isInteger(n));
+   109	    } catch {
+   110	      availSlots = [];
+   111	    }
+   112	  }
+   113	  const windows = availabilityToWindows(availSlots, ownerRow?.timezone ?? 'UTC');
+   114	  const now = new Date();
+   115	  const horizon = new Date(now.getTime() + et.maxDaysAhead * MS_PER_DAY);
+   116	  const blockingRows = await db
+   117	    .select({ startsAt: events.startsAt, endsAt: events.endsAt })
+   118	    .from(events)
+   119	    .where(
+   120	      and(
+   121	        eq(events.memberId, ownerMemberId),
+   122	        gte(events.startsAt, now),
+   123	        lte(events.startsAt, horizon),
+   124	        isNull(events.cancelledAt),
+   125	      ),
+   126	    );
+   127	
+   128	  const computed = computeSlots({
+   129	    now,
+   130	    eventType: {
+   131	      durationMinutes: et.durationMinutes,
+   132	      bufferBeforeMinutes: et.bufferBeforeMinutes ?? 0,
+   133	      bufferAfterMinutes: et.bufferAfterMinutes ?? 0,
+   134	      minNoticeMinutes: et.minNoticeMinutes ?? 0,
+   135	      maxDaysAhead: et.maxDaysAhead,
+   136	    },
+   137	    windows,
+   138	    blockingEvents: (blockingRows as Array<{ startsAt: Date | string; endsAt: Date | string | null }>).map(
+   139	      (r) => ({
+   140	        startsAt: r.startsAt instanceof Date ? r.startsAt : new Date(r.startsAt),
+   141	        endsAt: r.endsAt ? (r.endsAt instanceof Date ? r.endsAt : new Date(r.endsAt)) : null,
+   142	      }),
+   143	    ),
+   144	  });
+   145	
+   146	  const requestedMs = requestedStart.getTime();
+   147	  const matched = computed.find((s) => s.startsAt.getTime() === requestedMs);
+   148	  if (!matched) {
+   149	    return NextResponse.json(
+   150	      { error: 'Requested slot is no longer available' },
+   151	      { status: 409 },
+   152	    );
+   153	  }
+   154	
+   155	  // Owner Member lookup — need name/image for denormalized event columns.
+   156	  const [ownerMember] = await db
+   157	    .select()
+   158	    .from(members)
+   159	    .where(eq(members.id, ownerMemberId))
+   160	    .limit(1);
+   161	  if (!ownerMember) {
+   162	    return NextResponse.json({ error: 'Owner not found' }, { status: 404 });
+   163	  }
+   164	
+   165	  // Location resolution.
+   166	  let location: string | null;
+   167	  if (et.locationKind === 'castalia') {
+   168	    location = await mintCastaliaRoomUrl({
+   169	      ownerId: ownerMember.id,
+   170	      bookerId: bookerMember.id,
+   171	    });
+   172	  } else {
+   173	    location = et.locationValue ?? null;
+   174	  }
+   175	
+   176	  const endsAt = new Date(requestedMs + et.durationMinutes * 60_000);
+   177	  const ownerLegacyId = legacyIdFor(ownerMember);
+   178	  const bookerLegacyId = legacyIdFor(bookerMember);
+   179	
+   180	  // 1. Insert event row.
+   181	  // Race-safety: a partial unique index `events_booking_owner_starts_unique`
+   182	  // on (member_id, starts_at) WHERE source_event_type_id IS NOT NULL turns
+   183	  // a concurrent double-book into a Postgres unique violation (SQLSTATE
+   184	  // 23505). We catch it and return 409, mirroring the slot-already-taken
+   185	  // path above. Without this, two simultaneous bookers can both pass
+   186	  // computeSlots() (since neither has inserted yet) and create duplicate
+   187	  // events for the same owner+time.
+   188	  const note = parsed.data.note && parsed.data.note.length > 0 ? parsed.data.note : null;
+   189	
+   190	  let createdEvent: { id: number };
+   191	  try {
+   192	    [createdEvent] = await db
+   193	      .insert(events)
+   194	      .values({
+   195	        title: et.title,
+   196	        description: et.description ?? null,
+   197	        startsAt: requestedStart,
+   198	        endsAt,
+   199	        timezone: 'UTC',
+   200	        location,
+   201	        creatorId: ownerLegacyId,
+   202	        memberId: ownerMember.id,
+   203	        creatorName: ownerMember.name ?? 'Unknown',
+   204	        creatorImage: ownerMember.image ?? null,
+   205	        visibility: 'private',
+   206	        sourceEventTypeId: et.id,
+   207	        noteFromBooker: note,
+   208	      })
+   209	      .returning();
+   210	  } catch (err) {
+   211	    const code = (err as { code?: string } | null)?.code;
+   212	    const msg = String((err as { message?: string } | null)?.message ?? '');
+   213	    if (code === '23505' || msg.includes('events_booking_owner_starts_unique')) {
+   214	      return NextResponse.json(
+   215	        { error: 'Requested slot is no longer available' },
+   216	        { status: 409 },
+   217	      );
+   218	    }
+   219	    throw err;
+   220	  }
+   221	
+   222	  const eventId = createdEvent.id;
+   223	
+   224	  // 2. Insert RSVPs (owner + booker, both = yes). Best-effort sequential.
+   225	  await db.insert(rsvps).values({
+   226	    eventId,
+   227	    userId: ownerLegacyId,
+   228	    memberId: ownerMember.id,
+   229	    userName: ownerMember.name ?? 'Unknown',
+   230	    userImage: ownerMember.image ?? null,
+   231	    status: 'yes',
+   232	  });
+   233	
+   234	  await db.insert(rsvps).values({
+   235	    eventId,
+   236	    userId: bookerLegacyId,
+   237	    memberId: bookerMember.id,
+   238	    userName: bookerMember.name ?? 'Unknown',
+   239	    userImage: bookerMember.image ?? null,
+   240	    status: 'yes',
+   241	  });
+   242	
+   243	  // 3. Booking-confirmed inbox notifications (owner + booker).
+   244	  // Best-effort: log but don't fail the response if fan-out misfires.
+   245	  const startsAtIso = requestedStart.toISOString();
+   246	  const payload = { startsAt: startsAtIso, location, note };
+   247	  const ownerTitle = `${et.title} booked by ${bookerMember.name ?? 'Someone'}`;
+   248	  const bookerTitle = `${et.title} booked with ${ownerMember.name ?? 'host'}`;
+   249	  const url = `/events/${eventId}`;
+   250	
+   251	  try {
+   252	    await createNotification(db, {
+   253	      userId: ownerLegacyId,
+   254	      memberId: ownerMember.id,
+   255	      type: 'booking.confirmed',
+   256	      eventId,
+   257	      actorId: bookerLegacyId,
+   258	      actorMemberId: bookerMember.id,
+   259	      actorName: bookerMember.name ?? null,
+   260	      title: ownerTitle,
+   261	      url,
+   262	      payload,
+   263	    });
+   264	  } catch (err) {
+   265	    console.error('[POST /api/booking/book] owner notification failed', err);
+   266	  }
+   267	
+   268	  try {
+   269	    await createNotification(db, {
+   270	      userId: bookerLegacyId,
+   271	      memberId: bookerMember.id,
+   272	      type: 'booking.confirmed',
+   273	      eventId,
+   274	      actorId: ownerLegacyId,
+   275	      actorMemberId: ownerMember.id,
+   276	      actorName: ownerMember.name ?? null,
+   277	      title: bookerTitle,
+   278	      url,
+   279	      payload,
+   280	    });
+   281	  } catch (err) {
+   282	    console.error('[POST /api/booking/book] booker notification failed', err);
+   283	  }
+   284	
+   285	  // 4. Transactional emails (owner + booker). Booking confirmations are
+   286	  // not gated on notification_preferences — those control recurring
+   287	  // reminders. The first "you have a meeting" message is a one-time
+   288	  // transactional notice that always sends when we have an address.
+   289	  const ownerName = ownerMember.name ?? 'host';
+   290	  const bookerName = bookerMember.name ?? 'someone';
+   291	  const eventTimezone = 'UTC';
+   292	
+   293	  if (ownerMember.email) {
+   294	    try {
+   295	      const { subject, html } = buildBookingConfirmedEmail({
+   296	        flavor: 'owner',
+   297	        eventId,
+   298	        eventTitle: et.title,
+   299	        startsAt: requestedStart,
+   300	        endsAt,
+   301	        location,
+   302	        ownerName,
+   303	        bookerName,
+   304	        recipientTimezone: ownerMember.timezone ?? eventTimezone,
+   305	        eventTimezone,
+   306	        noteFromBooker: note,
+   307	      });
+   308	      const result = await sendEmail(ownerMember.email, subject, html);
+   309	      if (!result.success) {
+   310	        console.error('[POST /api/booking/book] owner email failed', result.error);
+   311	      }
+   312	    } catch (err) {
+   313	      console.error('[POST /api/booking/book] owner email threw', err);
+   314	    }
+   315	  }
+   316	
+   317	  if (bookerMember.email) {
+   318	    try {
+   319	      const { subject, html } = buildBookingConfirmedEmail({
+   320	        flavor: 'booker',
+   321	        eventId,
+   322	        eventTitle: et.title,
+   323	        startsAt: requestedStart,
+   324	        endsAt,
+   325	        location,
+   326	        ownerName,
+   327	        bookerName,
+   328	        recipientTimezone: bookerMember.timezone ?? eventTimezone,
+   329	        eventTimezone,
+   330	      });
+   331	      const result = await sendEmail(bookerMember.email, subject, html);
+   332	      if (!result.success) {
+   333	        console.error('[POST /api/booking/book] booker email failed', result.error);
+   334	      }
+   335	    } catch (err) {
+   336	      console.error('[POST /api/booking/book] booker email threw', err);
+   337	    }
+   338	  }
+   339	
+   340	  // A successful booking writes an event into the owner's calendar AND
+   341	  // burns one slot on the public picker. Invalidate both.
+   342	  revalidateCalendarViews();
+   343	  revalidatePath(`/${handle}/${slug}`);
+   344	  revalidatePath(`/${handle}`);
+   345	
+   346	  return NextResponse.json(
+   347	    {
+   348	      id: eventId,
+   349	      startsAt: startsAtIso,
+   350	      endsAt: endsAt.toISOString(),
+   351	      location,
+   352	      title: et.title,
+   353	    },
+   354	    { status: 201 },
+   355	  );
+   356	}

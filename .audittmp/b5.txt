@@ -1,0 +1,161 @@
+     1	/**
+     2	 * POST /api/booking/event-types/ai-generate — turn a freeform
+     3	 * description into a structured EventType candidate.
+     4	 *
+     5	 * The user types something like "30-min coffee chat, in Castalia, 15
+     6	 * min buffer between bookings" and the assistant returns the same
+     7	 * shape EventTypeForm uses. The endpoint does NOT persist — caller
+     8	 * reviews and saves via the normal POST /api/booking/event-types.
+     9	 *
+    10	 * Auth: signed-in member. Talks to the same LiteLLM proxy
+    11	 * (`LITELLM_BASE_URL`, default https://llm.castalia.one/v1) used by
+    12	 * the /api/chat event-creation tools.
+    13	 */
+    14	
+    15	import { NextResponse } from 'next/server';
+    16	import { z } from 'zod';
+    17	import { db } from '@/lib/db';
+    18	import { getCurrentMember } from '@/lib/auth/get-current-member';
+    19	
+    20	export const maxDuration = 30;
+    21	
+    22	const LITELLM_BASE_URL = process.env.LITELLM_BASE_URL || 'https://llm.castalia.one/v1';
+    23	const LITELLM_API_KEY = process.env.LITELLM_API_KEY || '';
+    24	
+    25	const Input = z.object({
+    26	  prompt: z.string().min(3).max(2000),
+    27	});
+    28	
+    29	const Candidate = z.object({
+    30	  title: z.string().min(1).max(120),
+    31	  slug: z.string().regex(/^[a-z0-9][a-z0-9-]{1,49}$/),
+    32	  description: z.string().nullable(),
+    33	  durationMinutes: z.number().int().min(5).max(480),
+    34	  locationKind: z.enum(['castalia', 'external_link', 'in_person']),
+    35	  locationValue: z.string().nullable(),
+    36	  bufferBeforeMinutes: z.number().int().min(0).max(240),
+    37	  bufferAfterMinutes: z.number().int().min(0).max(240),
+    38	  minNoticeMinutes: z.number().int().min(0).max(43200),
+    39	  maxDaysAhead: z.number().int().min(1).max(365),
+    40	});
+    41	
+    42	const SYSTEM_PROMPT = `You convert a user's freeform description of a 1:1 meeting type into a JSON object matching the schema below. Reply with JSON ONLY, no prose.
+    43	
+    44	Schema:
+    45	{
+    46	  "title": string (1-120 chars, plain text, e.g. "Coffee Chat"),
+    47	  "slug": string (lowercase alphanumeric + hyphens, 2-50 chars, e.g. "coffee-chat"),
+    48	  "description": string | null (short, optional),
+    49	  "durationMinutes": integer (5-480; common: 15, 30, 45, 60),
+    50	  "locationKind": "castalia" | "external_link" | "in_person",
+    51	  "locationValue": string | null (null when locationKind=castalia; URL for external_link; address/place for in_person),
+    52	  "bufferBeforeMinutes": integer (0-240),
+    53	  "bufferAfterMinutes": integer (0-240),
+    54	  "minNoticeMinutes": integer (0-43200; default 60 = "at least 1 hour ahead"),
+    55	  "maxDaysAhead": integer (1-365; default 30)
+    56	}
+    57	
+    58	Rules:
+    59	- Default locationKind to "castalia" (a Castalia talk-zone link is auto-minted) unless the user explicitly names Zoom/Meet/Teams/Discord (external_link) or a physical place (in_person).
+    60	- Default duration to 30 if unspecified.
+    61	- Default buffers to 0 unless the user mentions "buffer", "break", "setup", "padding", "rest between".
+    62	- Derive a clean slug from the title (lowercase, hyphens, no spaces, max 50).
+    63	- If the user provides URLs/addresses, put them in locationValue and set locationKind accordingly.`;
+    64	
+    65	export async function POST(request: Request) {
+    66	  const member = await getCurrentMember(db);
+    67	  if (!member) {
+    68	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    69	  }
+    70	
+    71	  if (!LITELLM_API_KEY) {
+    72	    return NextResponse.json(
+    73	      { error: 'AI suggest is not configured on this deployment' },
+    74	      { status: 503 },
+    75	    );
+    76	  }
+    77	
+    78	  let body: unknown;
+    79	  try {
+    80	    body = await request.json();
+    81	  } catch {
+    82	    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    83	  }
+    84	  const parsed = Input.safeParse(body);
+    85	  if (!parsed.success) {
+    86	    return NextResponse.json({ error: 'prompt is required (3-2000 chars)' }, { status: 400 });
+    87	  }
+    88	
+    89	  let llmRes: Response;
+    90	  try {
+    91	    llmRes = await fetch(`${LITELLM_BASE_URL}/chat/completions`, {
+    92	      method: 'POST',
+    93	      headers: {
+    94	        Authorization: `Bearer ${LITELLM_API_KEY}`,
+    95	        'Content-Type': 'application/json',
+    96	      },
+    97	      body: JSON.stringify({
+    98	        model: 'Liminalia',
+    99	        messages: [
+   100	          { role: 'system', content: SYSTEM_PROMPT },
+   101	          { role: 'user', content: parsed.data.prompt },
+   102	        ],
+   103	        response_format: { type: 'json_object' },
+   104	        stream: false,
+   105	      }),
+   106	    });
+   107	  } catch (err) {
+   108	    console.error('[ai-generate] LiteLLM fetch failed', err);
+   109	    return NextResponse.json({ error: 'AI service unreachable' }, { status: 502 });
+   110	  }
+   111	
+   112	  if (!llmRes.ok) {
+   113	    const errText = await llmRes.text().catch(() => '');
+   114	    console.error('[ai-generate] LiteLLM error:', llmRes.status, errText.slice(0, 200));
+   115	    return NextResponse.json({ error: 'AI service returned an error' }, { status: 502 });
+   116	  }
+   117	
+   118	  let llmData: unknown;
+   119	  try {
+   120	    llmData = await llmRes.json();
+   121	  } catch {
+   122	    return NextResponse.json({ error: 'AI returned malformed response' }, { status: 502 });
+   123	  }
+   124	
+   125	  const content = (
+   126	    llmData as { choices?: Array<{ message?: { content?: string } }> }
+   127	  ).choices?.[0]?.message?.content;
+   128	  if (!content || typeof content !== 'string') {
+   129	    return NextResponse.json({ error: 'AI returned no content' }, { status: 502 });
+   130	  }
+   131	
+   132	  let candidate: unknown;
+   133	  try {
+   134	    candidate = JSON.parse(content);
+   135	  } catch {
+   136	    return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 502 });
+   137	  }
+   138	
+   139	  // Coerce common LLM near-misses before schema validation.
+   140	  if (candidate && typeof candidate === 'object') {
+   141	    const c = candidate as Record<string, unknown>;
+   142	    if (c.description === undefined) c.description = null;
+   143	    if (c.locationValue === undefined) c.locationValue = null;
+   144	    if (c.bufferBeforeMinutes === undefined) c.bufferBeforeMinutes = 0;
+   145	    if (c.bufferAfterMinutes === undefined) c.bufferAfterMinutes = 0;
+   146	    if (c.minNoticeMinutes === undefined) c.minNoticeMinutes = 60;
+   147	    if (c.maxDaysAhead === undefined) c.maxDaysAhead = 30;
+   148	    if (c.locationKind === 'castalia') c.locationValue = null;
+   149	  }
+   150	
+   151	  const validated = Candidate.safeParse(candidate);
+   152	  if (!validated.success) {
+   153	    console.error('[ai-generate] schema mismatch', validated.error.issues, candidate);
+   154	    return NextResponse.json(
+   155	      { error: 'AI returned an unusable shape — try rephrasing.' },
+   156	      { status: 502 },
+   157	    );
+   158	  }
+   159	
+   160	  return NextResponse.json({ candidate: validated.data });
+   161	}

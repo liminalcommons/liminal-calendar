@@ -1,0 +1,220 @@
+     1	/**
+     2	 * PATCH /api/booking/events/[id]/cancel — soft-cancel a booking-created
+     3	 * event (sourceEventTypeId IS NOT NULL).
+     4	 *
+     5	 * Auth: caller must be either
+     6	 *   (a) the event's host — events.member_id === caller.member.id, or
+     7	 *   (b) the booker — has a yes-rsvp on the event for caller.member.id.
+     8	 *
+     9	 * Idempotent: cancelling an already-cancelled event returns 200 with the
+    10	 * existing cancellation row; we don't re-fire emails.
+    11	 *
+    12	 * Past events cannot be cancelled (use "mark as no-show" semantics later
+    13	 * if needed). Manual (non-booking) events are out of scope here.
+    14	 *
+    15	 * Side effects on first cancel:
+    16	 *   - sets cancelled_at, cancelled_by_member_id, cancellation_reason
+    17	 *   - sends "cancelled" emails to both parties (when an address exists)
+    18	 *   - inserts inbox notifications for both parties
+    19	 *   - revalidates calendar views and the public booking page
+    20	 */
+    21	
+    22	import { NextRequest, NextResponse } from 'next/server';
+    23	import { revalidatePath } from 'next/cache';
+    24	import { z } from 'zod';
+    25	import { and, eq, sql } from 'drizzle-orm';
+    26	import { db } from '@/lib/db';
+    27	import { events, rsvps, members } from '@/lib/db/schema';
+    28	import { getCurrentMember } from '@/lib/auth/get-current-member';
+    29	import { createNotification } from '@/lib/notifications/inbox/repo';
+    30	import { sendEmail } from '@/lib/email';
+    31	import { buildBookingCancelledEmail } from '@/lib/notifications/booking-emails';
+    32	import { revalidateCalendarViews } from '@/lib/cache/revalidate-calendar-views';
+    33	
+    34	const Input = z.object({
+    35	  reason: z.string().trim().max(2000).optional(),
+    36	});
+    37	
+    38	function legacyIdFor(m: {
+    39	  id: number;
+    40	  logtoId: string | null;
+    41	  clerkId: string | null;
+    42	}): string {
+    43	  return m.logtoId ?? m.clerkId ?? String(m.id);
+    44	}
+    45	
+    46	export async function PATCH(
+    47	  request: NextRequest,
+    48	  context: { params: Promise<{ id: string }> },
+    49	) {
+    50	  const callerOrNull = await getCurrentMember(db);
+    51	  if (!callerOrNull) {
+    52	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    53	  }
+    54	  const caller = callerOrNull;
+    55	
+    56	  const { id: rawId } = await context.params;
+    57	  const eventId = Number.parseInt(rawId, 10);
+    58	  if (!Number.isFinite(eventId) || eventId <= 0) {
+    59	    return NextResponse.json({ error: 'Invalid event id' }, { status: 400 });
+    60	  }
+    61	
+    62	  let body: unknown = {};
+    63	  try {
+    64	    body = await request.json();
+    65	  } catch {
+    66	    // empty body is fine — reason is optional
+    67	  }
+    68	  const parsed = Input.safeParse(body);
+    69	  if (!parsed.success) {
+    70	    return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+    71	  }
+    72	  const reason =
+    73	    parsed.data.reason && parsed.data.reason.length > 0 ? parsed.data.reason : null;
+    74	
+    75	  // Load event.
+    76	  const [event] = await db.select().from(events).where(eq(events.id, eventId)).limit(1);
+    77	  if (!event) {
+    78	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    79	  }
+    80	  if (event.sourceEventTypeId === null) {
+    81	    return NextResponse.json(
+    82	      { error: 'Only booking-created events can be cancelled here' },
+    83	      { status: 400 },
+    84	    );
+    85	  }
+    86	
+    87	  // Authorization: host or booker.
+    88	  const isHost = event.memberId === caller.id;
+    89	  let isBooker = false;
+    90	  if (!isHost) {
+    91	    const [rsvp] = await db
+    92	      .select({ id: rsvps.id })
+    93	      .from(rsvps)
+    94	      .where(and(eq(rsvps.eventId, eventId), eq(rsvps.memberId, caller.id)))
+    95	      .limit(1);
+    96	    isBooker = !!rsvp;
+    97	  }
+    98	  if (!isHost && !isBooker) {
+    99	    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+   100	  }
+   101	
+   102	  // Idempotent: already cancelled → 200 with current state.
+   103	  if (event.cancelledAt) {
+   104	    return NextResponse.json({
+   105	      id: event.id,
+   106	      cancelledAt: event.cancelledAt,
+   107	      cancelledByMemberId: event.cancelledByMemberId,
+   108	      cancellationReason: event.cancellationReason,
+   109	      alreadyCancelled: true,
+   110	    });
+   111	  }
+   112	
+   113	  // Past events: don't allow cancellation through this endpoint.
+   114	  const startsAtDate = event.startsAt instanceof Date ? event.startsAt : new Date(event.startsAt);
+   115	  if (startsAtDate.getTime() < Date.now()) {
+   116	    return NextResponse.json(
+   117	      { error: 'Cannot cancel a meeting that already started' },
+   118	      { status: 400 },
+   119	    );
+   120	  }
+   121	
+   122	  // Mark cancelled.
+   123	  const cancelledAt = new Date();
+   124	  await db
+   125	    .update(events)
+   126	    .set({
+   127	      cancelledAt,
+   128	      cancelledByMemberId: caller.id,
+   129	      cancellationReason: reason,
+   130	      updatedAt: sql`NOW()`,
+   131	    })
+   132	    .where(eq(events.id, eventId));
+   133	
+   134	  // Load host + booker member rows for emails + notifications.
+   135	  const [hostMember] = event.memberId
+   136	    ? await db.select().from(members).where(eq(members.id, event.memberId)).limit(1)
+   137	    : [null];
+   138	
+   139	  const rsvpRows = await db
+   140	    .select({ memberId: rsvps.memberId, userId: rsvps.userId })
+   141	    .from(rsvps)
+   142	    .where(eq(rsvps.eventId, eventId));
+   143	  // Booker = the non-host attendee. There may be more in odd cases (e.g.
+   144	  // host invited an extra) but we only treat the first non-host as the
+   145	  // canonical booker for cancellation routing.
+   146	  const bookerRsvp = rsvpRows.find((r) => r.memberId !== event.memberId);
+   147	  const [bookerMember] = bookerRsvp?.memberId
+   148	    ? await db.select().from(members).where(eq(members.id, bookerRsvp.memberId)).limit(1)
+   149	    : [null];
+   150	
+   151	  const startsAtIso = startsAtDate.toISOString();
+   152	  const cancellerName = caller.name ?? 'Someone';
+   153	  const callerLegacyId = legacyIdFor(caller);
+   154	
+   155	  // Per-recipient fan-out: inbox + email each, best-effort.
+   156	  async function notify(
+   157	    recipientMember: typeof hostMember,
+   158	    flavor: 'host' | 'booker',
+   159	  ): Promise<void> {
+   160	    if (!recipientMember) return;
+   161	    const recipientLegacyId = legacyIdFor(recipientMember);
+   162	    const recipientIsCanceller = recipientMember.id === caller.id;
+   163	    const title = recipientIsCanceller
+   164	      ? `You cancelled ${event.title}`
+   165	      : `${cancellerName} cancelled ${event.title}`;
+   166	
+   167	    try {
+   168	      await createNotification(db, {
+   169	        userId: recipientLegacyId,
+   170	        memberId: recipientMember.id,
+   171	        type: 'booking.cancelled',
+   172	        eventId,
+   173	        actorId: callerLegacyId,
+   174	        actorMemberId: caller.id,
+   175	        actorName: caller.name ?? null,
+   176	        title,
+   177	        url: `/events/${eventId}`,
+   178	        payload: { startsAt: startsAtIso, reason, cancelledByMemberId: caller.id },
+   179	      });
+   180	    } catch (err) {
+   181	      console.error(`[cancel] ${flavor} inbox failed`, err);
+   182	    }
+   183	
+   184	    if (recipientMember.email) {
+   185	      try {
+   186	        const { subject, html } = buildBookingCancelledEmail({
+   187	          flavor,
+   188	          eventId,
+   189	          eventTitle: event.title,
+   190	          startsAt: startsAtDate,
+   191	          recipientTimezone: recipientMember.timezone ?? 'UTC',
+   192	          eventTimezone: event.timezone ?? 'UTC',
+   193	          cancellerName: caller.name ?? 'Someone',
+   194	          recipientIsCanceller,
+   195	          reason,
+   196	        });
+   197	        const result = await sendEmail(recipientMember.email, subject, html);
+   198	        if (!result.success) {
+   199	          console.error(`[cancel] ${flavor} email failed`, result.error);
+   200	        }
+   201	      } catch (err) {
+   202	        console.error(`[cancel] ${flavor} email threw`, err);
+   203	      }
+   204	    }
+   205	  }
+   206	
+   207	  await notify(hostMember, 'host');
+   208	  await notify(bookerMember, 'booker');
+   209	
+   210	  revalidateCalendarViews();
+   211	  revalidatePath(`/events/${eventId}`);
+   212	  revalidatePath('/book');
+   213	
+   214	  return NextResponse.json({
+   215	    id: eventId,
+   216	    cancelledAt: cancelledAt.toISOString(),
+   217	    cancelledByMemberId: caller.id,
+   218	    cancellationReason: reason,
+   219	  });
+   220	}

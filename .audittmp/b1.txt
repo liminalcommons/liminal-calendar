@@ -1,0 +1,151 @@
+     1	/**
+     2	 * GET    /api/booking/event-types/[id] — fetch one (own only)
+     3	 * PATCH  /api/booking/event-types/[id] — partial update (own only)
+     4	 * DELETE /api/booking/event-types/[id] — soft-delete via active=false
+     5	 *
+     6	 * Task 2 of Plan 3 (1:1 Booking).
+     7	 *
+     8	 * Auth: getCurrentMember(db). Authorization: row.ownerMemberId ===
+     9	 * member.id; on mismatch return 404 (do not disclose existence).
+    10	 *
+    11	 * Soft-delete preserves historical events FK references.
+    12	 */
+    13	
+    14	import { NextRequest, NextResponse } from 'next/server';
+    15	import { revalidatePath } from 'next/cache';
+    16	import { eq } from 'drizzle-orm';
+    17	import { db } from '@/lib/db';
+    18	import { eventTypes } from '@/lib/db/schema';
+    19	import { getCurrentMember } from '@/lib/auth/get-current-member';
+    20	import { EventTypeInput } from '@/lib/booking/event-types-repo';
+    21	
+    22	async function loadById(id: number) {
+    23	  const [row] = await db
+    24	    .select()
+    25	    .from(eventTypes)
+    26	    .where(eq(eventTypes.id, id))
+    27	    .limit(1);
+    28	  return row ?? null;
+    29	}
+    30	
+    31	export async function GET(
+    32	  _req: NextRequest,
+    33	  { params }: { params: Promise<{ id: string }> },
+    34	) {
+    35	  const member = await getCurrentMember(db);
+    36	  if (!member) {
+    37	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    38	  }
+    39	  const { id: idStr } = await params;
+    40	  const id = parseInt(idStr, 10);
+    41	  if (!Number.isFinite(id)) {
+    42	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    43	  }
+    44	  const row = await loadById(id);
+    45	  if (!row || row.ownerMemberId !== member.id) {
+    46	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    47	  }
+    48	  return NextResponse.json(row);
+    49	}
+    50	
+    51	export async function PATCH(
+    52	  request: NextRequest,
+    53	  { params }: { params: Promise<{ id: string }> },
+    54	) {
+    55	  const member = await getCurrentMember(db);
+    56	  if (!member) {
+    57	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    58	  }
+    59	  const { id: idStr } = await params;
+    60	  const id = parseInt(idStr, 10);
+    61	  if (!Number.isFinite(id)) {
+    62	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    63	  }
+    64	  const row = await loadById(id);
+    65	  if (!row || row.ownerMemberId !== member.id) {
+    66	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    67	  }
+    68	
+    69	  let body: unknown;
+    70	  try {
+    71	    body = await request.json();
+    72	  } catch {
+    73	    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    74	  }
+    75	  const parsed = EventTypeInput.partial().safeParse(body);
+    76	  if (!parsed.success) {
+    77	    return NextResponse.json(
+    78	      { error: 'Invalid input', details: parsed.error.flatten() },
+    79	      { status: 400 },
+    80	    );
+    81	  }
+    82	
+    83	  try {
+    84	    const [updated] = await db
+    85	      .update(eventTypes)
+    86	      .set({ ...parsed.data, updatedAt: new Date() })
+    87	      .where(eq(eventTypes.id, id))
+    88	      .returning();
+    89	
+    90	    revalidatePath('/book');
+    91	    if (member.handle) {
+    92	      revalidatePath(`/${member.handle}`);
+    93	      revalidatePath(`/${member.handle}/${updated.slug}`);
+    94	    }
+    95	
+    96	    return NextResponse.json(updated);
+    97	  } catch (e: unknown) {
+    98	    // Mirror the POST handler: PG SQLSTATE 23505 takes priority; constraint
+    99	    // name may live in `.message` or `.cause.message` depending on driver.
+   100	    const code = (e as { code?: string } | null)?.code;
+   101	    const msg = String((e as { message?: string } | null)?.message ?? '');
+   102	    const causeMsg = String(
+   103	      ((e as { cause?: { message?: string } } | null)?.cause?.message) ?? '',
+   104	    );
+   105	    if (
+   106	      code === '23505' ||
+   107	      /event_types_owner_slug_unique/.test(msg) ||
+   108	      /event_types_owner_slug_unique/.test(causeMsg)
+   109	    ) {
+   110	      return NextResponse.json({ error: 'Slug already in use' }, { status: 409 });
+   111	    }
+   112	    console.error('[PATCH /api/booking/event-types/[id]]', e);
+   113	    return NextResponse.json(
+   114	      { error: 'Failed to update event type' },
+   115	      { status: 500 },
+   116	    );
+   117	  }
+   118	}
+   119	
+   120	export async function DELETE(
+   121	  _req: NextRequest,
+   122	  { params }: { params: Promise<{ id: string }> },
+   123	) {
+   124	  const member = await getCurrentMember(db);
+   125	  if (!member) {
+   126	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+   127	  }
+   128	  const { id: idStr } = await params;
+   129	  const id = parseInt(idStr, 10);
+   130	  if (!Number.isFinite(id)) {
+   131	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+   132	  }
+   133	  const row = await loadById(id);
+   134	  if (!row || row.ownerMemberId !== member.id) {
+   135	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+   136	  }
+   137	
+   138	  await db
+   139	    .update(eventTypes)
+   140	    .set({ active: false, updatedAt: new Date() })
+   141	    .where(eq(eventTypes.id, id))
+   142	    .returning();
+   143	
+   144	  revalidatePath('/book');
+   145	  if (member.handle) {
+   146	    revalidatePath(`/${member.handle}`);
+   147	    revalidatePath(`/${member.handle}/${row.slug}`);
+   148	  }
+   149	
+   150	  return new NextResponse(null, { status: 204 });
+   151	}

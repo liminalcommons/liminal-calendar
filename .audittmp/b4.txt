@@ -1,0 +1,114 @@
+     1	/**
+     2	 * GET /api/booking/[handle]/[slug]/slots — Task 5 of Plan 3 (1:1 Booking).
+     3	 *
+     4	 * Returns the available slots for `[handle]`'s `[slug]` event-type over
+     5	 * the configured horizon (`maxDaysAhead`), respecting `minNoticeMinutes`
+     6	 * and per-slot buffers via the pure `computeSlots` engine.
+     7	 *
+     8	 * Auth: must be signed in (`getCurrentMember`). We don't surface the
+     9	 * booker's identity to the engine — we only use the auth check to gate
+    10	 * the endpoint, matching plan-3 Q-policy: "auth-gated, signed-in only".
+    11	 *
+    12	 * Blocking: filters `events.memberId === ownerMemberId` only. Per spec
+    13	 * Q7=C, RSVPs DO NOT block the host's availability.
+    14	 *
+    15	 * Next.js 15: `params` is async, must be awaited.
+    16	 */
+    17	
+    18	import { NextRequest, NextResponse } from 'next/server';
+    19	import { and, eq, gte, isNull, lte } from 'drizzle-orm';
+    20	import { db } from '@/lib/db';
+    21	import { events, members } from '@/lib/db/schema';
+    22	import { getCurrentMember } from '@/lib/auth/get-current-member';
+    23	import { resolveHandleToMemberId } from '@/lib/booking/handle-resolver';
+    24	import { getEventTypeBySlug } from '@/lib/booking/event-types-repo';
+    25	import { availabilityToWindows } from '@/lib/booking/availability-to-windows';
+    26	import { computeSlots } from '@/lib/booking/slots';
+    27	
+    28	const MS_PER_DAY = 86_400_000;
+    29	
+    30	export async function GET(
+    31	  _request: NextRequest,
+    32	  context: { params: Promise<{ handle: string; slug: string }> },
+    33	) {
+    34	  const member = await getCurrentMember(db);
+    35	  if (!member) {
+    36	    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    37	  }
+    38	
+    39	  const { handle, slug } = await context.params;
+    40	
+    41	  const ownerMemberId = await resolveHandleToMemberId(handle);
+    42	  if (ownerMemberId === null) {
+    43	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    44	  }
+    45	
+    46	  const eventType = await getEventTypeBySlug(ownerMemberId, slug);
+    47	  if (!eventType) {
+    48	    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    49	  }
+    50	
+    51	  // Bookable hours = the owner's `members.availability` half-hour heatmap,
+    52	  // set in /profile. Single source of truth — same data the WeeklyGrid
+    53	  // heatmap reads.
+    54	  const [ownerRow] = await db
+    55	    .select({ availability: members.availability, timezone: members.timezone })
+    56	    .from(members)
+    57	    .where(eq(members.id, ownerMemberId))
+    58	    .limit(1);
+    59	
+    60	  let availSlots: number[] = [];
+    61	  if (ownerRow?.availability) {
+    62	    try {
+    63	      const parsed = JSON.parse(ownerRow.availability);
+    64	      if (Array.isArray(parsed)) availSlots = parsed.filter((n) => Number.isInteger(n));
+    65	    } catch {
+    66	      availSlots = [];
+    67	    }
+    68	  }
+    69	  const windows = availabilityToWindows(availSlots, ownerRow?.timezone ?? 'UTC');
+    70	
+    71	  const now = new Date();
+    72	  const horizon = new Date(now.getTime() + eventType.maxDaysAhead * MS_PER_DAY);
+    73	
+    74	  // Blocking events: anything the owner is creator/host of inside the
+    75	  // horizon. We pass start+end to the engine; null end → engine treats
+    76	  // as start + duration. RSVPs are intentionally NOT queried.
+    77	  const blockingRows = await db
+    78	    .select({ startsAt: events.startsAt, endsAt: events.endsAt })
+    79	    .from(events)
+    80	    .where(
+    81	      and(
+    82	        eq(events.memberId, ownerMemberId),
+    83	        gte(events.startsAt, now),
+    84	        lte(events.startsAt, horizon),
+    85	        isNull(events.cancelledAt),
+    86	      ),
+    87	    );
+    88	
+    89	  const slots = computeSlots({
+    90	    now,
+    91	    eventType: {
+    92	      durationMinutes: eventType.durationMinutes,
+    93	      bufferBeforeMinutes: eventType.bufferBeforeMinutes ?? 0,
+    94	      bufferAfterMinutes: eventType.bufferAfterMinutes ?? 0,
+    95	      minNoticeMinutes: eventType.minNoticeMinutes ?? 0,
+    96	      maxDaysAhead: eventType.maxDaysAhead,
+    97	    },
+    98	    windows,
+    99	    blockingEvents: blockingRows.map((r) => ({
+   100	      startsAt: r.startsAt instanceof Date ? r.startsAt : new Date(r.startsAt),
+   101	      endsAt: r.endsAt ? (r.endsAt instanceof Date ? r.endsAt : new Date(r.endsAt)) : null,
+   102	    })),
+   103	  });
+   104	
+   105	  return NextResponse.json({
+   106	    eventType: {
+   107	      id: eventType.id,
+   108	      title: eventType.title,
+   109	      durationMinutes: eventType.durationMinutes,
+   110	      locationKind: eventType.locationKind,
+   111	    },
+   112	    slots: slots.map((s) => ({ startsAt: s.startsAt.toISOString() })),
+   113	  });
+   114	}

@@ -8,15 +8,20 @@ jest.mock('@clerk/nextjs/server', () => ({
 jest.mock('@/lib/auth/sync-clerk-member-on-read', () => ({
   syncClerkMemberOnRead: jest.fn(),
 }));
+jest.mock('@/lib/auth/sync-logto-member-on-read', () => ({
+  syncLogtoMemberOnRead: jest.fn(),
+}));
 
 import { auth as nextAuth } from '../../../auth';
 import { auth as clerkAuth } from '@clerk/nextjs/server';
 import { syncClerkMemberOnRead } from '@/lib/auth/sync-clerk-member-on-read';
+import { syncLogtoMemberOnRead } from '@/lib/auth/sync-logto-member-on-read';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 
 const mockNextAuth = nextAuth as unknown as jest.Mock;
 const mockClerkAuth = clerkAuth as unknown as jest.Mock;
 const mockSyncOnRead = syncClerkMemberOnRead as unknown as jest.Mock;
+const mockLogtoSync = syncLogtoMemberOnRead as unknown as jest.Mock;
 
 function makeFakeDb(rowToReturn: unknown[] = []) {
   const calls: { from?: unknown; where?: unknown; limit?: unknown } = {};
@@ -158,14 +163,51 @@ describe('getCurrentMember', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null when Logto session has logtoUserId but no Member row exists', async () => {
-    mockNextAuth.mockResolvedValue({ user: { logtoUserId: 'logto-orphan' } });
+  it('provisions a Logto member on read when no row exists yet, then returns it', async () => {
+    // Regression: previously this returned null, 401-ing every protected
+    // route for any Castalia user without a pre-existing email-matched row.
+    const member = {
+      id: 7,
+      logtoId: 'logto-fresh',
+      clerkId: null,
+      name: 'Fresh',
+      email: 'fresh@example.com',
+    };
+    mockNextAuth.mockResolvedValue({
+      user: { logtoUserId: 'logto-fresh', email: 'fresh@example.com', name: 'Fresh' },
+    });
     mockClerkAuth.mockResolvedValue({ userId: null });
-    const { db } = makeFakeDb([]);
+
+    const { db, setRows } = makeMutableFakeDb();
+    // Sync mock simulates the row appearing after provisioning.
+    mockLogtoSync.mockImplementation(async () => {
+      setRows([member]);
+    });
 
     const result = await getCurrentMember(db);
+
+    expect(mockLogtoSync).toHaveBeenCalledTimes(1);
+    expect(mockLogtoSync).toHaveBeenCalledWith(db, {
+      logtoUserId: 'logto-fresh',
+      email: 'fresh@example.com',
+      name: 'Fresh',
+    });
+    expect(result).toBe(member);
+    // Provisioning succeeded → Clerk fallback never consulted.
+    expect(mockClerkAuth).not.toHaveBeenCalled();
+  });
+
+  it('falls through to Clerk when Logto provisioning still yields no row', async () => {
+    mockNextAuth.mockResolvedValue({ user: { logtoUserId: 'logto-unfixable' } });
+    mockClerkAuth.mockResolvedValue({ userId: null });
+
+    const { db } = makeMutableFakeDb(); // rows stay []
+    mockLogtoSync.mockResolvedValue(undefined);
+
+    const result = await getCurrentMember(db);
+
+    expect(mockLogtoSync).toHaveBeenCalledTimes(1);
+    expect(mockClerkAuth).toHaveBeenCalled();
     expect(result).toBeNull();
-    // After Logto miss, falls through to Clerk; Clerk has no user, no sync.
-    expect(mockSyncOnRead).not.toHaveBeenCalled();
   });
 });
