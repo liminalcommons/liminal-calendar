@@ -26,18 +26,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: 'Castalia',
       type: 'oidc',
       issuer: LOGTO_ISSUER,
-      // Skip OIDC discovery and declare the endpoints explicitly. Logto's
-      // discovery doc advertises `authorization_response_iss_parameter_supported:
-      // true` but Logto never emits `iss` on the callback redirect, so Auth.js
-      // (oauth4webapi) enforced RFC-9207 and every Castalia callback failed with
-      // `?error=Configuration`. With `wellKnown: null` Auth.js fabricates the
-      // authorization-server metadata from these endpoints instead of reading
-      // the misadvertised flag, so the `iss` check is correctly skipped.
-      wellKnown: null,
+      // Declare the OAuth endpoints explicitly so Auth.js skips OIDC discovery.
+      // Logto's discovery doc advertises
+      // `authorization_response_iss_parameter_supported: true` but Logto never
+      // emits `iss` on the callback redirect, so Auth.js (oauth4webapi) enforced
+      // RFC-9207 and every Castalia callback failed with `?error=Configuration`.
+      // When `token` and `userinfo` URLs are both provided, @auth/core's oauth
+      // callback builds the authorization-server metadata from these endpoints
+      // (handleOAuth: the non-discovery branch) WITHOUT that flag, so the `iss`
+      // check is correctly skipped. Endpoint URLs are from Logto's discovery doc.
       authorization: { url: `${LOGTO_ISSUER}/auth`, params: { scope: 'openid email profile' } },
       token: `${LOGTO_ISSUER}/token`,
       userinfo: `${LOGTO_ISSUER}/me`,
-      jwks_endpoint: `${LOGTO_ISSUER}/jwks`,
       checks: ['pkce', 'state'],
       clientId: process.env.LOGTO_CLIENT_ID?.trim(),
       clientSecret: process.env.LOGTO_CLIENT_SECRET?.trim(),
