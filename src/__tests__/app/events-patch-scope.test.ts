@@ -3,28 +3,37 @@
  *
  * PATCH /api/events/[id] — scope handling for the drag-to-reschedule flow.
  *
- * The drag UX sends `scope: 'all'` on recurring events (B4). The server's
- * existing behavior (update events.startsAt/endsAt) IS the "all" semantic,
- * because expandRecurringEvents uses the row as the template.
+ * The drag UX sends `scope: 'all'` on recurring events. The server's existing
+ * behavior (update events.startsAt/endsAt) IS the "all" semantic, because
+ * expandRecurringEvents uses the row as the template.
  *
- * What B5 adds: explicit validation that rejects unsupported scopes
- * ('this_only', 'this_and_following') as 501 Not Implemented, and rejects
- * unknown values as 400. Defense in depth — the modal disables the
- * unsupported branches client-side, but the server must not silently
- * accept them either, since "silent accept = mystery bug" if the modal
+ * Contract locked here: explicit validation that rejects unsupported scopes
+ * ('this_only', 'this_and_following') as 501 Not Implemented, rejects unknown
+ * values as 400, and accepts 'all' (or omitted) as 200. Defense in depth — the
+ * modal disables the unsupported branches client-side, but the server must not
+ * silently accept them either, since "silent accept = mystery bug" if the modal
  * gating ever drifts.
+ *
+ * Auth: the route reads getAuthedUser() from '@/lib/auth/get-authed-user' and
+ * gates field edits behind canEditEvent(role, isCreator). isCreator is true when
+ * event.memberId === authed.memberId, so the mocked caller's memberId is set to
+ * match the event row's memberId, making the caller the creator (passes the
+ * gate at any role tier). canEditEvent is exercised for real, not mocked.
  */
 
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
-}));
-jest.mock('@/lib/auth-helpers', () => ({
-  getUserRole: jest.fn(() => 'host'),
-  canEditEvent: jest.fn(() => true),
-  canDeleteEvent: jest.fn(() => true),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
+}));
+jest.mock('@/lib/cache/revalidate-calendar-views', () => ({
+  revalidateCalendarViews: jest.fn(),
+}));
+jest.mock('@/lib/notifications/fanout', () => ({
+  diffEventForNotification: jest.fn(() => null),
+  fanoutEventChanged: jest.fn(),
+  fanoutEventCancelled: jest.fn(),
 }));
 jest.mock('@/lib/db/to-display-event', () => ({
   dbEventToDisplayEvent: (e: unknown) => ({
@@ -35,29 +44,52 @@ jest.mock('@/lib/db/to-display-event', () => ({
   }),
 }));
 
-import { auth } from '../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { PATCH } from '@/app/api/events/[id]/route';
 
-const mockAuth = auth as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
+
+const CREATOR_MEMBER_ID = 7;
 
 const baseRow = {
   id: 42,
-  creatorId: 'me',
+  memberId: CREATOR_MEMBER_ID,
   title: 'Weekly Sync',
+  description: 'sync',
   startsAt: new Date('2026-05-03T10:00:00Z'),
   endsAt: new Date('2026-05-03T11:00:00Z'),
+  timezone: 'UTC',
+  location: null,
+  imageUrl: null,
   recurrenceRule: 'weekly',
+  cancelledByMemberId: null,
 };
 
 function setupDbMocks(initialRow = baseRow) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const dbModule = require('@/lib/db') as { db: Record<string, unknown> };
   let updatedRow: Record<string, unknown> = { ...initialRow };
+
+  // The route uses `select().from().where()` twice: once to load the event
+  // (returns [initialRow]) and once after the update to load rsvps (returns []).
+  // Both share the same chain shape; the event load awaits the first row via
+  // destructuring `const [event] = ...`, so a single-element array works, and
+  // the rsvps query awaits the whole array. Returning [initialRow] for the
+  // event load and [] for rsvps would require call counting; instead we return
+  // a thenable that resolves to [initialRow] for the event lookup and rely on
+  // the rsvps lookup tolerating a non-empty array (dbEventToDisplayEvent is
+  // mocked and ignores rsvps). To keep it simple and correct, return [initialRow]
+  // for the first .where and [] for subsequent ones.
+  let selectCalls = 0;
   dbModule.db.select = () => ({
     from: () => ({
-      where: () => Promise.resolve([initialRow]),
+      where: () => {
+        selectCalls += 1;
+        return Promise.resolve(selectCalls === 1 ? [initialRow] : []);
+      },
     }),
   });
+
   dbModule.db.update = () => ({
     set: (values: Record<string, unknown>) => ({
       where: () => ({
@@ -81,7 +113,15 @@ const params = { params: Promise.resolve({ id: '42' }) };
 describe('PATCH /api/events/[id] — scope handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth.mockResolvedValue({ user: { hyloId: 'me', id: 'me' } });
+    // Caller is the event creator (memberId matches the row), role 'host'.
+    // isCreator === true → canEditEvent(role, isCreator) === true at any tier.
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: CREATOR_MEMBER_ID,
+      id: 'user-abc',
+      role: 'host',
+      name: 'Me',
+      image: null,
+    });
     setupDbMocks();
   });
 

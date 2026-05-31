@@ -4,12 +4,22 @@
  * Tests for Plan 2 Task 4:
  *   A. GET /api/events/[id]/invitations
  *   B. PATCH /api/events/[id] with optional `invitees` field
+ *
+ * Identity model: routes resolve the caller via `getAuthedUser()`
+ * (@/lib/auth/get-authed-user), which returns an `AuthedUser`:
+ *   { memberId: number|null, id, role: 'member'|'host'|'admin', name, image, ... }
+ * Ownership/creator is `event.memberId === authed.memberId`. There is no
+ * `hyloId` anywhere — Hylo was removed. Each auth mock below therefore sets
+ * `memberId` (the canonical integer FK) rather than a provider string.
  */
 
 // ── Shared mocks ──────────────────────────────────────────────────────────────
 
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockGetAuthedUser: jest.Mock<any, any[]> = jest.fn();
+
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: () => mockGetAuthedUser(),
 }));
 
 jest.mock('@/lib/db', () => ({
@@ -20,26 +30,14 @@ jest.mock('@/lib/db/to-display-event', () => ({
   dbEventToDisplayEvent: (e: unknown) => ({ id: (e as { id: number }).id, _mock: true }),
 }));
 
+jest.mock('@/lib/cache/revalidate-calendar-views', () => ({
+  revalidateCalendarViews: jest.fn(),
+}));
+
 jest.mock('@/lib/notifications/fanout', () => ({
   diffEventForNotification: jest.fn(() => null),
   fanoutEventChanged: jest.fn(),
   fanoutEventCancelled: jest.fn(),
-}));
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockGetUserRole: jest.Mock<any, any[]> = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockCanEditEvent: jest.Mock<any, any[]> = jest.fn();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockCanDeleteEvent: jest.Mock<any, any[]> = jest.fn(() => false);
-
-jest.mock('@/lib/auth-helpers', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getUserRole: (arg: any) => mockGetUserRole(arg),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  canEditEvent: (role: any, isCreator: any) => mockCanEditEvent(role, isCreator),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  canDeleteEvent: (role: any, isCreator: any) => mockCanDeleteEvent(role, isCreator),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,7 +46,7 @@ const mockVisibleCondition = { _sql: 'visible' } as any;
 const mockPublicCondition = { _sql: 'public' } as any;
 
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn(() => mockVisibleCondition),
+  visibleEventsForMemberCondition: jest.fn(() => mockVisibleCondition),
   publicOnlyEventsCondition: jest.fn(() => mockPublicCondition),
 }));
 
@@ -69,11 +67,31 @@ jest.mock('@/lib/events/invitations-repo', () => ({
   listEventInvitations: (arg: any) => mockListEventInvitations(arg),
 }));
 
-import { auth } from '../../../auth';
 import { GET as getInvitations } from '@/app/api/events/[id]/invitations/route';
 import { PATCH } from '@/app/api/events/[id]/route';
+import type { AuthedUser } from '@/lib/auth/get-authed-user';
 
-const mockAuth = auth as unknown as jest.Mock;
+// ── Auth helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Build an AuthedUser. `memberId` is the canonical integer identity the routes
+ * compare against `event.memberId` for ownership; `id` is the provider string
+ * surfaced to display-event projection. Both are set consistently.
+ */
+function authedUser(
+  memberId: number,
+  role: AuthedUser['role'] = 'member',
+): AuthedUser {
+  return {
+    memberId,
+    id: `logto-${memberId}`,
+    role,
+    name: `Member ${memberId}`,
+    image: null,
+    logtoUserId: `logto-${memberId}`,
+    email: null,
+  };
+}
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -134,14 +152,16 @@ function makeInvitees(count: number) {
 
 // ── Shared event row ──────────────────────────────────────────────────────────
 
-const CREATOR_ID = 'creator-99';
+// The event's owner — ownership is `event.memberId === authed.memberId`.
+const CREATOR_MEMBER_ID = 99;
 const BASE_EVENT = {
   id: 42,
-  creatorId: CREATOR_ID,
+  memberId: CREATOR_MEMBER_ID,
   title: 'Test Event',
   startsAt: new Date('2026-07-01T18:00:00Z'),
   endsAt: new Date('2026-07-01T19:00:00Z'),
   visibility: 'private',
+  cancelledByMemberId: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,7 +176,7 @@ describe('GET /api/events/[id]/invitations', () => {
 
   // Test 1: Unauthed → 401
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
     const res = await getInvitations(
       {} as import('next/server').NextRequest,
       params42,
@@ -166,9 +186,7 @@ describe('GET /api/events/[id]/invitations', () => {
 
   // Test 2: Event not visible → 404
   it('returns 404 when event not visible to user', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'viewer-1', id: 'viewer-1' },
-    });
+    mockGetAuthedUser.mockResolvedValue(authedUser(1));
     setupEventNotVisible();
 
     const res = await getInvitations(
@@ -180,9 +198,7 @@ describe('GET /api/events/[id]/invitations', () => {
 
   // Test 3: Event visible (creator) → 200 with invitation list
   it('returns 200 with invitation list when event is visible to creator', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID));
     setupEventVisible(BASE_EVENT);
 
     const invitations = [
@@ -207,15 +223,15 @@ describe('GET /api/events/[id]/invitations', () => {
 
   // Test 4: Event visible via existing invitation row → 200
   it('returns 200 when event is visible because user is an invitee', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'invitee-user', id: 'invitee-user' },
-    });
-    // The visibility condition includes invitation check — mock returns the event
+    // A non-creator member whose visibility comes from an invitation row.
+    // The DB visibility condition (mocked here) is what grants access; the
+    // route just needs a positive memberId to take the member-visibility path.
+    mockGetAuthedUser.mockResolvedValue(authedUser(7));
     setupEventVisible(BASE_EVENT);
 
     mockListEventInvitations.mockResolvedValue([
       {
-        inviteeUserId: 'invitee-user',
+        inviteeUserId: 'logto-7',
         inviteeName: 'Invitee',
         inviteeImage: null,
         invitedAt: null,
@@ -233,9 +249,7 @@ describe('GET /api/events/[id]/invitations', () => {
 
   // Test 5: Empty list → returns { invitations: [] }
   it('returns empty array when there are no invitations', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID));
     setupEventVisible(BASE_EVENT);
     mockListEventInvitations.mockResolvedValue([]);
 
@@ -251,6 +265,12 @@ describe('GET /api/events/[id]/invitations', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // B. PATCH /api/events/[id] with invitees
+//
+// Invitation-edit authz (route): `wantsInvitationEdit && !isCreator &&
+// role !== 'admin'` → 403. i.e. the event creator (ANY role, members
+// included) OR an admin may edit invitations. Field-only edits go through
+// canEditEvent(role, isCreator) === isCreator. The cap is enforced by
+// validateInviteeCap({ organizerRole: authed.role, ... }).
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('PATCH /api/events/[id] — invitees editing', () => {
@@ -261,11 +281,9 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 6: Non-creator non-admin → 403
   it('returns 403 for non-creator non-admin trying to edit invitations', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'other-user', id: 'other-user' },
-    });
-    mockGetUserRole.mockReturnValue('member');
-    mockCanEditEvent.mockReturnValue(false);
+    // A stranger member (memberId 12 ≠ creator 99), role member → not creator,
+    // not admin → invitation edit forbidden.
+    mockGetAuthedUser.mockResolvedValue(authedUser(12, 'member'));
     setupPatchDbMocks(BASE_EVENT);
 
     const res = await PATCH(
@@ -278,11 +296,7 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 7: Creator (member) + 11 invitees → 400, invitations unchanged
   it('returns 400 for member creator with 11 invitees (cap exceeded)', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
-    mockGetUserRole.mockReturnValue('member');
-    mockCanEditEvent.mockReturnValue(false); // member+creator → canEditEvent false (field edits blocked)
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID, 'member'));
     setupPatchDbMocks(BASE_EVENT);
     mockValidateInviteeCap.mockImplementation(() => {
       throw new Error('INVITEE_CAP_EXCEEDED');
@@ -300,11 +314,7 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 8: Creator (member) + 10 → 200
   it('returns 200 for member creator with exactly 10 invitees', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
-    mockGetUserRole.mockReturnValue('member');
-    mockCanEditEvent.mockReturnValue(false);
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID, 'member'));
     setupPatchDbMocks(BASE_EVENT);
     const invitees = makeInvitees(10);
     mockValidateInviteeCap.mockReturnValue(invitees);
@@ -322,11 +332,7 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 9: Creator (host) + 50 → 200
   it('returns 200 for host creator with 50 invitees (no cap)', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
-    mockGetUserRole.mockReturnValue('host');
-    mockCanEditEvent.mockReturnValue(true);
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID, 'host'));
     setupPatchDbMocks(BASE_EVENT);
     const invitees = makeInvitees(50);
     mockValidateInviteeCap.mockReturnValue(invitees);
@@ -343,11 +349,8 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 10: Admin (not creator) + 30 → 200
   it('returns 200 for admin (not creator) with 30 invitees', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'admin-user', id: 'admin-user' },
-    });
-    mockGetUserRole.mockReturnValue('admin');
-    mockCanEditEvent.mockReturnValue(false); // admin is not creator here
+    // memberId 5 ≠ creator 99, but role admin → invitation edit allowed.
+    mockGetAuthedUser.mockResolvedValue(authedUser(5, 'admin'));
     setupPatchDbMocks(BASE_EVENT);
     const invitees = makeInvitees(30);
     mockValidateInviteeCap.mockReturnValue(invitees);
@@ -364,11 +367,8 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 11: PATCH without `invitees` key → existing fields update, invitations untouched
   it('does not touch invitations when invitees key is absent', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
-    mockGetUserRole.mockReturnValue('host');
-    mockCanEditEvent.mockReturnValue(true);
+    // Host creator may edit fields (canEditEvent === isCreator).
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID, 'host'));
     setupPatchDbMocks(BASE_EVENT);
 
     const res = await PATCH(
@@ -382,11 +382,7 @@ describe('PATCH /api/events/[id] — invitees editing', () => {
 
   // Test 12: PATCH with `invitees: []` → all invitations cleared
   it('clears all invitations when invitees is an explicit empty array', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: CREATOR_ID, id: CREATOR_ID },
-    });
-    mockGetUserRole.mockReturnValue('host');
-    mockCanEditEvent.mockReturnValue(true);
+    mockGetAuthedUser.mockResolvedValue(authedUser(CREATOR_MEMBER_ID, 'host'));
     setupPatchDbMocks(BASE_EVENT);
     mockValidateInviteeCap.mockReturnValue([]); // empty after dedupe
 

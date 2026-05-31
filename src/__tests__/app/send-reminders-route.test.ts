@@ -115,25 +115,25 @@ describe('GET /api/cron/send-reminders', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it('sends email to a Hylo Member (lookup matches members.hyloId)', async () => {
+  it('sends email to a Logto Member (lookup matches members.logtoId)', async () => {
     setupSelectQueue([
       // 1st select: dueEvents (events innerJoin rsvps where window+remindMe+!no)
       [
         {
           eventId: 1,
-          title: 'Hylo Event',
+          title: 'Logto Event',
           startsAt: new Date('2026-04-28T10:00:00Z'),
           endsAt: null,
           location: null,
           description: null,
           eventTimezone: 'UTC',
-          userId: 'h-42', // Hylo userId on rsvps row
+          userId: 'logto-42', // Logto userId on rsvps row
         },
       ],
       // 2nd select: alreadySent — empty
       [],
-      // 3rd select: memberRows lookup by OR(hyloId, clerkId)
-      [{ hyloId: 'h-42', clerkId: null, email: 'alice@x.y', timezone: 'UTC' }],
+      // 3rd select: memberRows lookup by OR(clerkId, logtoId)
+      [{ logtoId: 'logto-42', clerkId: null, email: 'alice@x.y', timezone: 'UTC' }],
     ]);
 
     const res = await GET(makeReq());
@@ -147,7 +147,7 @@ describe('GET /api/cron/send-reminders', () => {
     expect(mockCreateNotification).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        userId: 'h-42',
+        userId: 'logto-42',
         type: 'reminder.24hr',
         eventId: 1,
       }),
@@ -198,13 +198,13 @@ describe('GET /api/cron/send-reminders', () => {
           location: null,
           description: null,
           eventTimezone: 'UTC',
-          userId: 'h-1',
+          userId: 'logto-1',
         },
       ],
       // alreadySent contains this exact (eventId, userId) for type='24hr'
-      [{ eventId: 3, userId: 'h-1' }],
+      [{ eventId: 3, userId: 'logto-1' }],
       // memberRows would still return — but skipped before email send
-      [{ hyloId: 'h-1', clerkId: null, email: 'a@x.y', timezone: 'UTC' }],
+      [{ logtoId: 'logto-1', clerkId: null, email: 'a@x.y', timezone: 'UTC' }],
     ]);
 
     const res = await GET(makeReq());
@@ -227,11 +227,11 @@ describe('GET /api/cron/send-reminders', () => {
           location: null,
           description: null,
           eventTimezone: 'UTC',
-          userId: 'h-2',
+          userId: 'logto-2',
         },
       ],
       [],
-      [{ hyloId: 'h-2', clerkId: null, email: 'c@x.y', timezone: 'UTC' }],
+      [{ logtoId: 'logto-2', clerkId: null, email: 'c@x.y', timezone: 'UTC' }],
     ]);
 
     const res = await GET(makeReq());
@@ -345,12 +345,12 @@ describe('GET /api/cron/send-reminders', () => {
           location: null,
           description: null,
           eventTimezone: 'UTC',
-          userId: 'h-3',
+          userId: 'logto-3',
         },
       ],
       [],
       // member.email is null
-      [{ hyloId: 'h-3', clerkId: null, email: null, timezone: 'UTC' }],
+      [{ logtoId: 'logto-3', clerkId: null, email: null, timezone: 'UTC' }],
     ]);
 
     const res = await GET(makeReq());

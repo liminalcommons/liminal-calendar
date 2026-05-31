@@ -12,7 +12,7 @@ jest.mock('../../../auth', () => ({
   auth: jest.fn(() => Promise.resolve(null)),
 }));
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn(() => ({ __vis: 'user' })),
+  visibleEventsForMemberCondition: jest.fn(() => ({ __vis: 'member' })),
   publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
 }));
 jest.mock('@/lib/auth/get-current-member', () => ({
@@ -140,7 +140,7 @@ describe('POST /api/events/[id]/comments', () => {
 
   it('returns 400 for non-numeric event id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(makeReq({ body: 'hi' }), {
       params: Promise.resolve({ id: 'abc' }),
@@ -150,7 +150,7 @@ describe('POST /api/events/[id]/comments', () => {
 
   it('returns 400 for invalid JSON body', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(makeReq('__INVALID__'), eventParams);
     expect(res.status).toBe(400);
@@ -158,7 +158,7 @@ describe('POST /api/events/[id]/comments', () => {
 
   it('returns 400 for empty body', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ body: '   ' }), eventParams);
@@ -167,7 +167,7 @@ describe('POST /api/events/[id]/comments', () => {
 
   it('returns 400 for body over 2000 chars', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ body: 'x'.repeat(2001) }), eventParams);
@@ -176,41 +176,47 @@ describe('POST /api/events/[id]/comments', () => {
 
   it('returns 404 when event does not exist', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([]);
     const res = await POST(makeReq({ body: 'hi' }), eventParams);
     expect(res.status).toBe(404);
   });
 
-  it('creates a comment using hyloId for Hylo Member', async () => {
+  it('creates a comment using logtoId for a Logto Member', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y', image: 'img.png',
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'Alice', email: 'a@x.y', image: 'img.png', role: 'member',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ body: 'hello' }), eventParams);
     expect(res.status).toBe(200);
     const args = mockCreateComment.mock.calls[0][1];
-    expect(args.authorId).toBe('h-1');
+    // authorId is the legacy string identity: logtoId takes precedence.
+    expect(args.authorId).toBe('logto_1');
+    // memberId is the canonical Member.id passed straight through.
+    expect(args.memberId).toBe(1);
     expect(args.authorName).toBe('Alice');
     expect(args.authorImage).toBe('img.png');
     expect(args.body).toBe('hello');
     expect(args.eventId).toBe(5);
   });
 
-  it('creates a comment using clerkId for Clerk-only Member', async () => {
+  it('creates a comment using clerkId for a Clerk-only Member', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 2, hyloId: null, clerkId: 'clerk_x', name: 'Bob', email: null, image: null,
+      id: 2, logtoId: null, clerkId: 'clerk_x', name: 'Bob', email: null, image: null, role: 'member',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ body: 'hi' }), eventParams);
     expect(res.status).toBe(200);
-    expect(mockCreateComment.mock.calls[0][1].authorId).toBe('clerk_x');
+    const args = mockCreateComment.mock.calls[0][1];
+    // No logtoId, so authorId falls back to clerkId.
+    expect(args.authorId).toBe('clerk_x');
+    expect(args.memberId).toBe(2);
   });
 
   it('returns the created comment in the response body', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'Alice', email: null, image: null,
+      id: 1, logtoId: 'logto_1', clerkId: null, name: 'Alice', email: null, image: null, role: 'member',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ body: 'hello' }), eventParams);
