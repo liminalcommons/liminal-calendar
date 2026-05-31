@@ -2,8 +2,8 @@
  * @jest-environment node
  */
 
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 jest.mock('@clerk/nextjs/server', () => ({
   clerkClient: jest.fn(),
@@ -18,16 +18,34 @@ jest.mock('@/lib/auth/sync-clerk-member-with-merge', () => ({
   syncClerkMemberWithMerge: jest.fn(),
 }));
 
-import { auth } from '../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { clerkClient } from '@clerk/nextjs/server';
 import { findMemberByClerkId } from '@/lib/auth/find-member-by-clerk-id';
 import { syncClerkMemberWithMerge } from '@/lib/auth/sync-clerk-member-with-merge';
 import { POST } from '@/app/api/admin/backfill-clerk/route';
 
-const mockAuth = auth as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 const mockClerkClient = clerkClient as unknown as jest.Mock;
 const mockFindByClerkId = findMemberByClerkId as unknown as jest.Mock;
 const mockSync = syncClerkMemberWithMerge as unknown as jest.Mock;
+
+// Canonical authed-user shapes the route reads (only the role gate matters here).
+const adminUser = {
+  memberId: 1,
+  id: 'logto-admin',
+  role: 'admin' as const,
+  name: 'Admin',
+  image: null,
+  logtoUserId: 'logto-admin',
+};
+const memberUser = {
+  memberId: 2,
+  id: 'logto-member',
+  role: 'member' as const,
+  name: 'Member',
+  image: null,
+  logtoUserId: 'logto-member',
+};
 
 function makeUser(overrides: Partial<{
   id: string;
@@ -60,19 +78,19 @@ describe('POST /api/admin/backfill-clerk', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('returns 401 when no session', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
     const res = await POST();
     expect(res.status).toBe(401);
   });
 
   it('returns 403 when caller is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-1', role: 'member' } });
+    mockGetAuthedUser.mockResolvedValue(memberUser);
     const res = await POST();
     expect(res.status).toBe(403);
   });
 
   it('returns zero counts when Clerk has no users', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    mockGetAuthedUser.mockResolvedValue(adminUser);
     setupClerkUserList([]);
     const res = await POST();
     expect(res.status).toBe(200);
@@ -86,7 +104,7 @@ describe('POST /api/admin/backfill-clerk', () => {
   });
 
   it('counts already-provisioned users without calling sync', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    mockGetAuthedUser.mockResolvedValue(adminUser);
     setupClerkUserList([
       makeUser({ id: 'clerk_1' }),
       makeUser({ id: 'clerk_2' }),
@@ -102,7 +120,7 @@ describe('POST /api/admin/backfill-clerk', () => {
   });
 
   it('provisions fresh Clerk users and counts them', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    mockGetAuthedUser.mockResolvedValue(adminUser);
     setupClerkUserList([
       makeUser({
         id: 'clerk_new',
@@ -137,7 +155,7 @@ describe('POST /api/admin/backfill-clerk', () => {
   });
 
   it('counts failures when sync throws and continues processing remaining users', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    mockGetAuthedUser.mockResolvedValue(adminUser);
     setupClerkUserList([
       makeUser({ id: 'clerk_will_fail' }),
       makeUser({ id: 'clerk_ok' }),
@@ -158,7 +176,7 @@ describe('POST /api/admin/backfill-clerk', () => {
   });
 
   it('mixes already-provisioned and fresh in a single pass', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-admin', role: 'admin' } });
+    mockGetAuthedUser.mockResolvedValue(adminUser);
     setupClerkUserList([
       makeUser({ id: 'clerk_existing' }),
       makeUser({ id: 'clerk_fresh' }),

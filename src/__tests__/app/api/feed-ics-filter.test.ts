@@ -3,7 +3,7 @@
  */
 
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn(() => ({ __vis: 'user' })),
+  visibleEventsForMemberCondition: jest.fn(() => ({ __vis: 'member' })),
   publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
 }));
 
@@ -32,8 +32,10 @@ jest.mock('@/lib/db', () => ({
           where: () => {
             if (call === 1) {
               // member lookup — need .limit(); also need .orderBy() for no-token path (call=1 there)
+              // Route selects { id, clerkId, logtoId }; supply all three so
+              // _memberId (visibility) and _userId (rsvps filter) both resolve.
               return {
-                limit: () => Promise.resolve([{ hyloId: 'u1' }]),
+                limit: () => Promise.resolve([{ id: 7, logtoId: 'u1', clerkId: null }]),
                 orderBy: () => Promise.resolve([mockEventA, mockEventB]),
               };
             }

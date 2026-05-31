@@ -10,6 +10,15 @@ jest.mock('@/lib/auth/get-current-member', () => ({
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
 }));
+// PUT revalidates calendar views + handle paths on success; outside a Next.js
+// request context revalidatePath throws "static generation store missing".
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+}));
+jest.mock('@/lib/cache/revalidate-calendar-views', () => ({
+  revalidateCalendarViews: jest.fn(),
+}));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { PUT } from '@/app/api/profile/handle/route';

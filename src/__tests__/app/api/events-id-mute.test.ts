@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 
+jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }));
 jest.mock('../../../../auth', () => ({ auth: jest.fn() }));
 jest.mock('@/lib/auth/get-current-member', () => ({ getCurrentMember: jest.fn() }));
 jest.mock('@/lib/db', () => ({ db: {} }));

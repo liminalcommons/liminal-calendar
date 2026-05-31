@@ -4,8 +4,17 @@
 
 import { GET, PUT } from '@/app/api/preferences/notifications/route';
 
-jest.mock('@/../auth', () => ({
-  auth: jest.fn(),
+// The route reads identity via getAuthedUser() (canonical AuthedUser shape),
+// not auth() directly. Mock that boundary so the test exercises the route's
+// real auth read. `id` is the legacy provider-string identity the preferences
+// helpers key on (notification_preferences.userId).
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
+}));
+// PUT calls revalidatePath('/preferences/notifications'); stub it so it does
+// not require a Next request/static-generation store under jest.
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
 }));
 jest.mock('@/lib/db', () => ({
   db: {
@@ -23,17 +32,29 @@ jest.mock('@/lib/db', () => ({
   },
 }));
 
-const { auth } = jest.requireMock('@/../auth') as { auth: jest.Mock };
+const { getAuthedUser } = jest.requireMock('@/lib/auth/get-authed-user') as {
+  getAuthedUser: jest.Mock;
+};
+
+const authedUser = {
+  memberId: 1,
+  id: 'u1',
+  role: 'member' as const,
+  name: null,
+  image: null,
+  logtoUserId: 'u1',
+  email: null,
+};
 
 describe('GET /api/preferences/notifications', () => {
   it('returns 401 without a session', async () => {
-    auth.mockResolvedValue(null);
+    getAuthedUser.mockResolvedValue(null);
     const res = await GET(new Request('http://localhost'));
     expect(res.status).toBe(401);
   });
 
   it('returns the lazy-inserted preferences row for the authed user', async () => {
-    auth.mockResolvedValue({ user: { id: 'u1', hyloId: 'u1' } });
+    getAuthedUser.mockResolvedValue(authedUser);
     const res = await GET(new Request('http://localhost'));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -44,13 +65,13 @@ describe('GET /api/preferences/notifications', () => {
 
 describe('PUT /api/preferences/notifications', () => {
   it('returns 401 without a session', async () => {
-    auth.mockResolvedValue(null);
+    getAuthedUser.mockResolvedValue(null);
     const res = await PUT(new Request('http://localhost', { method: 'PUT', body: JSON.stringify({}) }));
     expect(res.status).toBe(401);
   });
 
   it('rejects non-boolean values with 400', async () => {
-    auth.mockResolvedValue({ user: { id: 'u1', hyloId: 'u1' } });
+    getAuthedUser.mockResolvedValue(authedUser);
     const res = await PUT(new Request('http://localhost', {
       method: 'PUT',
       body: JSON.stringify({ pushOneHour: 'yes' }),
@@ -59,7 +80,7 @@ describe('PUT /api/preferences/notifications', () => {
   });
 
   it('persists boolean updates and returns ok', async () => {
-    auth.mockResolvedValue({ user: { id: 'u1', hyloId: 'u1' } });
+    getAuthedUser.mockResolvedValue(authedUser);
     const res = await PUT(new Request('http://localhost', {
       method: 'PUT',
       body: JSON.stringify({ pushOneHour: false, emailOneHour: true }),

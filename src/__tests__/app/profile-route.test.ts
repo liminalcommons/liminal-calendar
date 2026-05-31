@@ -9,6 +9,15 @@ jest.mock('@/lib/auth/get-current-member', () => ({
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
 }));
+// PATCH revalidates calendar views + paths on success; outside a Next.js
+// request context revalidatePath throws "static generation store missing".
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+}));
+jest.mock('@/lib/cache/revalidate-calendar-views', () => ({
+  revalidateCalendarViews: jest.fn(),
+}));
 
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { GET, PATCH } from '@/app/api/profile/route';
@@ -44,11 +53,12 @@ describe('GET /api/profile', () => {
   it('returns 200 with the profile when Member exists', async () => {
     const member = {
       id: 1,
-      hyloId: 'h-1',
+      logtoId: 'logto-1',
       clerkId: null,
       name: 'Alice',
       email: 'a@x.y',
       image: 'img.png',
+      role: 'member',
       timezone: 'America/Los_Angeles',
       availability: '[1,2,3]',
     };
@@ -57,10 +67,12 @@ describe('GET /api/profile', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
-      hyloId: 'h-1',
+      logtoId: 'logto-1',
+      clerkId: null,
       name: 'Alice',
       email: 'a@x.y',
       image: 'img.png',
+      role: 'member',
       timezone: 'America/Los_Angeles',
       availability: [1, 2, 3],
     });
@@ -69,11 +81,12 @@ describe('GET /api/profile', () => {
   it('returns 200 with default timezone and empty availability when those fields are null', async () => {
     mockGetCurrentMember.mockResolvedValue({
       id: 1,
-      hyloId: null,
+      logtoId: null,
       clerkId: 'clerk_x',
       name: 'B',
       email: null,
       image: null,
+      role: 'member',
       timezone: null,
       availability: null,
     });
@@ -106,7 +119,7 @@ describe('PATCH /api/profile', () => {
   });
 
   it('returns 400 when JSON parsing fails', async () => {
-    mockGetCurrentMember.mockResolvedValue({ id: 1, hyloId: 'h', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ id: 1, logtoId: 'logto-1', name: 'A' });
     const res = await PATCH(makeReq('__INVALID__'));
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -114,7 +127,7 @@ describe('PATCH /api/profile', () => {
   });
 
   it('returns 400 when validation fails', async () => {
-    mockGetCurrentMember.mockResolvedValue({ id: 1, hyloId: 'h', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ id: 1, logtoId: 'logto-1', name: 'A' });
     // availability must be an array — string fails validation.
     const res = await PATCH(makeReq({ availability: 'not-an-array' }));
     expect(res.status).toBe(400);
@@ -123,9 +136,9 @@ describe('PATCH /api/profile', () => {
   });
 
   it('returns 200 with updated profile on valid name update', async () => {
-    mockGetCurrentMember.mockResolvedValue({ id: 7, hyloId: 'h-7', name: 'old' });
+    mockGetCurrentMember.mockResolvedValue({ id: 7, logtoId: 'logto-7', name: 'old' });
     setupDbUpdateMock([
-      { hyloId: 'h-7', name: 'new', timezone: 'UTC', availability: '[]' },
+      { logtoId: 'logto-7', clerkId: null, name: 'new', timezone: 'UTC', availability: '[]' },
     ]);
     const res = await PATCH(makeReq({ name: 'new' }));
     expect(res.status).toBe(200);

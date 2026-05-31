@@ -1,6 +1,13 @@
 import { renderHook, act } from '@testing-library/react';
 import { useRsvpMutation } from '@/lib/rsvp/use-rsvp-mutation';
 
+// The hook calls useRouter() (to refresh after a successful submit). Outside the
+// Next.js app-router runtime this throws "invariant expected app router to be
+// mounted", so provide a stub router.
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ refresh: jest.fn(), push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+}));
+
 // Mock apiFetch so we can observe POST calls without a network.
 jest.mock('@/lib/api-fetch', () => ({
   apiFetch: jest.fn(),

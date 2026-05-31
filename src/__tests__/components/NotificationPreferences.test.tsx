@@ -8,11 +8,20 @@ beforeEach(() => {
   fetchMock.mockReset();
 });
 
+// The component issues two GETs on mount — the preferences load and a
+// muted-series load — plus a PUT on toggle. Route by URL/method instead of call
+// order so the muted-series fetch doesn't consume the single queued preferences
+// response (which left the prefs fetch resolving to undefined and threw).
 function mockGetReturns(prefs: Record<string, boolean>) {
-  fetchMock.mockResolvedValueOnce({
-    ok: true,
-    json: async () => prefs,
-  } as Response);
+  fetchMock.mockImplementation((url: unknown, opts?: { method?: string }) => {
+    if (typeof url === 'string' && url.includes('/muted')) {
+      return Promise.resolve({ ok: true, json: async () => ({ muted: [] }) } as Response);
+    }
+    if (opts?.method === 'PUT') {
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => prefs } as Response);
+  });
 }
 
 describe('<NotificationPreferences>', () => {
@@ -46,7 +55,6 @@ describe('<NotificationPreferences>', () => {
       pushOneHour: true, pushFifteenMin: true, pushAtStart: true,
       emailTwentyFourHour: false, emailOneHour: false, emailFifteenMin: false,
     });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) } as Response);
     render(<NotificationPreferences />);
     await waitFor(() => screen.getAllByRole('switch'));
     fireEvent.click(screen.getByRole('switch', { name: /24 hours before/i }));

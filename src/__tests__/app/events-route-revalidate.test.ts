@@ -10,12 +10,13 @@
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 jest.mock('@/lib/auth-helpers', () => ({
   getUserRole: jest.fn(() => 'admin'),
   canCreateEvents: jest.fn(() => true),
+  canCreatePublicEvent: jest.fn(() => true),
 }));
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
@@ -40,10 +41,10 @@ jest.mock('@/lib/events/create-event-input', () => ({
 }));
 
 import { revalidatePath } from 'next/cache';
-import { auth } from '../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { POST } from '@/app/api/events/route';
 
-const mockAuth = auth as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 const mockRevalidate = revalidatePath as unknown as jest.Mock;
 
 function setupInsertMock(returnedRow: unknown) {
@@ -65,8 +66,8 @@ function makeReq(body: unknown): import('next/server').NextRequest {
 describe('POST /api/events — issue #8 cache invalidation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth.mockResolvedValue({
-      user: { hyloId: '69147', id: '69147', name: 'Tester', image: null },
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 69147, id: '69147', name: 'Tester', image: null, role: 'admin',
     });
     setupInsertMock({
       id: 42,
@@ -88,7 +89,7 @@ describe('POST /api/events — issue #8 cache invalidation', () => {
   });
 
   it('does NOT call revalidatePath when auth fails', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
 
     const res = await POST(makeReq({ title: 'Test' }));
 

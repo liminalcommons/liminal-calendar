@@ -9,17 +9,14 @@
  * the DB mock returns no rows (simulating the predicate filtering it out).
  */
 
-jest.mock('../../../auth.ts', () => ({
-  auth: jest.fn(),
-}));
-jest.mock('@/../auth', () => ({
-  auth: jest.fn(),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
 }));
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn((userId: string) => ({ __vis: 'user', userId })),
+  visibleEventsForMemberCondition: jest.fn((memberId: number) => ({ __vis: 'member', memberId })),
   publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
 }));
 jest.mock('@/lib/auth/get-current-member', () => ({
@@ -43,21 +40,20 @@ jest.mock('@/lib/ics-generator', () => ({
   generateCalendarFeed: jest.fn(() => 'BEGIN:VCALENDAR\nEND:VCALENDAR'),
 }));
 
-import { auth } from '../../../auth';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 
-const mockAuth = auth as unknown as jest.Mock;
-// rsvped-events route uses @/../auth — keep in sync via requireMock
-const mockAuthAlt = jest.requireMock('@/../auth') as { auth: jest.Mock };
-const mockVisibleForUser = visibleEventsForUserCondition as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
+const mockVisibleForMember = visibleEventsForMemberCondition as unknown as jest.Mock;
 const mockPublicOnly = publicOnlyEventsCondition as unknown as jest.Mock;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const mockGetCurrentMember = getCurrentMember as unknown as jest.Mock;
 
-function setAuth(session: unknown) {
-  mockAuth.mockResolvedValue(session);
-  mockAuthAlt.auth.mockResolvedValue(session);
+// Resolve the unified user shape. Pass null for anonymous, or a memberId-bearing
+// object for an authenticated caller.
+function setAuth(authed: unknown) {
+  mockGetAuthedUser.mockResolvedValue(authed);
 }
 
 // ─── DB mock helpers ──────────────────────────────────────────────────────────
@@ -114,7 +110,7 @@ describe('GET /api/calendar/feed.ics — visibility filtering', () => {
     const res = await feedGET(makeIcsReq());
     expect(res.status).toBe(200);
     expect(mockPublicOnly).toHaveBeenCalledTimes(1);
-    expect(mockVisibleForUser).not.toHaveBeenCalled();
+    expect(mockVisibleForMember).not.toHaveBeenCalled();
   });
 
   it('returns empty ICS when DB returns no events (private event hidden from anonymous)', async () => {
@@ -143,15 +139,15 @@ describe('GET /api/events/[id]/comments — visibility on eventExists', () => {
     const res = await commentsGET({} as import('next/server').NextRequest, commentsParams);
     expect(res.status).toBe(404);
     expect(mockPublicOnly).toHaveBeenCalledTimes(1);
-    expect(mockVisibleForUser).not.toHaveBeenCalled();
+    expect(mockVisibleForMember).not.toHaveBeenCalled();
   });
 
-  it('calls visibleEventsForUserCondition when user is signed in', async () => {
-    setAuth({ user: { hyloId: 'h-55', clerkId: null } });
+  it('calls visibleEventsForMemberCondition when user is signed in', async () => {
+    setAuth({ memberId: 55, id: 'h-55', role: 'member', name: null, image: null });
     setupDbSelect([]); // event not found
     const res = await commentsGET({} as import('next/server').NextRequest, commentsParams);
     expect(res.status).toBe(404);
-    expect(mockVisibleForUser).toHaveBeenCalledWith('h-55');
+    expect(mockVisibleForMember).toHaveBeenCalledWith(55);
     expect(mockPublicOnly).not.toHaveBeenCalled();
   });
 
@@ -182,15 +178,15 @@ describe('GET /api/events/[id]/rsvp — visibility filtering', () => {
     const res = await rsvpGET({} as import('next/server').NextRequest, rsvpParams);
     expect(res.status).toBe(404);
     expect(mockPublicOnly).toHaveBeenCalledTimes(1);
-    expect(mockVisibleForUser).not.toHaveBeenCalled();
+    expect(mockVisibleForMember).not.toHaveBeenCalled();
   });
 
-  it('calls visibleEventsForUserCondition with hyloId when user is signed in', async () => {
-    setAuth({ user: { hyloId: 'h-99', clerkId: null } });
+  it('calls visibleEventsForMemberCondition with memberId when user is signed in', async () => {
+    setAuth({ memberId: 99, id: 'h-99', role: 'member', name: null, image: null });
     setupDbSelect([]); // event not found for this user
     const res = await rsvpGET({} as import('next/server').NextRequest, rsvpParams);
     expect(res.status).toBe(404);
-    expect(mockVisibleForUser).toHaveBeenCalledWith('h-99');
+    expect(mockVisibleForMember).toHaveBeenCalledWith(99);
   });
 
   it('returns 404 for private event not belonging to anonymous caller', async () => {
@@ -216,29 +212,21 @@ describe('GET /api/preferences/notifications/rsvped-events — visibility filter
     let dataCallCount = 0;
     dbModule.db.select = jest.fn(() => ({
       from: () => ({
-        // .where(...).limit(1) — getAuthedUser's memberId lookup. Return [] so
-        // the lookup yields null (works for both Hylo + Clerk paths) without
-        // disturbing the data-call counter.
         where: (cond: unknown) => {
-          // The members lookup chains .limit(); the rsvps query does not.
-          // Use a thenable wrapper so both shapes work: callers awaiting
-          // directly get the data array; callers chaining .limit() get
-          // an empty list (the auth side-channel).
-          const getRsvps = () => {
+          const getData = () => {
             dataCallCount++;
             if (dataCallCount === 1) {
               void cond;
+              // First select: the rsvps eventId query (awaited directly).
               return rsvpIds.map((id) => ({ eventId: id }));
             }
             return eventRows;
           };
           return {
-            // rsvps query — awaited directly without .limit()
-            then: (resolve: (v: unknown) => void) => resolve(getRsvps()),
+            // rsvps query — awaited directly without .orderBy()/.limit()
+            then: (resolve: (v: unknown) => void) => resolve(getData()),
             // events query — chains .orderBy().limit()
             orderBy: () => ({ limit: () => Promise.resolve(eventRows) }),
-            // getAuthedUser's members lookup — chains .limit()
-            limit: () => Promise.resolve([]),
           };
         },
         orderBy: () => ({
@@ -248,18 +236,18 @@ describe('GET /api/preferences/notifications/rsvped-events — visibility filter
     }));
   }
 
-  it('calls visibleEventsForUserCondition with hyloId for authenticated user', async () => {
-    setAuth({ user: { hyloId: 'h-22', clerkId: null } });
+  it('calls visibleEventsForMemberCondition with memberId for authenticated user', async () => {
+    setAuth({ memberId: 22, id: 'h-22', role: 'member', name: null, image: null });
     makeRsvpedEventsDbMock([42], []);
 
     const req = { url: 'http://localhost/api/preferences/notifications/rsvped-events' } as Request;
     const res = await rsvpedEventsGET(req);
     expect(res.status).toBe(200);
-    expect(mockVisibleForUser).toHaveBeenCalledWith('h-22');
+    expect(mockVisibleForMember).toHaveBeenCalledWith(22);
   });
 
   it('returns empty events when DB returns no rows (private event hidden from caller)', async () => {
-    setAuth({ user: { hyloId: 'h-33', clerkId: null } });
+    setAuth({ memberId: 33, id: 'h-33', role: 'member', name: null, image: null });
     makeRsvpedEventsDbMock([99], []);
 
     const req = { url: 'http://localhost/api/preferences/notifications/rsvped-events' } as Request;

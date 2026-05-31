@@ -2,11 +2,14 @@
  * @jest-environment node
  */
 
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}));
 jest.mock('../../../auth', () => ({
   auth: jest.fn(() => Promise.resolve(null)),
 }));
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn(() => ({ __vis: 'user' })),
+  visibleEventsForMemberCondition: jest.fn(() => ({ __vis: 'member' })),
   publicOnlyEventsCondition: jest.fn(() => ({ __vis: 'public' })),
 }));
 jest.mock('@/lib/auth/get-current-member', () => ({
@@ -70,7 +73,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('returns 400 for invalid event id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
     });
     const res = await POST(makeReq({ response: 'yes' }), {
       params: Promise.resolve({ id: 'not-a-number' }),
@@ -80,7 +83,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('returns 400 for invalid JSON body', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
     });
     const res = await POST(makeReq('__INVALID__'), eventParams);
     expect(res.status).toBe(400);
@@ -88,7 +91,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('returns 400 for invalid response value', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
     });
     const res = await POST(makeReq({ response: 'maybe' }), eventParams);
     expect(res.status).toBe(400);
@@ -96,7 +99,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('returns 404 when event does not exist', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
     });
     setupEventMock([]);
     const res = await POST(makeReq({ response: 'yes' }), eventParams);
@@ -105,7 +108,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('upserts RSVP for Hylo Member with hyloId as userId', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y', image: 'img.png',
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y', image: 'img.png',
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ response: 'yes' }), eventParams);
@@ -118,7 +121,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('upserts RSVP for Clerk-only Member with clerkId as userId', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 2, hyloId: null, clerkId: 'clerk_x', name: 'Bob', email: 'b@x.y', image: null,
+      id: 2, logtoId: null, clerkId: 'clerk_x', name: 'Bob', email: 'b@x.y', image: null,
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(makeReq({ response: 'interested' }), eventParams);
@@ -129,7 +132,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('does NOT subscribe to newsletter when subscribeToNewsletter is omitted', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
     });
     setupEventMock([{ id: 5 }]);
     await POST(makeReq({ response: 'yes' }), eventParams);
@@ -138,7 +141,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('does NOT subscribe when subscribeToNewsletter is false', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
     });
     setupEventMock([{ id: 5 }]);
     await POST(makeReq({ response: 'yes', subscribeToNewsletter: false }), eventParams);
@@ -147,7 +150,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('SUBSCRIBES to newsletter when opt-in is true and email is present', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
     });
     setupEventMock([{ id: 5 }]);
     const res = await POST(
@@ -166,7 +169,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('does NOT subscribe when opt-in is true but Member has no email', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: null, image: null,
     });
     setupEventMock([{ id: 5 }]);
     await POST(makeReq({ response: 'yes', subscribeToNewsletter: true }), eventParams);
@@ -175,7 +178,7 @@ describe('POST /api/events/[id]/rsvp', () => {
 
   it('newsletter subscribe failure does NOT fail the RSVP (fire-and-forget)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
+      id: 1, logtoId: 'h-1', clerkId: null, name: 'A', email: 'a@x.y', image: null,
     });
     setupEventMock([{ id: 5 }]);
     mockAddNewsletter.mockRejectedValue(new Error('newsletter table missing'));

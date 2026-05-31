@@ -11,6 +11,12 @@
 jest.mock('@/lib/auth/get-current-member', () => ({
   getCurrentMember: jest.fn(),
 }));
+// The success paths (POST 201, PATCH 200, DELETE 204) call revalidatePath,
+// which throws "static generation store missing" outside a Next request.
+// Stub it so the handlers reach their success responses.
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+}));
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
 }));

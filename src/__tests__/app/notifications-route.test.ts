@@ -45,7 +45,7 @@ describe('GET /api/notifications', () => {
 
   it('returns notifications + unseenCount for the current user', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      hyloId: 'h-1',
+      logtoId: 'h-1',
       clerkId: null,
       name: 'Alice',
     });
@@ -72,7 +72,7 @@ describe('GET /api/notifications', () => {
 
   it('falls back to clerkId when hyloId is null', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      hyloId: null,
+      logtoId: null,
       clerkId: 'clerk_xyz',
       name: 'Bob',
     });
@@ -88,7 +88,7 @@ describe('GET /api/notifications', () => {
   });
 
   it('passes ?limit through to the repo', async () => {
-    mockGetCurrentMember.mockResolvedValue({ hyloId: 'h-1', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ logtoId: 'h-1', name: 'A' });
     mockList.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
@@ -101,7 +101,7 @@ describe('GET /api/notifications', () => {
   });
 
   it('passes ?unseenOnly=true through to the repo', async () => {
-    mockGetCurrentMember.mockResolvedValue({ hyloId: 'h-1', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ logtoId: 'h-1', name: 'A' });
     mockList.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
@@ -114,7 +114,7 @@ describe('GET /api/notifications', () => {
   });
 
   it('returns 500 when the repo throws', async () => {
-    mockGetCurrentMember.mockResolvedValue({ hyloId: 'h-1', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ logtoId: 'h-1', name: 'A' });
     mockList.mockRejectedValue(new Error('db down'));
     mockCount.mockResolvedValue(0);
 
@@ -132,7 +132,7 @@ describe('POST /api/notifications/seen', () => {
 
   it('marks all unseen for the current user, returns marked count', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      hyloId: 'h-1',
+      logtoId: 'h-1',
       clerkId: null,
       name: 'A',
     });
@@ -146,7 +146,7 @@ describe('POST /api/notifications/seen', () => {
   });
 
   it('returns 500 when the repo throws', async () => {
-    mockGetCurrentMember.mockResolvedValue({ hyloId: 'h-1', name: 'A' });
+    mockGetCurrentMember.mockResolvedValue({ logtoId: 'h-1', name: 'A' });
     mockMarkAllSeen.mockRejectedValue(new Error('db down'));
 
     const res = await POST_SEEN();

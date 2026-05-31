@@ -8,8 +8,8 @@
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 jest.mock('@/lib/auth-helpers', () => ({
   getUserRole: jest.fn(() => 'member'),
@@ -25,21 +25,26 @@ jest.mock('@/lib/db/to-display-event', () => ({
 jest.mock('@/lib/events/create-event-input', () => ({
   validateCreateEventInput: jest.fn(),
 }));
+jest.mock('@/lib/events/invitations-repo', () => ({
+  validateInviteeCap: jest.fn((args: { invitees: unknown[] }) => args.invitees),
+  setEventInvitations: jest.fn(),
+  INVITEE_CAP_MEMBER: 10,
+}));
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn((userId: string) => ({ __visibilityCond: 'user', userId })),
+  visibleEventsForMemberCondition: jest.fn((memberId: number) => ({ __visibilityCond: 'member', memberId })),
   publicOnlyEventsCondition: jest.fn(() => ({ __visibilityCond: 'public' })),
 }));
 
-import { auth } from '../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { getUserRole, canCreatePublicEvent } from '@/lib/auth-helpers';
-import { visibleEventsForUserCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { GET, POST } from '@/app/api/events/route';
 
-const mockAuth = auth as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 const mockGetUserRole = getUserRole as unknown as jest.Mock;
 const mockCanCreatePublicEvent = canCreatePublicEvent as unknown as jest.Mock;
-const mockVisibleForUser = visibleEventsForUserCondition as unknown as jest.Mock;
+const mockVisibleForMember = visibleEventsForMemberCondition as unknown as jest.Mock;
 const mockPublicOnly = publicOnlyEventsCondition as unknown as jest.Mock;
 const mockValidateInput = validateCreateEventInput as unknown as jest.Mock;
 
@@ -118,37 +123,39 @@ describe('GET /api/events — visibility filtering', () => {
   });
 
   it('uses publicOnlyEventsCondition when no user is signed in', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
     setupSelectMock([]);
 
     await GET(makeGetReq());
 
     expect(mockPublicOnly).toHaveBeenCalledTimes(1);
-    expect(mockVisibleForUser).not.toHaveBeenCalled();
+    expect(mockVisibleForMember).not.toHaveBeenCalled();
   });
 
-  it('uses visibleEventsForUserCondition with hyloId when user is signed in', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-42', clerkId: null } });
+  it('uses visibleEventsForMemberCondition with memberId when user is signed in', async () => {
+    mockGetAuthedUser.mockResolvedValue({ memberId: 42, id: 'h-42', role: 'member', name: null, image: null });
     setupSelectMock([]);
 
     await GET(makeGetReq());
 
-    expect(mockVisibleForUser).toHaveBeenCalledWith('h-42');
+    expect(mockVisibleForMember).toHaveBeenCalledWith(42);
     expect(mockPublicOnly).not.toHaveBeenCalled();
   });
 
-  it('falls back to clerkId when hyloId is absent', async () => {
-    mockAuth.mockResolvedValue({ user: { hyloId: null, clerkId: 'clerk_99' } });
+  it('uses publicOnlyEventsCondition when authed user has no resolved memberId', async () => {
+    // Authenticated session but no canonical members row yet (memberId null):
+    // visibility falls back to public-only — private rows must not leak.
+    mockGetAuthedUser.mockResolvedValue({ memberId: null, id: 'clerk_99', role: 'member', name: null, image: null });
     setupSelectMock([]);
 
     await GET(makeGetReq());
 
-    expect(mockVisibleForUser).toHaveBeenCalledWith('clerk_99');
-    expect(mockPublicOnly).not.toHaveBeenCalled();
+    expect(mockPublicOnly).toHaveBeenCalledTimes(1);
+    expect(mockVisibleForMember).not.toHaveBeenCalled();
   });
 
   it('returns 200 with the rows returned by the DB (public event visible to stranger)', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
     const publicEvent = { id: 1, visibility: 'public', title: 'Public Gathering' };
     setupSelectMock([publicEvent]);
 
@@ -163,7 +170,7 @@ describe('GET /api/events — visibility filtering', () => {
   it('returns empty array when DB returns no rows (private event hidden from stranger)', async () => {
     // Stranger has no session; publicOnlyEventsCondition is applied.
     // The DB (mocked) returns no rows — simulating the predicate filtered them out.
-    mockAuth.mockResolvedValue(null);
+    mockGetAuthedUser.mockResolvedValue(null);
     setupSelectMock([]);
 
     const res = await GET(makeGetReq());
@@ -173,17 +180,17 @@ describe('GET /api/events — visibility filtering', () => {
     expect(body).toHaveLength(0);
   });
 
-  it('visibleEventsForUserCondition is called for authenticated user (private event visible)', async () => {
+  it('visibleEventsForMemberCondition is called for authenticated user (private event visible)', async () => {
     // Authenticated user: the visibility predicate includes creator/RSVP/invite logic.
     // The DB (mocked) returns the private event — simulating it matched the predicate.
-    mockAuth.mockResolvedValue({ user: { hyloId: 'h-7', clerkId: null } });
+    mockGetAuthedUser.mockResolvedValue({ memberId: 7, id: 'h-7', role: 'member', name: null, image: null });
     const privateEvent = { id: 2, visibility: 'private', title: 'Private Event' };
     setupSelectMock([privateEvent]);
 
     const res = await GET(makeGetReq());
 
     expect(res.status).toBe(200);
-    expect(mockVisibleForUser).toHaveBeenCalledWith('h-7');
+    expect(mockVisibleForMember).toHaveBeenCalledWith(7);
     const body = await res.json();
     expect(body).toHaveLength(1);
   });
@@ -205,8 +212,8 @@ describe('POST /api/events — visibility', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'h-1', id: 'h-1', name: 'Alice', image: null, role: 'member' },
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 1, id: 'h-1', name: 'Alice', image: null, role: 'member',
     });
   });
 
@@ -255,8 +262,8 @@ describe('POST /api/events — visibility', () => {
   });
 
   it('host POSTing visibility:"public" → 201', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'h-2', id: 'h-2', name: 'Host User', image: null, role: 'host' },
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 2, id: 'h-2', name: 'Host User', image: null, role: 'host',
     });
     mockGetUserRole.mockReturnValue('host');
     mockCanCreatePublicEvent.mockReturnValue(true);
@@ -273,8 +280,8 @@ describe('POST /api/events — visibility', () => {
   });
 
   it('admin POSTing visibility:"public" → 201', async () => {
-    mockAuth.mockResolvedValue({
-      user: { hyloId: 'h-3', id: 'h-3', name: 'Admin User', image: null, role: 'admin' },
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 3, id: 'h-3', name: 'Admin User', image: null, role: 'admin',
     });
     mockGetUserRole.mockReturnValue('admin');
     mockCanCreatePublicEvent.mockReturnValue(true);

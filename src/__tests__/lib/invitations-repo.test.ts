@@ -1,67 +1,50 @@
 /**
  * Invitations repo — setEventInvitations + listEventInvitations.
  *
- * Mocks @/lib/db so db.transaction is fully controllable. The transaction
- * callback receives a fake tx with .delete(), .insert(), .select() chains
- * that record calls without touching a real database.
+ * The Neon HTTP driver does not support db.transaction(), so the repo runs
+ * the replace-set as two sequential top-level statements: db.delete().where()
+ * then db.insert().values(). Mocks @/lib/db so those chains record their calls
+ * without touching a real database. db.select() backs both resolveMemberId
+ * (.from().where().limit()) and listEventInvitations (.from().where().orderBy()).
  */
 
 import { setEventInvitations, listEventInvitations, INVITEE_CAP_MEMBER } from '@/lib/events/invitations-repo';
 
-// ── Fake transaction machinery ────────────────────────────────────────────────
+// ── Recorded db calls ─────────────────────────────────────────────────────────
 
-interface TxCalls {
+interface DbCalls {
   deleteWheres: unknown[];
   insertValues: unknown[];
   selectRows: unknown[];
 }
 
-function makeTx(selectRows: unknown[] = []): { tx: object; calls: TxCalls } {
-  const calls: TxCalls = { deleteWheres: [], insertValues: [], selectRows };
+// ── Mock @/lib/db ─────────────────────────────────────────────────────────────
 
-  const tx = {
+let _txCalls: DbCalls = { deleteWheres: [], insertValues: [], selectRows: [] };
+
+jest.mock('@/lib/db', () => ({
+  db: {
     delete: (_table: unknown) => ({
       where: (cond: unknown) => {
-        calls.deleteWheres.push(cond);
+        _txCalls.deleteWheres.push(cond);
         return Promise.resolve();
       },
     }),
     insert: (_table: unknown) => ({
       values: (rows: unknown) => {
-        calls.insertValues.push(rows);
+        _txCalls.insertValues.push(rows);
         return Promise.resolve();
       },
     }),
+    // Backs resolveMemberId (members lookup, .limit) AND listEventInvitations
+    // (.orderBy). resolveMemberId reads from `members` which has no fixture
+    // here — return [] so it resolves memberId=null; listEventInvitations
+    // returns the seeded _selectRows.
     select: (_proj?: unknown) => ({
       from: (_table: unknown) => ({
         where: (_cond: unknown) => ({
-          orderBy: (_col: unknown) => Promise.resolve(selectRows),
-        }),
-      }),
-    }),
-  };
-
-  return { tx, calls };
-}
-
-// ── Mock @/lib/db ─────────────────────────────────────────────────────────────
-
-let _txCallback: ((tx: object) => Promise<void>) | null = null;
-let _txCalls: TxCalls = { deleteWheres: [], insertValues: [], selectRows: [] };
-let _selectRows: unknown[] = [];
-
-jest.mock('@/lib/db', () => ({
-  db: {
-    transaction: async (cb: (tx: object) => Promise<void>) => {
-      const { tx, calls } = makeTx(_selectRows);
-      _txCalls = calls;
-      _txCallback = cb;
-      await cb(tx);
-    },
-    select: (_proj?: unknown) => ({
-      from: (_table: unknown) => ({
-        where: (_cond: unknown) => ({
-          orderBy: (_col: unknown) => Promise.resolve(_selectRows),
+          limit: (_n: unknown) => Promise.resolve([]),
+          orderBy: (_col: unknown) => Promise.resolve(_txCalls.selectRows),
         }),
       }),
     }),
@@ -69,9 +52,7 @@ jest.mock('@/lib/db', () => ({
 }));
 
 function resetMock(selectRows: unknown[] = []) {
-  _selectRows = selectRows;
   _txCalls = { deleteWheres: [], insertValues: [], selectRows };
-  _txCallback = null;
 }
 
 // ── Helper to build invitees ──────────────────────────────────────────────────

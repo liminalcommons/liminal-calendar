@@ -8,8 +8,8 @@
 jest.mock('next/cache', () => ({
   revalidatePath: jest.fn(),
 }));
-jest.mock('../../../auth', () => ({
-  auth: jest.fn(),
+jest.mock('@/lib/auth/get-authed-user', () => ({
+  getAuthedUser: jest.fn(),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,10 +67,10 @@ jest.mock('@/lib/events/invitations-repo', () => ({
   INVITEE_CAP_MEMBER: 10,
 }));
 
-import { auth } from '../../../auth';
+import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { POST } from '@/app/api/events/route';
 
-const mockAuth = auth as unknown as jest.Mock;
+const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 
 function setupInsertMock(returnedRow: unknown) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -113,9 +113,18 @@ function makeInvitees(count: number, prefix = 'user') {
 describe('POST /api/events — invitations cap enforcement', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAuth.mockResolvedValue({
-      user: { hyloId: '69147', id: '69147', name: 'Tester', image: null },
-    });
+    // Route reads role from getAuthedUser().role. Each test sets the desired
+    // role via mockGetUserRole.mockReturnValue(...); resolve it lazily here so
+    // the per-test role flows through to organizerRole.
+    mockGetAuthedUser.mockImplementation(() =>
+      Promise.resolve({
+        memberId: 69147,
+        id: '69147',
+        name: 'Tester',
+        image: null,
+        role: (mockGetUserRole() as string) || 'member',
+      }),
+    );
     mockValidateInviteeCap.mockImplementation(
       ({ invitees }: { organizerRole: string; invitees: unknown[] }) => {
         // Mirror real impl: dedupe by userId

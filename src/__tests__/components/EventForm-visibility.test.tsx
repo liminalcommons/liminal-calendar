@@ -26,6 +26,26 @@ jest.mock('next-auth/react', () => ({
   useSession: jest.fn(),
 }));
 
+// EventForm calls useUser() from @clerk/nextjs, which throws "useUser can only be
+// used within <ClerkProvider>" when rendered bare. Stub it as an unauthenticated
+// Clerk user.
+jest.mock('@clerk/nextjs', () => ({
+  useUser: () => ({ isSignedIn: false, isLoaded: true, user: null }),
+}));
+
+// useResolvedRole fetches /api/profile and caches the result at module scope, so
+// the first test's role would leak into later tests (host/admin would all read
+// the cached 'member'). Drive it from the same NextAuth session the test controls
+// so each role renders independently while EventForm's real canCreatePublic gating
+// (role === 'host' || 'admin') stays under test.
+jest.mock('@/lib/use-resolved-role', () => ({
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  useResolvedRole: () => {
+    const { useSession } = require('next-auth/react');
+    return { role: useSession().data?.user?.role ?? null, resolved: true };
+  },
+}));
+
 jest.mock('@/lib/api-fetch', () => ({
   apiFetch: jest.fn().mockResolvedValue({ ok: true, json: async () => ({ zones: [] }) }),
   SESSION_EXPIRED_EVENT: 'calendar:session-expired',

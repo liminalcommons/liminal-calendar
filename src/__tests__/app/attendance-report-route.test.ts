@@ -13,13 +13,24 @@ jest.mock('@/lib/auth/get-current-member', () => ({
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
 }));
+// POST revalidates /admin/attendance-reports on success; outside a Next.js
+// request context revalidatePath throws "static generation store missing".
+jest.mock('next/cache', () => ({
+  revalidatePath: jest.fn(),
+  revalidateTag: jest.fn(),
+}));
+// Negative reports fan out a host notification (best-effort); stub it so the
+// suite never reaches the real notification transport.
+jest.mock('@/lib/notifications/fanout', () => ({
+  fanoutAttendanceNegative: jest.fn(),
+}));
 jest.mock('@/lib/attendance-reports/repo', () => ({
   upsertAttendanceReport: jest.fn(),
   getAttendanceReportForUser: jest.fn(),
   REPORT_NOTE_MAX_LENGTH: 1000,
 }));
 jest.mock('@/lib/events/visibility', () => ({
-  visibleEventsForUserCondition: jest.fn(() => ({ __visibilityCond: 'user' })),
+  visibleEventsForMemberCondition: jest.fn(() => ({ __visibilityCond: 'member' })),
   publicOnlyEventsCondition: jest.fn(() => ({ __visibilityCond: 'public' })),
 }));
 
@@ -80,7 +91,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 for non-numeric event id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(
       makeReq({ eventHappened: true, hostPresent: true }),
@@ -91,7 +102,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 for invalid JSON body', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(makeReq('__INVALID__'), eventParams);
     expect(res.status).toBe(400);
@@ -99,7 +110,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 when eventHappened is missing or non-boolean', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(makeReq({ hostPresent: true }), eventParams);
     expect(res.status).toBe(400);
@@ -107,7 +118,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 when hostPresent is missing or non-boolean', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await POST(makeReq({ eventHappened: true }), eventParams);
     expect(res.status).toBe(400);
@@ -115,7 +126,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 when note is longer than 1000 characters', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([{ id: 5, ends_at: yesterday.toISOString(), starts_at: yesterday.toISOString() }]);
     const res = await POST(
@@ -128,7 +139,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 404 when event does not exist', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([]);
     const res = await POST(
@@ -142,7 +153,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
     // Visibility predicate returns no rows — simulates a private event the user
     // has no RSVP for (the DB would return empty from the AND condition).
     mockGetCurrentMember.mockResolvedValue({
-      id: 3, hyloId: 'h-stranger', clerkId: null, name: 'Stranger', email: null, image: null, role: 'member',
+      id: 3, logtoId: 'logto-stranger', clerkId: null, name: 'Stranger', email: null, image: null, role: 'member',
     });
     setupEventMock([]); // DB returns empty because visibility filter excludes event
     const res = await POST(
@@ -155,7 +166,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
   it('returns 200 when event is private but user has an RSVP (visibility allows)', async () => {
     // Visibility predicate returns the event — simulates a private event the user RSVP'd to.
     mockGetCurrentMember.mockResolvedValue({
-      id: 4, hyloId: 'h-attendee', clerkId: null, name: 'Attendee', email: null, image: null, role: 'member',
+      id: 4, logtoId: 'logto-attendee', clerkId: null, name: 'Attendee', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -172,7 +183,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 200 when event is public (no RSVP required)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 5, hyloId: 'h-pub', clerkId: null, name: 'Anyone', email: null, image: null, role: 'member',
+      id: 5, logtoId: 'logto-pub', clerkId: null, name: 'Anyone', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -189,7 +200,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 when event has not yet ended (endsAt in the future)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -206,7 +217,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('returns 400 when ends_at is null and starts_at + 1h is still in the future', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     // Event starting in 30min, no ends_at → starts_at + 1h still future
     const startsIn30 = new Date(Date.now() + 30 * 60_000);
@@ -222,9 +233,9 @@ describe('POST /api/events/[id]/attendance-report', () => {
     expect(res.status).toBe(400);
   });
 
-  it('upserts the report when event has ended (Hylo Member, hyloId as reporterId)', async () => {
+  it('upserts the report when event has ended (Logto Member, logtoId as reporterId)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'Alice', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'Alice', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -238,16 +249,16 @@ describe('POST /api/events/[id]/attendance-report', () => {
     expect(res.status).toBe(200);
     const args = mockUpsert.mock.calls[0][1];
     expect(args.eventId).toBe(5);
-    expect(args.reporterId).toBe('h-1');
+    expect(args.reporterId).toBe('logto-1');
     expect(args.reporterName).toBe('Alice');
     expect(args.eventHappened).toBe(true);
     expect(args.hostPresent).toBe(false);
     expect(args.note).toBe('no host');
   });
 
-  it('upserts with clerkId when Member has no hyloId', async () => {
+  it('upserts with clerkId when Member has no logtoId', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 2, hyloId: null, clerkId: 'clerk_x', name: 'Bob', email: null, image: null, role: 'member',
+      id: 2, logtoId: null, clerkId: 'clerk_x', name: 'Bob', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -264,7 +275,7 @@ describe('POST /api/events/[id]/attendance-report', () => {
 
   it('null note is preserved (not stringified)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     setupEventMock([{
       id: 5,
@@ -288,7 +299,7 @@ describe('GET /api/events/[id]/attendance-report', () => {
 
   it('returns 400 for non-numeric event id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await GET(makeReq(null), {
       params: Promise.resolve({ id: 'abc' }),
@@ -298,7 +309,7 @@ describe('GET /api/events/[id]/attendance-report', () => {
 
   it('returns 200 + { report: null } when current user has no report', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetReport.mockResolvedValue(undefined);
     const res = await GET(makeReq(null), eventParams);
@@ -311,14 +322,14 @@ describe('GET /api/events/[id]/attendance-report', () => {
     const row = {
       id: 7,
       eventId: 5,
-      reporterId: 'h-1',
+      reporterId: 'logto-1',
       reporterName: 'Alice',
       eventHappened: true,
       hostPresent: false,
       note: null,
     };
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, logtoId: 'logto-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetReport.mockResolvedValue(row);
     const res = await GET(makeReq(null), eventParams);
