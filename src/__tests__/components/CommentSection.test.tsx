@@ -81,7 +81,7 @@ describe('<CommentSection>', () => {
 
   it('POSTs the comment and prepends it to the list on submit', async () => {
     mockUseSession.mockReturnValue({
-      data: { user: { name: 'Alice', hyloId: 'h-1' } },
+      data: { user: { name: 'Alice' } },
       status: 'authenticated',
     });
     mockGetReturns([]);

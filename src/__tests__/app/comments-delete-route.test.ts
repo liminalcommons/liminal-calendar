@@ -49,7 +49,7 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
 
   it('returns 400 for non-numeric event id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await DELETE(makeReq(), {
       params: Promise.resolve({ id: 'abc', commentId: '99' }),
@@ -59,7 +59,7 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
 
   it('returns 400 for non-numeric comment id', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await DELETE(makeReq(), {
       params: Promise.resolve({ id: '5', commentId: 'xyz' }),
@@ -69,7 +69,7 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
 
   it('returns 404 when the comment does not exist', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue(undefined);
     const res = await DELETE(makeReq(), goodParams);
@@ -78,7 +78,7 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
 
   it('returns 404 when the comment exists but is on a different event', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue({
       id: 99, eventId: 999, authorId: 'h-1', deletedAt: null,
@@ -89,7 +89,7 @@ describe('DELETE /api/events/[id]/comments/[commentId]', () => {
 
   it('returns 404 when the comment is already soft-deleted', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     mockGetComment.mockResolvedValue({
       id: 99, eventId: 5, authorId: 'h-1', deletedAt: new Date(),

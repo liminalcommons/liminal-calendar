@@ -143,7 +143,7 @@ describe('syncClerkMemberWithMerge', () => {
 
   it('DELEGATES to syncClerkMember when a Member already has this clerkId (returning user, no merge attempt)', async () => {
     // Returning Clerk user — Member row already has this clerkId. Even if a
-    // matching Hylo-only email candidate would exist, the wrapper must NOT
+    // matching identity-less email candidate would exist, the wrapper must NOT
     // try to merge (would otherwise hit a unique-violation on clerkId).
     const existing = { id: 5, clerkId: 'clerk_returning', logtoId: null, name: 'X', email: 'x@x.y' };
     const candidate = { id: 7, clerkId: null, logtoId: null, name: 'Alice', email: 'x@x.y' };

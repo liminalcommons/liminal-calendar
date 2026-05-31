@@ -54,9 +54,9 @@ export async function syncClerkMemberWithMerge(
   if (input.emailVerified && input.email) {
     const emailLower = input.email.toLowerCase();
 
-    // Step 3: find a matching Hylo-only Member. LOWER() on both sides for
-    // case-insensitive comparison (Hylo and Clerk may report different
-    // casing for the same email).
+    // Step 3: find a matching identity-less Member (no clerkId yet). LOWER()
+    // on both sides for case-insensitive comparison (providers may report
+    // different casing for the same email).
     const [candidate] = await db
       .select()
       .from(members)

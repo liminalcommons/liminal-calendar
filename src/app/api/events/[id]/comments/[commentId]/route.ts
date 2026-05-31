@@ -34,8 +34,8 @@ export async function DELETE(
   // authorId (logtoId/clerkId/'unknown'). The provider string is mutable,
   // can be null for legacy rows, and collides on 'unknown' — keying authorship
   // on it locks real authors out (e.g. a member whose only id is a legacy
-  // value that no longer matches logtoId/clerkId) and is brittle across the
-  // Hylo→Logto→Clerk identity migrations. event_comments.memberId is set on
+  // value that no longer matches logtoId/clerkId) and is brittle across
+  // identity-provider migrations. event_comments.memberId is set on
   // every create (see comments POST → createComment), so it's the reliable key.
   const isAuthor = comment.memberId != null && comment.memberId === member.id;
   const isAdmin = member.role === 'admin';

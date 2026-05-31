@@ -2,7 +2,7 @@
 --
 -- Goal: introduce members.id (integer) as the canonical person identifier.
 -- Every table that currently points at a person via a provider-specific
--- string (hyloId or clerkId) gets a nullable member_id INTEGER REFERENCES
+-- string (a logtoId or clerkId) gets a nullable member_id INTEGER REFERENCES
 -- members(id). This phase ONLY adds columns and backfills them. Reads
 -- and writes still use the legacy string columns — phase 2 will dual-write,
 -- phase 3 will flip reads, phase 4 will drop the legacy columns.

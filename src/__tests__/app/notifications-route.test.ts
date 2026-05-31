@@ -61,7 +61,7 @@ describe('GET /api/notifications', () => {
     expect(body.notifications).toHaveLength(2);
     expect(body.unseenCount).toBe(2);
 
-    // Repo called with hyloId as the resolved user id.
+    // Repo called with the logtoId as the resolved user id.
     expect(mockList).toHaveBeenCalledWith(
       expect.anything(),
       'h-1',
@@ -70,7 +70,7 @@ describe('GET /api/notifications', () => {
     expect(mockCount).toHaveBeenCalledWith(expect.anything(), 'h-1');
   });
 
-  it('falls back to clerkId when hyloId is null', async () => {
+  it('falls back to clerkId when logtoId is null', async () => {
     mockGetCurrentMember.mockResolvedValue({
       logtoId: null,
       clerkId: 'clerk_xyz',

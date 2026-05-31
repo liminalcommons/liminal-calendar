@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  *
- * /api/admin/hylo-nudge — admin-gated re-signup nudge endpoint.
+ * /api/admin/resignup-nudge — admin-gated re-signup nudge endpoint.
  * Verifies access control, dry-run, batching, partial-failure handling.
  */
 
@@ -16,7 +16,7 @@ jest.mock('@/lib/email', () => ({
 // Build a controllable in-memory db. The drizzle chain we use is
 // .select(...).from(members).where(...).limit(N) and .update(members).set(...).where(...)
 // — small surface, easy to fake.
-type Row = { id: number; name: string | null; email: string | null; hyloId: string | null; nudgedAt: Date | null };
+type Row = { id: number; name: string | null; email: string | null; nudgedAt: Date | null };
 
 let mockRows: Row[] = [];
 let mockUpdates: Array<{ id: number; nudgedAt: Date }> = [];
@@ -71,13 +71,13 @@ jest.mock('@/lib/db', () => ({
 import { NextRequest } from 'next/server';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { sendEmail } from '@/lib/email';
-import { GET, POST } from '@/app/api/admin/hylo-nudge/route';
+import { GET, POST } from '@/app/api/admin/resignup-nudge/route';
 
 const mockAuth = getAuthedUser as jest.MockedFunction<typeof getAuthedUser>;
 const mockSend = sendEmail as jest.MockedFunction<typeof sendEmail>;
 
 function makePost(body: unknown): NextRequest {
-  return new NextRequest('http://localhost/api/admin/hylo-nudge', {
+  return new NextRequest('http://localhost/api/admin/resignup-nudge', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -99,7 +99,7 @@ beforeEach(() => {
   mockSend.mockResolvedValue({ success: true });
 });
 
-describe('GET /api/admin/hylo-nudge', () => {
+describe('GET /api/admin/resignup-nudge', () => {
   it('401 when not signed in', async () => {
     mockAuth.mockResolvedValue(null);
     const res = await GET();
@@ -115,8 +115,8 @@ describe('GET /api/admin/hylo-nudge', () => {
   it('returns counts + sample for admin', async () => {
     mockAuth.mockResolvedValue(admin);
     mockRows = [
-      { id: 10, name: 'Eve',  email: 'e@x.com', hyloId: 'h-1', nudgedAt: null },
-      { id: 11, name: 'Adam', email: 'a@x.com', hyloId: 'h-2', nudgedAt: new Date() },
+      { id: 10, name: 'Eve',  email: 'e@x.com', nudgedAt: null },
+      { id: 11, name: 'Adam', email: 'a@x.com', nudgedAt: new Date() },
     ];
     const res = await GET();
     expect(res.status).toBe(200);
@@ -125,13 +125,13 @@ describe('GET /api/admin/hylo-nudge', () => {
     // (pendingOnly=false), then sample. Our mock toggles pendingOnly per call
     // is too crude — at minimum verify shape is right.
     expect(j).toHaveProperty('pending');
-    expect(j).toHaveProperty('totalHyloOnly');
+    expect(j).toHaveProperty('totalPending');
     expect(j).toHaveProperty('sample');
     expect(Array.isArray(j.sample)).toBe(true);
   });
 });
 
-describe('POST /api/admin/hylo-nudge', () => {
+describe('POST /api/admin/resignup-nudge', () => {
   it('401 when not signed in', async () => {
     mockAuth.mockResolvedValue(null);
     const res = await POST(makePost({}));
@@ -147,7 +147,7 @@ describe('POST /api/admin/hylo-nudge', () => {
   it('dryRun does not call sendEmail and does not mark nudged_at', async () => {
     mockAuth.mockResolvedValue(admin);
     mockRows = [
-      { id: 10, name: 'Eve', email: 'e@x.com', hyloId: 'h-1', nudgedAt: null },
+      { id: 10, name: 'Eve', email: 'e@x.com', nudgedAt: null },
     ];
     const res = await POST(makePost({ dryRun: true, limit: 10 }));
     expect(res.status).toBe(200);
@@ -161,8 +161,8 @@ describe('POST /api/admin/hylo-nudge', () => {
   it('sends real emails when not dry-run and marks nudged_at', async () => {
     mockAuth.mockResolvedValue(admin);
     mockRows = [
-      { id: 10, name: 'Eve', email: 'e@x.com', hyloId: 'h-1', nudgedAt: null },
-      { id: 11, name: 'Bob', email: 'b@x.com', hyloId: 'h-2', nudgedAt: null },
+      { id: 10, name: 'Eve', email: 'e@x.com', nudgedAt: null },
+      { id: 11, name: 'Bob', email: 'b@x.com', nudgedAt: null },
     ];
     const res = await POST(makePost({ limit: 10 }));
     expect(res.status).toBe(200);
@@ -176,8 +176,8 @@ describe('POST /api/admin/hylo-nudge', () => {
   it('continues on per-row email failure and reports it', async () => {
     mockAuth.mockResolvedValue(admin);
     mockRows = [
-      { id: 10, name: 'Eve', email: 'e@x.com', hyloId: 'h-1', nudgedAt: null },
-      { id: 11, name: 'Bob', email: 'b@x.com', hyloId: 'h-2', nudgedAt: null },
+      { id: 10, name: 'Eve', email: 'e@x.com', nudgedAt: null },
+      { id: 11, name: 'Bob', email: 'b@x.com', nudgedAt: null },
     ];
     mockSend
       .mockResolvedValueOnce({ success: false, error: 'rate limit' })
@@ -213,7 +213,7 @@ describe('POST /api/admin/hylo-nudge', () => {
   it('skips rows missing email (defence in depth — predicate should filter them)', async () => {
     mockAuth.mockResolvedValue(admin);
     mockRows = [
-      { id: 10, name: 'X', email: null, hyloId: 'h-x', nudgedAt: null },
+      { id: 10, name: 'X', email: null, nudgedAt: null },
     ];
     const res = await POST(makePost({}));
     expect(res.status).toBe(200);

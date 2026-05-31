@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { EventRSVP } from '@/components/events/EventRSVP';
 
 jest.mock('next-auth/react', () => ({
-  useSession: () => ({ data: { user: { id: 'u1', hyloId: 'u1' } }, status: 'authenticated' }),
+  useSession: () => ({ data: { user: { id: 'u1' } }, status: 'authenticated' }),
 }));
 
 // EventRSVP fetches /api/events/{id}/rsvp on mount via apiFetch.

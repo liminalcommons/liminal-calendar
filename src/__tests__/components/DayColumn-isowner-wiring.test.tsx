@@ -77,7 +77,7 @@ describe('DayColumn isOwner wiring', () => {
   });
 
   it('compares currentUserId stringwise (creator_id stored as numeric string)', async () => {
-    // Hylo IDs are numeric strings; session may surface them as numbers in
+    // Provider IDs are strings; session may surface them as numbers in
     // some shapes. DayColumn must coerce to string for the comparison.
     const ev = mkEvent('1', '67402');
     const { container } = await renderColumn('67402', [ev]);

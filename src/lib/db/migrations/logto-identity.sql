@@ -1,10 +1,12 @@
--- Logto identity: third provider on the members table.
+-- Logto identity: an additional provider on the members table.
 --
 -- Castalia (the new canonical signin) issues Logto identities. This
--- migration adds `logto_id` alongside the existing `hylo_id` and
--- `clerk_id`, and broadens the chk_members_identity invariant to allow
--- any one of the three. Hylo + Clerk rows continue to satisfy the
--- constraint unchanged.
+-- migration adds `logto_id` alongside the existing `clerk_id`, and
+-- (historically) broadened the chk_members_identity invariant.
+--
+-- NOTE: the legacy identity CHECK has since been retired entirely (a row
+-- may carry only an email), so the re-ADD at the bottom of this file is
+-- now superseded by the unconditional DROP in migrate.ts.
 --
 -- Additive only. No row-level migration. The first-signin auto-link
 -- (a separate step) attaches logto_id to existing rows by email match.
@@ -33,12 +35,8 @@ END $$;
 --    (`select members where logto_id = $1`).
 CREATE INDEX IF NOT EXISTS idx_members_logto_id ON members(logto_id);
 
--- 3. Replace the identity CHECK constraint to allow logto_id as the
---    sole non-null identity. Drop+recreate (PostgreSQL lacks
---    ALTER CONSTRAINT for CHECK predicate changes).
+-- 3. Drop the legacy identity CHECK constraint. (This historically
+--    re-added a widened CHECK; that re-ADD has been removed — a Member
+--    row may now be valid with only an email, e.g. pending re-signup.)
 ALTER TABLE members
   DROP CONSTRAINT IF EXISTS chk_members_identity;
-
-ALTER TABLE members
-  ADD CONSTRAINT chk_members_identity
-  CHECK (hylo_id IS NOT NULL OR clerk_id IS NOT NULL OR logto_id IS NOT NULL);

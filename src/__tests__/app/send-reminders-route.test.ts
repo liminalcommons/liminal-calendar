@@ -156,7 +156,7 @@ describe('GET /api/cron/send-reminders', () => {
 
   it('sends email to a Clerk-only Member (lookup matches members.clerkId)', async () => {
     // This is the path the d3cab7c fix enabled. Without the fix, the
-    // memberRows query would have used inArray(hyloId, ['clerk_xyz'])
+    // memberRows query would have used inArray on the provider-string user id (['clerk_xyz'])
     // and matched nothing → sent=0. With the fix, the OR predicate
     // matches by clerkId and emails get delivered.
     setupSelectQueue([
@@ -175,8 +175,8 @@ describe('GET /api/cron/send-reminders', () => {
       ],
       // alreadySent — empty
       [],
-      // memberRows — Clerk-only Member (hyloId null, clerkId set, email set)
-      [{ hyloId: null, clerkId: 'clerk_xyz', email: 'bob@x.y', timezone: 'UTC' }],
+      // memberRows — Clerk-only Member (clerkId set, email set)
+      [{ clerkId: 'clerk_xyz', email: 'bob@x.y', timezone: 'UTC' }],
     ]);
 
     const res = await GET(makeReq());

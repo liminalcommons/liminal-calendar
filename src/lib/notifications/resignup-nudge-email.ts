@@ -1,11 +1,11 @@
-// HTML email asking a former Hylo-only member to sign in again via Castalia
-// or Clerk. The auth.ts Logto callback email-matches against `members.email`
-// (auth.ts:108-124), so a successful sign-in with the SAME email re-links
-// their existing row (preserving role, events, RSVPs, bookings).
+// HTML email asking a former identity-less member to sign in again via
+// Castalia or Clerk. The auth.ts Logto callback email-matches against
+// `members.email` (auth.ts:108-124), so a successful sign-in with the SAME
+// email re-links their existing row (preserving role, events, RSVPs, bookings).
 
 const SIGNIN_URL = 'https://liminalcalendar.com/welcome';
 
-export function hyloResignupEmail(args: { name: string | null }): {
+export function resignupNudgeEmail(args: { name: string | null }): {
   subject: string;
   html: string;
 } {
@@ -22,7 +22,7 @@ export function hyloResignupEmail(args: { name: string | null }): {
             <h1 style="margin:0 0 12px;font-size:20px;color:#e8dccc;">Sign in to Liminal Calendar again</h1>
             <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#c4b69a;">${greeting}</p>
             <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#c4b69a;">
-              We changed how sign-in works on the Liminal Commons Calendar. Hylo sign-in is no longer available — but you can sign in with <strong>Castalia</strong> or with <strong>email / Google</strong>, and your events, RSVPs, and bookings will carry over automatically.
+              We changed how sign-in works on the Liminal Commons Calendar. Your old sign-in method is no longer available — but you can sign in with <strong>Castalia</strong> or with <strong>email / Google</strong>, and your events, RSVPs, and bookings will carry over automatically.
             </p>
             <p style="margin:0 0 28px;font-size:15px;line-height:1.55;color:#c4b69a;">
               Just use the same email address you've always used (<em>this one</em>). Your role, history, and any reminders you'd set up stay attached to your account.

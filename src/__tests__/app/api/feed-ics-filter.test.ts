@@ -14,7 +14,7 @@ const mockEventA = { id: 1, title: 'EventA', startsAt: new Date('2026-06-01T10:0
 const mockEventB = { id: 2, title: 'EventB', startsAt: new Date('2026-06-02T10:00:00Z'), endsAt: null, location: null, description: null, timezone: 'UTC', creatorName: 'Bob', recurrenceRule: null };
 
 // The DB mock must handle three call shapes that appear in different code paths:
-//   1. .where().limit()            → member-by-token lookup → [{hyloId: 'u1'}]
+//   1. .where().limit()            → member-by-token lookup → [{ logtoId: 'u1' }]
 //   2a. .where() thenable          → rsvps-eventIds → [{eventId: 1}]  (rsvps-only filter)
 //   2b. .where().orderBy()         → all events with visibility → [A, B]  (no filter)
 //   3. .where().orderBy()          → events by inArray+visibility → [A]   (after rsvps lookup)

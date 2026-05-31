@@ -37,7 +37,7 @@ function ProviderBadge({ member }: { member: Member }) {
   // Castalia (Logto) is the canonical identity once provisioned. Clerk is
   // kept visible as an origin hint in case an admin needs to know where the
   // row first came from. Members with neither identity are kept on the
-  // table for outreach (they previously had a Hylo identity that was
+  // table for outreach (they previously had a legacy identity that was
   // removed).
   const hasLogto = Boolean(member.logtoId);
   const hasClerk = Boolean(member.clerkId);

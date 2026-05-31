@@ -107,7 +107,7 @@ export const COMMUNITY_TIMEZONES: CommunityTimezone[] = [
 ];
 
 /**
- * Infer IANA timezone from a free-text location string (e.g. Hylo's location field).
+ * Infer IANA timezone from a free-text location string (e.g. an event's location field).
  * Returns null if no match found.
  */
 const LOCATION_TZ_MAP: [RegExp, string][] = [

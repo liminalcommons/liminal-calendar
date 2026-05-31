@@ -23,10 +23,10 @@ describe('applyRedirectPolicy', () => {
   it('keeps same-origin absolute urls', () => {
     expect(
       applyRedirectPolicy({
-        url: 'https://auth.liminalcalendar.com/start-hylo-signin',
+        url: 'https://auth.liminalcalendar.com/sign-in',
         baseUrl: authBase,
       }),
-    ).toBe('https://auth.liminalcalendar.com/start-hylo-signin');
+    ).toBe('https://auth.liminalcalendar.com/sign-in');
   });
 
   it('rejects foreign hosts and falls back to the apex', () => {

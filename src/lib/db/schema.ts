@@ -31,9 +31,9 @@ export const members = pgTable('members', {
   timezone: text('timezone').default('UTC'),
   availability: text('availability').default('[]'), // JSON array of UTC slot indices 0-335
   feedToken: text('feed_token').unique(), // Per-user ICS subscription token
-  // Set when /api/admin/hylo-nudge sends a re-signup invitation to this
-  // member's email. Null = never nudged. Used to deduplicate against
-  // accidental re-runs of the admin endpoint.
+  // Set when the admin re-signup nudge endpoint sends a re-signup
+  // invitation to this member's email. Null = never nudged. Used to
+  // deduplicate against accidental re-runs of the admin endpoint.
   nudgedAt: timestamp('nudged_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -49,7 +49,7 @@ export const events = pgTable('events', {
   location: text('location'),
   imageUrl: text('image_url'),
   recurrenceRule: text('recurrence_rule'), // 'daily' | 'weekly' | 'fortnightly' | 'monthly' | null
-  // Legacy provider-string id (hyloId or clerkId). Phase 4 will drop this.
+  // Legacy provider-string id (a logtoId or clerkId). Phase 4 will drop this.
   creatorId: text('creator_id').notNull(),
   // Canonical creator FK (Phase 1 backfilled, Phase 2 dual-writes,
   // Phase 3 reads, Phase 4 makes notNull and drops creator_id).
@@ -78,7 +78,7 @@ export const rsvps = pgTable(
     eventId: integer('event_id')
       .notNull()
       .references(() => events.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull(), // legacy: hyloId or clerkId
+    userId: text('user_id').notNull(), // legacy provider-string: logtoId or clerkId
     memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
     userName: text('user_name').notNull(),
     userImage: text('user_image'),
@@ -130,7 +130,7 @@ export const pushSubscriptions = pgTable(
 // email is opt-in.
 export const notificationPreferences = pgTable('notification_preferences', {
   id: serial('id').primaryKey(),
-  userId: text('user_id').notNull().unique(), // Hylo user id OR Clerk user id (matches rsvps.user_id pattern)
+  userId: text('user_id').notNull().unique(), // provider-string user id: logtoId or clerkId (matches rsvps.user_id pattern)
   memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
   pushOneHour: boolean('push_1h').notNull().default(true),
   pushFifteenMin: boolean('push_15min').notNull().default(true),
@@ -164,7 +164,7 @@ export const eventComments = pgTable('event_comments', {
   eventId: integer('event_id')
     .notNull()
     .references(() => events.id, { onDelete: 'cascade' }),
-  authorId: text('author_id').notNull(), // hyloId or clerkId — same convention as rsvps.userId
+  authorId: text('author_id').notNull(), // provider-string: logtoId or clerkId — same convention as rsvps.userId
   memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
   authorName: text('author_name').notNull(),
   authorImage: text('author_image'),
@@ -218,7 +218,7 @@ export const notifications = pgTable(
   'notifications',
   {
     id: serial('id').primaryKey(),
-    userId: text('user_id').notNull(), // recipient (hyloId or clerkId)
+    userId: text('user_id').notNull(), // recipient provider-string (logtoId or clerkId)
     memberId: integer('member_id').references(() => members.id, { onDelete: 'cascade' }),
     type: text('type').notNull(),
     eventId: integer('event_id').references(() => events.id, { onDelete: 'cascade' }),
@@ -299,7 +299,7 @@ export const eventInvitations = pgTable(
 // for the biweekly Show & Tell hour. Submitters propose; host triages.
 export const topicSubmissions = pgTable('topic_submissions', {
   id: serial('id').primaryKey(),
-  submitterId: text('submitter_id').notNull(), // hyloId | clerkId | logtoId
+  submitterId: text('submitter_id').notNull(), // provider-string: clerkId | logtoId
   memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
   submitterName: text('submitter_name').notNull(),
   submitterEmail: text('submitter_email'),

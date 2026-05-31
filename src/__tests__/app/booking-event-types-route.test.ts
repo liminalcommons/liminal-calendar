@@ -157,7 +157,6 @@ describe('POST /api/booking/event-types', () => {
       id: 7,
       logtoId: 'lg_seven',
       clerkId: null,
-      hyloId: null,
     });
     const { insertValues } = setupDbMocks({
       insertReturning: [{ id: 99, slug: 'coffee-30' }],
@@ -177,7 +176,6 @@ describe('POST /api/booking/event-types', () => {
       id: 42,
       logtoId: null,
       clerkId: null,
-      hyloId: null,
     });
     const { insertValues } = setupDbMocks({
       insertReturning: [{ id: 1 }],

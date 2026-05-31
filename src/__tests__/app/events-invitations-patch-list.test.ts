@@ -9,7 +9,7 @@
  * (@/lib/auth/get-authed-user), which returns an `AuthedUser`:
  *   { memberId: number|null, id, role: 'member'|'host'|'admin', name, image, ... }
  * Ownership/creator is `event.memberId === authed.memberId`. There is no
- * `hyloId` anywhere — Hylo was removed. Each auth mock below therefore sets
+ * a legacy provider id anywhere. Each auth mock below therefore sets
  * `memberId` (the canonical integer FK) rather than a provider string.
  */
 

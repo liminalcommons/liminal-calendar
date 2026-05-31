@@ -1,16 +1,15 @@
 /**
- * Admin: re-signup nudge for Hylo-only members.
+ * Admin: re-signup nudge for members who can no longer authenticate.
  *
- * Background: when Hylo OAuth was removed (commit fde970a), `members`
- * rows whose only identity was hyloId became unable to authenticate.
- * Their events, RSVPs, and bookings still exist in the DB; they just
- * can't sign in. The Logto callback in auth.ts:108-124 will re-link
- * an existing row by email on first Castalia sign-in — so a single
- * email asking them to sign in again is enough to restore access
- * without data loss.
+ * Background: a prior identity-provider change left some `members` rows
+ * with no usable login id (only an email). Their events, RSVPs, and
+ * bookings still exist in the DB; they just can't sign in. The Logto
+ * callback in auth.ts:108-124 will re-link an existing row by email on
+ * first Castalia sign-in — so a single email asking them to sign in
+ * again is enough to restore access without data loss.
  *
- * GET  /api/admin/hylo-nudge       — count + sample (read-only)
- * POST /api/admin/hylo-nudge       — send nudges
+ * GET  /api/admin/resignup-nudge       — count + sample (read-only)
+ * POST /api/admin/resignup-nudge       — send nudges
  *   body: { dryRun?: boolean, limit?: number, force?: boolean }
  *     dryRun: skip Resend, just report who *would* be nudged
  *     limit:  cap per-call (default 50). Batch by re-running.
@@ -24,7 +23,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { sendEmail } from '@/lib/email';
-import { hyloResignupEmail } from '@/lib/notifications/hylo-resignup-email';
+import { resignupNudgeEmail } from '@/lib/notifications/resignup-nudge-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,15 +31,10 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 
 // Single predicate for "needs re-signup nudge". Used by both GET (count +
-// sample) and POST (target selection) so they can never drift.
-//
-// Note: we deliberately do NOT filter on `hyloId IS NOT NULL` even though
-// the original cohort is Hylo-era members. The chk_members_identity
-// constraint guaranteed that any pre-Logto/pre-Clerk row had hyloId set,
-// so (clerkId IS NULL AND logtoId IS NULL AND email IS NOT NULL) already
-// captures the same set. Skipping the hyloId clause lets us drop that
-// column without breaking this endpoint.
-function hyloOnlyPredicate(includeAlreadyNudged: boolean) {
+// sample) and POST (target selection) so they can never drift. A member
+// needs a nudge when they have an email but no usable login identity
+// (neither a clerkId nor a logtoId).
+function pendingResignupPredicate(includeAlreadyNudged: boolean) {
   const base = [
     isNull(members.clerkId),
     isNull(members.logtoId),
@@ -65,11 +59,11 @@ export async function GET() {
     const [pending] = await db
       .select({ count: count() })
       .from(members)
-      .where(hyloOnlyPredicate(false));
+      .where(pendingResignupPredicate(false));
     const [total] = await db
       .select({ count: count() })
       .from(members)
-      .where(hyloOnlyPredicate(true));
+      .where(pendingResignupPredicate(true));
 
     // 5-row sample so the admin can sanity-check who's about to be emailed
     // before pulling the trigger on a 500-person batch.
@@ -81,17 +75,17 @@ export async function GET() {
         nudgedAt: members.nudgedAt,
       })
       .from(members)
-      .where(hyloOnlyPredicate(true))
+      .where(pendingResignupPredicate(true))
       .limit(5);
 
     return NextResponse.json({
       pending: Number(pending?.count ?? 0),
-      totalHyloOnly: Number(total?.count ?? 0),
+      totalPending: Number(total?.count ?? 0),
       alreadyNudged: Number(total?.count ?? 0) - Number(pending?.count ?? 0),
       sample,
     });
   } catch (err) {
-    console.error('[GET /api/admin/hylo-nudge]', err);
+    console.error('[GET /api/admin/resignup-nudge]', err);
     return NextResponse.json({ error: 'Query failed' }, { status: 500 });
   }
 }
@@ -118,7 +112,7 @@ export async function POST(req: NextRequest) {
         email: members.email,
       })
       .from(members)
-      .where(hyloOnlyPredicate(force))
+      .where(pendingResignupPredicate(force))
       .limit(limit);
 
     if (targets.length === 0) {
@@ -127,7 +121,7 @@ export async function POST(req: NextRequest) {
         attempted: 0,
         sent: 0,
         failed: 0,
-        message: 'No Hylo-only members pending nudge.',
+        message: 'No members pending re-signup nudge.',
       });
     }
 
@@ -150,7 +144,7 @@ export async function POST(req: NextRequest) {
         results.push({ id: t.id, email: '(missing)', ok: false, error: 'no email' });
         continue;
       }
-      const { subject, html } = hyloResignupEmail({ name: t.name });
+      const { subject, html } = resignupNudgeEmail({ name: t.name });
       const res = await sendEmail(t.email, subject, html);
       if (res.success) {
         try {
@@ -182,7 +176,7 @@ export async function POST(req: NextRequest) {
       results,
     });
   } catch (err) {
-    console.error('[POST /api/admin/hylo-nudge]', err);
+    console.error('[POST /api/admin/resignup-nudge]', err);
     return NextResponse.json({ error: 'Nudge run failed' }, { status: 500 });
   }
 }

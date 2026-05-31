@@ -24,7 +24,7 @@ import { GET } from '@/app/api/calendar/feed.ics/route';
 
 interface DbMockOpts {
   /** Member row to return for the token lookup; null = no match. */
-  memberRow?: { id: number; hyloId: string | null; clerkId: string | null } | null;
+  memberRow?: { id: number; logtoId: string | null; clerkId: string | null } | null;
 }
 
 function setupDbMocks(opts: DbMockOpts = {}) {
@@ -75,7 +75,7 @@ describe('GET /api/calendar/feed.ics — Cache-Control privacy', () => {
   });
 
   it('valid token: Cache-Control is private (no intermediate proxy caching)', async () => {
-    setupDbMocks({ memberRow: { id: 1, hyloId: 'hy_1', clerkId: null } });
+    setupDbMocks({ memberRow: { id: 1, logtoId: 'lg_1', clerkId: null } });
     const res = await GET(
       makeReq('https://example.com/api/calendar/feed.ics?token=valid-token'),
     );

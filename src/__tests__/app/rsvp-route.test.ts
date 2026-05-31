@@ -106,7 +106,7 @@ describe('POST /api/events/[id]/rsvp', () => {
     expect(res.status).toBe(404);
   });
 
-  it('upserts RSVP for Hylo Member with hyloId as userId', async () => {
+  it('upserts RSVP for a member with a provider-string userId', async () => {
     mockGetCurrentMember.mockResolvedValue({
       id: 1, logtoId: 'h-1', clerkId: null, name: 'Alice', email: 'a@x.y', image: 'img.png',
     });

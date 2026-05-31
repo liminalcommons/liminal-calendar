@@ -27,7 +27,6 @@ export const RESERVED_HANDLES = new Set<string>([
   'show-and-tell',
   'sign-in',
   'sign-up',
-  'start-hylo-signin',
   'topics',
   'welcome',
 ]);

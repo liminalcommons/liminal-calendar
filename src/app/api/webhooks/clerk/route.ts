@@ -13,8 +13,8 @@ export const dynamic = 'force-dynamic';
  * under the hood with `CLERK_WEBHOOK_SIGNING_SECRET` from env).
  *
  * On `user.created` events: provisions a Member row via
- * syncClerkMemberWithMerge — which handles email-merge into existing
- * Hylo-only Members when the email is verified, or creates a separate
+ * syncClerkMemberWithMerge — which handles email-merge into an existing
+ * identity-less Member when the email is verified, or creates a separate
  * Clerk-only row otherwise.
  *
  * Other event types are accepted (200) but ignored. Adding handlers

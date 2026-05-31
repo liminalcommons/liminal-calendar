@@ -26,8 +26,6 @@ export interface EventFormValues {
   imageUrl?: string
   meetingLink?: string
   timezone?: string
-  hyloGroupNames?: string[]
-  availableHyloGroups?: string[]
 }
 
 export const EVENT_TOOLS = [
@@ -130,30 +128,12 @@ export const EVENT_TOOLS = [
       },
     },
   },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'set_hylo_groups',
-      description: 'Set which Hylo groups this event should be posted to',
-      parameters: {
-        type: 'object',
-        properties: {
-          groupNames: { type: 'array', items: { type: 'string' }, description: 'Names of Hylo groups to post to' },
-        },
-        required: ['groupNames'],
-      },
-    },
-  },
 ]
 
 export function buildSystemPrompt(formState: EventFormValues): string {
   const today = new Date().toISOString().split('T')[0]
   const tz = formState.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
   const stateJson = JSON.stringify(formState, null, 2)
-
-  const hyloGroups = formState.availableHyloGroups?.length
-    ? `\n\nAvailable Hylo groups to post to (ONLY use these exact names with set_hylo_groups):\n${formState.availableHyloGroups.map(g => `- ${g}`).join('\n')}`
-    : ''
 
   return `You are an intentional event creation coach for the Liminal Commons community calendar — an online gathering space for sensemaking, metamodern dialogue, and collective intelligence.
 
@@ -162,7 +142,7 @@ Your role is to help hosts craft events that are meaningful, inviting, and clear
 Current form state:
 ${stateJson}
 
-Today is ${today}. User timezone: ${tz}.${hyloGroups}
+Today is ${today}. User timezone: ${tz}.
 
 YOUR APPROACH: INQUIRY-DRIVEN CO-CREATION
 
@@ -203,7 +183,6 @@ TOOL USAGE
 - If a title or description feels generic, set it first then suggest a more evocative alternative
 - The form is directly editable — you're a creative partner, not a gatekeeper
 - If the host just wants to fill the form quickly, respect that and help efficiently
-- Ask which Hylo groups the event should be posted to — use set_hylo_groups with the group names
 
 TIMEZONE COACHING (CRITICAL — you own this, no UI shows it)
 
@@ -254,8 +233,6 @@ export function applyToolCall(toolCall: ToolCall): Partial<EventFormValues> | nu
       return null // side-effect, handled server-side
     case 'suggest_times':
       return null // side-effect, handled server-side
-    case 'set_hylo_groups':
-      return { hyloGroupNames: args.groupNames }
     case 'set_meeting_link':
       return { meetingLink: args.link }
     default:
@@ -272,7 +249,6 @@ export function toolCallLabel(name: string): string {
     case 'set_recurrence': return 'Set recurrence'
     case 'generate_image': return 'Generating image...'
     case 'suggest_times': return 'Finding best times...'
-    case 'set_hylo_groups': return 'Set Hylo groups'
     case 'set_meeting_link': return 'Set meeting link'
     default: return name
   }

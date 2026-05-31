@@ -86,7 +86,8 @@ async function runMigrationsInner(sql: any) {
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'`;
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT '[]'`;
 
-  // Clerk identity column — nullable so existing Hylo-only rows are unaffected.
+  // Clerk identity column — nullable so existing identity-less rows are
+  // unaffected.
   await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
 
   // Handle — optional public-facing username, unique when present.
@@ -414,15 +415,10 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  // Hylo removal — drop the identity CHECK (Hylo-only rows are retained
-  // for outreach but no longer carry any identity), drop the hylo_id
-  // column on members, and drop hylo_group_id / hylo_post_id on events.
-  // IF EXISTS keeps this idempotent on databases already migrated.
+  // The legacy single-identity CHECK constraint is dropped because rows may
+  // now legitimately carry only an email (no clerk/logto id) — e.g. members
+  // pending re-signup. IF EXISTS keeps this idempotent.
   await sql`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
-  await sql`DROP INDEX IF EXISTS idx_members_hylo_id`;
-  await sql`ALTER TABLE members DROP COLUMN IF EXISTS hylo_id`;
-  await sql`ALTER TABLE events DROP COLUMN IF EXISTS hylo_group_id`;
-  await sql`ALTER TABLE events DROP COLUMN IF EXISTS hylo_post_id`;
 
   return { success: true, message: 'Migrations complete' };
 }

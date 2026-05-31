@@ -78,7 +78,6 @@ const BOOKER_MEMBER_ID = 7;
 
 const ownerMember = {
   id: OWNER_MEMBER_ID,
-  hyloId: null,
   clerkId: null,
   logtoId: 'lg_owner',
   name: 'Alice Owner',
@@ -89,7 +88,6 @@ const ownerMember = {
 
 const bookerMember = {
   id: BOOKER_MEMBER_ID,
-  hyloId: null,
   clerkId: null,
   logtoId: 'lg_booker',
   name: 'Bob Booker',

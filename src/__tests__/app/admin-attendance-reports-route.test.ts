@@ -41,7 +41,7 @@ describe('GET /api/admin/attendance-reports', () => {
 
   it('returns 403 when caller is not admin', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'A', email: null, image: null, role: 'member',
+      id: 1, clerkId: null, name: 'A', email: null, image: null, role: 'member',
     });
     const res = await GET(makeReq());
     expect(res.status).toBe(403);
@@ -50,7 +50,7 @@ describe('GET /api/admin/attendance-reports', () => {
 
   it('returns 403 when caller is host (not admin)', async () => {
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-1', clerkId: null, name: 'H', email: null, image: null, role: 'host',
+      id: 1, clerkId: null, name: 'H', email: null, image: null, role: 'host',
     });
     const res = await GET(makeReq());
     expect(res.status).toBe(403);
@@ -86,7 +86,7 @@ describe('GET /api/admin/attendance-reports', () => {
     ];
     mockAggregate.mockResolvedValue(aggregated);
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-admin', clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
+      id: 1, clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
     });
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
@@ -98,7 +98,7 @@ describe('GET /api/admin/attendance-reports', () => {
   it('returns 200 + empty array when there are no reports', async () => {
     mockAggregate.mockResolvedValue([]);
     mockGetCurrentMember.mockResolvedValue({
-      id: 1, hyloId: 'h-admin', clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
+      id: 1, clerkId: null, name: 'Admin', email: null, image: null, role: 'admin',
     });
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
