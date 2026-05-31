@@ -38,6 +38,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorization: { url: `${LOGTO_ISSUER}/auth`, params: { scope: 'openid email profile' } },
       token: `${LOGTO_ISSUER}/token`,
       userinfo: `${LOGTO_ISSUER}/me`,
+      // Skipping discovery (above) also discards Logto's
+      // `id_token_signing_alg_values_supported: ["ES384"]`, so oauth4webapi
+      // falls back to its RS256 default and rejects every Logto ID token with
+      // `unexpected JWT "alg" header parameter` → CallbackRouteError →
+      // `?error=Configuration`. Re-supply the JWKS endpoint (to fetch Logto's
+      // ES384 verification key) and pin the expected ID-token alg to ES384.
+      jwks_endpoint: `${LOGTO_ISSUER}/jwks`,
+      client: { id_token_signed_response_alg: 'ES384' },
       checks: ['pkce', 'state'],
       clientId: process.env.LOGTO_CLIENT_ID?.trim(),
       clientSecret: process.env.LOGTO_CLIENT_SECRET?.trim(),
