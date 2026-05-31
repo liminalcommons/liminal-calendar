@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Suspense } from "react";
 import "@/styles/globals.css";
 import "@/styles/glitch-effects.css";
@@ -39,18 +40,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body>
-        <Providers>
-          {/* Suspense boundary required by useSearchParams in App Router. */}
-          <Suspense fallback={null}>
-            <RouteHistoryTracker />
-          </Suspense>
-          {children}
-          <MobileRedirect />
-          <SubscribePrompt />
-          <ServiceWorkerRegistration />
-          <InstallPrompt />
-          <BugReportFab />
-        </Providers>
+        <ClerkProvider>
+          <Providers>
+            {/* Suspense boundary required by useSearchParams in App Router. */}
+            <Suspense fallback={null}>
+              <RouteHistoryTracker />
+            </Suspense>
+            {children}
+            <MobileRedirect />
+            <SubscribePrompt />
+            <ServiceWorkerRegistration />
+            <InstallPrompt />
+            <BugReportFab />
+          </Providers>
+        </ClerkProvider>
       </body>
     </html>
   );

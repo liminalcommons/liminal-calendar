@@ -88,7 +88,7 @@ function processLogs(raw: string): { errors: string; all: string } {
 }
 
 // Surface the *names* of session-bearing cookies (never values) so we can
-// tell whether the user actually had a Logto session at the moment
+// tell whether the user actually had a Logto / Clerk session at the moment
 // they hit the button. The full cookie header carries secrets — names alone
 // are enough for triage.
 function cookieNamesFromHeader(cookieHeader: string | null): string[] {
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
   let serverAuth: {
     resolved: boolean;
     memberId: number | null;
-    provider: 'logto' | 'none';
+    provider: 'logto' | 'clerk' | 'none';
     role: string | null;
     error?: string;
   } = { resolved: false, memberId: null, provider: 'none', role: null };
@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
       serverAuth = {
         resolved: true,
         memberId: u.memberId,
-        provider: u.logtoUserId ? 'logto' : 'none',
+        provider: u.logtoUserId ? 'logto' : u.clerkId ? 'clerk' : 'none',
         role: u.role,
       };
     } else {
@@ -197,7 +197,7 @@ export async function POST(req: NextRequest) {
 
   const cookieNames = cookieNamesFromHeader(req.headers.get('cookie'));
   const sessionCookieNames = cookieNames.filter(n =>
-    /^(authjs|next-auth|__Secure-authjs|__Secure-next-auth|__session)/.test(n)
+    /^(authjs|next-auth|__Secure-authjs|__Secure-next-auth|__session|__clerk)/.test(n)
   );
 
   // Build issue body
@@ -239,8 +239,9 @@ export async function POST(req: NextRequest) {
   issueBody += `| | Client view | Server view |\n|---|---|---|\n`;
   const clientAuth = (metadata.auth && typeof metadata.auth === 'object' ? metadata.auth : {}) as Record<string, unknown>;
   issueBody += `| **memberId** | — | ${serverAuth.memberId ?? '_null_'} |\n`;
-  issueBody += `| **Provider** | ${clientAuth.hasNextAuthUser ? 'logto' : 'none'} | ${serverAuth.provider} |\n`;
+  issueBody += `| **Provider** | ${clientAuth.hasNextAuthUser ? 'logto' : clientAuth.clerkSignedIn ? 'clerk' : 'none'} | ${serverAuth.provider} |\n`;
   issueBody += `| **NextAuth (Logto)** | ${cell(clientAuth.nextAuth ?? '?')}${clientAuth.hasNextAuthUser ? ' / user present' : ''} | ${serverAuth.provider === 'logto' ? 'session ok' : '—'} |\n`;
+  issueBody += `| **Clerk** | ${clientAuth.clerkLoaded ? (clientAuth.clerkSignedIn ? 'signed in' : 'signed out') : 'loading'} | ${serverAuth.provider === 'clerk' ? 'session ok' : '—'} |\n`;
   issueBody += `| **Role** | — | ${cell(serverAuth.role ?? '_n/a_')} |\n`;
   if (serverAuth.error) issueBody += `| **Server error** | — | \`${cell(serverAuth.error)}\` |\n`;
   if (sessionCookieNames.length) issueBody += `| **Session cookies present** | — | ${sessionCookieNames.map(n => `\`${n}\``).join(', ')} |\n`;

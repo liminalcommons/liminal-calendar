@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
+import { useUser, useClerk } from '@clerk/nextjs';
 import { Sun, Moon, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { ViewToggle } from './ViewToggle';
@@ -21,20 +22,29 @@ function getInitials(name?: string | null, email?: string | null): string {
 
 export function NavBar() {
   const { data: session, status } = useSession();
+  const { isSignedIn: clerkSignedIn, user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { signOut: clerkSignOut } = useClerk();
   const { theme, toggle: toggleTheme } = useTheme();
 
   const handleSignOut = async () => {
-    signOut({ callbackUrl: '/' });
+    if (clerkSignedIn) await clerkSignOut({ redirectUrl: '/' });
+    else signOut({ callbackUrl: '/' });
   };
 
   const handleSignIn = () => {
     window.location.href = '/welcome';
   };
 
-  const user = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
+  const sessionUser = session?.user as { name?: string | null; email?: string | null; image?: string | null; role?: string } | undefined;
+  const user = sessionUser ?? (clerkSignedIn ? {
+    name: clerkUser?.fullName ?? clerkUser?.username ?? null,
+    email: clerkUser?.primaryEmailAddress?.emailAddress ?? null,
+    image: clerkUser?.imageUrl ?? null,
+    role: 'member',
+  } : undefined);
   const initials = getInitials(user?.name, user?.email);
-  const isAuthed = status === 'authenticated';
-  const isUnauthed = status === 'unauthenticated';
+  const isAuthed = status === 'authenticated' || clerkSignedIn;
+  const isUnauthed = status === 'unauthenticated' && clerkLoaded && !clerkSignedIn;
 
   return (
     <nav className="flex items-center justify-between px-4 h-14 bg-grove-surface border-b border-grove-border">
