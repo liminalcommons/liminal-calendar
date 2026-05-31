@@ -39,8 +39,8 @@ jest.mock('@clerk/nextjs', () => ({
 // so each role renders independently while EventForm's real canCreatePublic gating
 // (role === 'host' || 'admin') stays under test.
 jest.mock('@/lib/use-resolved-role', () => ({
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   useResolvedRole: () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useSession } = require('next-auth/react');
     return { role: useSession().data?.user?.role ?? null, resolved: true };
   },
