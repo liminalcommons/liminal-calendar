@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Bug, X, Send, Check, AlertCircle } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useUser } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { installConsoleInterceptors, getRecentLogsAsString } from '@/lib/client-logger';
 
@@ -11,7 +10,6 @@ type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 export function BugReportFab() {
   const { data: session, status: sessionStatus } = useSession();
-  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
   const pathname = usePathname();
   const isEmbed = pathname?.startsWith('/embed/') ?? false;
 
@@ -65,8 +63,6 @@ export function BugReportFab() {
             auth: {
               nextAuth: sessionStatus,
               hasNextAuthUser: !!session?.user,
-              clerkLoaded,
-              clerkSignedIn: !!clerkSignedIn,
             },
             build: {
               commitSha: process.env.NEXT_PUBLIC_COMMIT_SHA || null,

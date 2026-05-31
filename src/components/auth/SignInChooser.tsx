@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 
 export function SignInChooser() {
@@ -14,7 +13,7 @@ export function SignInChooser() {
         Sign in to Liminal Commons Calendar
       </h1>
       <p className="text-sm text-grove-text-muted">
-        Choose how you&apos;d like to continue.
+        Sign in with your Castalia account.
       </p>
       <div>
         <button
@@ -28,12 +27,6 @@ export function SignInChooser() {
           Use the same email you&apos;ve always used. Your roles, RSVPs and history carry over.
         </p>
       </div>
-      <Link
-        href="/sign-in"
-        className="block w-full rounded-md border border-grove-border text-grove-text py-2.5 px-4 text-sm font-medium text-center hover:bg-grove-border/30 transition-colors"
-      >
-        Continue with email or Google
-      </Link>
     </div>
   );
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useUser } from '@clerk/nextjs';
 import { useResolvedRole } from '@/lib/use-resolved-role';
 import { getUserTimezone, formatTimeInTimezone, isLateNightInAnyTimezone, COMMUNITY_TIMEZONES } from '@/lib/timezone-utils';
 import { RecurrenceSelector, type RecurrenceValue, type RecurrenceEndType } from './RecurrenceSelector';
@@ -201,7 +200,6 @@ interface EventFormProps {
 export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuccess }: EventFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
-  const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
 
   // ── Form state ────────────────────────────────────────────────────────────
   // Default to Custom mode with a Castalia URL pre-filled — a soft nudge
@@ -477,9 +475,8 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   // ── Role guard: only hosts and admins can host events.
   // Resolves role from /api/profile (role on members row).
   useEffect(() => {
-    if (session === undefined || !clerkLoaded) return; // still resolving
-    const sessionSignedIn = !!session?.user;
-    if (!sessionSignedIn && !clerkSignedIn) {
+    if (session === undefined) return; // still resolving
+    if (!session?.user) {
       router.replace('/');
       return;
     }
@@ -501,7 +498,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       }
     })();
     return () => { cancelled = true; };
-  }, [session, clerkLoaded, clerkSignedIn, router]);
+  }, [session, router]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const goToPrevWeek = () => {
