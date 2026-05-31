@@ -91,8 +91,10 @@ describe('canPromoteMembers', () => {
 });
 
 describe('canEditEvent', () => {
-  // Per commit bb229fa, edit requires ownership — admins can delete but not edit
-  // others' events.
+  // Policy (2026-05-30): edit requires ownership — ANY creator may edit their own
+  // event, regardless of tier. Non-creators (incl. admins) cannot edit others'
+  // events. Members can now edit their own events (was restricted "until UX
+  // finalized"; product confirmed enabling it).
   it('admin who is not creator cannot edit', () => {
     expect(canEditEvent('admin', false)).toBe(false);
   });
@@ -109,13 +111,19 @@ describe('canEditEvent', () => {
     expect(canEditEvent('host', false)).toBe(false);
   });
 
-  it('member who is creator cannot edit', () => {
-    expect(canEditEvent('member', true)).toBe(false);
+  it('member who is creator CAN edit their own event', () => {
+    expect(canEditEvent('member', true)).toBe(true);
+  });
+
+  it('member who is not creator cannot edit', () => {
+    expect(canEditEvent('member', false)).toBe(false);
   });
 });
 
 describe('canDeleteEvent', () => {
-  it('admin can delete', () => {
+  // Policy (2026-05-30): admins may delete any event; any creator may delete
+  // their own event (members included).
+  it('admin can delete any event', () => {
     expect(canDeleteEvent('admin', false)).toBe(true);
   });
 
@@ -123,8 +131,16 @@ describe('canDeleteEvent', () => {
     expect(canDeleteEvent('host', true)).toBe(true);
   });
 
-  it('member cannot delete', () => {
-    expect(canDeleteEvent('member', true)).toBe(false);
+  it('host who is not creator cannot delete', () => {
+    expect(canDeleteEvent('host', false)).toBe(false);
+  });
+
+  it('member who is creator CAN delete their own event', () => {
+    expect(canDeleteEvent('member', true)).toBe(true);
+  });
+
+  it('member who is not creator cannot delete', () => {
+    expect(canDeleteEvent('member', false)).toBe(false);
   });
 });
 

@@ -18,8 +18,8 @@ export function canCreateEvents(role: UserRole): boolean {
   // Two downstream gates enforce that: canCreatePublicEvent (rejects
   // public visibility for non-host/admin) and validateInviteeCap (rejects
   // members with >10 invitees, called inside POST /api/events before the
-  // INSERT). Edit + delete of member-created events remain restricted
-  // until UX for those flows is finalized.
+  // INSERT). Members may also edit + delete their own events (canEditEvent /
+  // canDeleteEvent gate on creator ownership).
   return role === 'member' || role === 'host' || role === 'admin';
 }
 
@@ -32,15 +32,16 @@ export function canPromoteMembers(role: UserRole): boolean {
 }
 
 export function canEditEvent(role: UserRole, isCreator: boolean): boolean {
-  // Only the creator can edit — admins can delete but not edit others' events
-  if (isCreator && (role === 'host' || role === 'admin')) return true;
-  return false;
+  // Any creator may edit their own event, regardless of tier (members included).
+  // Non-creators — including admins — cannot edit others' events; admins delete
+  // rather than edit. (Product 2026-05-30: members can edit their own events.)
+  return isCreator;
 }
 
 export function canDeleteEvent(role: UserRole, isCreator: boolean): boolean {
-  if (role === 'admin') return true;
-  if (role === 'host' && isCreator) return true;
-  return false;
+  // Admins may delete any event; any creator may delete their own (members
+  // included). (Product 2026-05-30: members can delete their own events.)
+  return role === 'admin' || isCreator;
 }
 
 export function canEditAllEvents(role: UserRole): boolean {
