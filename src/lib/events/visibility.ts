@@ -35,7 +35,13 @@ export function visibleEventsForUserCondition(userId: string): SQL {
  * expander (capped, range-clipped) decides which occurrences actually render.
  */
 export function eventsStartingOnOrAfter(from: Date): SQL {
-  return sql`(events.starts_at >= ${from} OR events.recurrence_rule IS NOT NULL)`;
+  // Bind an ISO-8601 string, NOT the raw Date. Drizzle's sql`` tag has no
+  // column-type context here, so a Date param is sent as its default
+  // toString() ("Fri May 01 2026 ... (Coordinated Universal Time)"), which
+  // Postgres cannot cast to timestamptz — the query 500s. (The typed `lte`
+  // helper serializes correctly because it knows the column type; this raw
+  // fragment does not.)
+  return sql`(events.starts_at >= ${from.toISOString()} OR events.recurrence_rule IS NOT NULL)`;
 }
 
 /**

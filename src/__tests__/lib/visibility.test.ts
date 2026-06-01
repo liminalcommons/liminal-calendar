@@ -40,6 +40,26 @@ describe('eventsStartingOnOrAfter — recurring-master bypass', () => {
     expect(debug).toMatch(/starts_at/);
     expect(debug).toMatch(/recurrence_rule/);
   });
+
+  // Regression (2026-06-01): the lower bound interpolated a raw JS `Date` into
+  // the sql`` template. Drizzle's sql tag has no column-type context there, so
+  // postgres-js bound the Date's default toString() form
+  // ("Fri May 01 2026 00:00:00 GMT+0000 (Coordinated Universal Time)"), which
+  // Postgres cannot cast to timestamptz → every `from`-bounded query 500'd
+  // ("Failed to fetch events"), bouncing /, /month and /list to the landing
+  // page. The bound param MUST be an ISO-8601 string.
+  it('binds the lower-bound date as an ISO-8601 string param, not a raw Date', () => {
+    const from = new Date('2026-05-01T00:00:00Z');
+    const cond = eventsStartingOnOrAfter(from) as unknown as { queryChunks?: unknown[] };
+    // Interpolated params appear as bare chunks between the StringChunk objects
+    // (which carry a `.value` array of literal SQL text). The bound date must be
+    // an ISO string chunk, never a Date instance.
+    const paramChunks = (cond.queryChunks ?? []).filter(
+      (c: any) => !(c && typeof c === 'object' && Array.isArray(c.value)),
+    );
+    expect(paramChunks).toContain(from.toISOString());
+    expect(paramChunks.some((v: unknown) => v instanceof Date)).toBe(false);
+  });
 });
 
 describe('publicOnlyEventsCondition', () => {
