@@ -10,10 +10,15 @@ export const maxDuration = 300;
 // makes this a pure union backfill — rows already on the VPS are skipped, only
 // Supabase-only rows insert. One-shot reconciliation after the VPS cutover.
 const TABLES = [
+  // Parents first. events.source_event_type_id → event_types(id), and
+  // event_types/bookable_windows → members, so they must precede events.
   'members',
-  'events',
-  'rsvps',
   'newsletter_subscribers',
+  'event_types',
+  'bookable_windows',
+  'events',
+  // Children of events / members.
+  'rsvps',
   'event_comments',
   'attendance_reports',
   'notifications',
@@ -22,8 +27,6 @@ const TABLES = [
   'push_subscriptions',
   'event_mutes',
   'event_invitations',
-  'event_types',
-  'bookable_windows',
   'topic_submissions',
 ];
 
