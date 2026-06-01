@@ -21,6 +21,24 @@ export function visibleEventsForUserCondition(userId: string): SQL {
 }
 
 /**
+ * Lower date bound for the list/month/feed window.
+ *
+ * A naive `starts_at >= from` is WRONG for recurring events: their master row
+ * stores the original anchor in `starts_at` (often months in the past), and
+ * the client-side expander projects future occurrences forward from it. If the
+ * master is filtered out by the lower bound it never reaches the expander, so
+ * its ongoing occurrences silently vanish. This fired on the 2026-06-01 month
+ * rollover — the rolling window start advanced from April 1 to May 1 and every
+ * April-anchored weekly series disappeared from month + list views.
+ *
+ * Fix: exempt any row carrying a recurrence_rule from the lower bound. The
+ * expander (capped, range-clipped) decides which occurrences actually render.
+ */
+export function eventsStartingOnOrAfter(from: Date): SQL {
+  return sql`(events.starts_at >= ${from} OR events.recurrence_rule IS NOT NULL)`;
+}
+
+/**
  * Used when no user is signed in — only public events are visible.
  */
 export function publicOnlyEventsCondition(): SQL {

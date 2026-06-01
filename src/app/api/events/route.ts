@@ -5,9 +5,9 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
-import { asc, inArray, gte, lte, and } from 'drizzle-orm';
+import { asc, inArray, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
-import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition, eventsStartingOnOrAfter } from '@/lib/events/visibility';
 import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
 import { fanoutInvitationReceived } from '@/lib/notifications/fanout';
 
@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
     const conditions = [];
     if (from) {
       const fromDate = new Date(from);
-      if (!isNaN(fromDate.getTime())) conditions.push(gte(events.startsAt, fromDate));
+      // Recurring masters anchor `starts_at` in the past; exempt them from the
+      // lower bound so the client expander still receives them. See
+      // eventsStartingOnOrAfter for the full rationale (2026-06-01 regression).
+      if (!isNaN(fromDate.getTime())) conditions.push(eventsStartingOnOrAfter(fromDate));
     }
     if (to) {
       const toDate = new Date(to);
