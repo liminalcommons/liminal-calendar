@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useResolvedRole } from '@/lib/use-resolved-role'
 import Link from 'next/link'
@@ -11,13 +11,24 @@ import { getUpcomingEvents, groupEventsByDateLabel } from '@/lib/calendar-utils'
 import { expandRecurringEvents } from '@/lib/recurrence-expander'
 import type { DisplayEvent } from '@/lib/display-event'
 
+// localStorage SWR cache key. Versioned + per-user so a different account on
+// the same browser can NEVER be shown a previous user's events.
+const LIST_CACHE_PREFIX = 'cal:list:v1:'
+
 export default function ListPage() {
   const { data: session } = useSession()
   const [events, setEvents] = useState<DisplayEvent[]>([])
   const [loading, setLoading] = useState(true)
   const { role: clerkAwareRole } = useResolvedRole()
   const userRole = clerkAwareRole ?? session?.user?.role
+  const userId = session?.user?.id
 
+  // Hold the raw payload so the cache can be written once the user id resolves,
+  // even if that happens after the fetch lands — keeps the fetch a single call.
+  const rawRef = useRef<unknown[] | null>(null)
+
+  // Network revalidate: cookie-authed, runs exactly once on mount independent of
+  // the client session resolving.
   useEffect(() => {
     const now = new Date()
     const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
@@ -37,11 +48,38 @@ export default function ListPage() {
           // the list looks empty even when the week grid is full.
           const expanded = expandRecurringEvents(data, rangeStart, rangeEnd)
           setEvents(getUpcomingEvents(expanded, 20))
+          rawRef.current = data
         }
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
+
+  // Persist the raw payload for instant paint next open, keyed by user id so a
+  // different account on this browser can never be shown these events.
+  useEffect(() => {
+    if (!userId || !rawRef.current) return
+    try { localStorage.setItem(LIST_CACHE_PREFIX + userId, JSON.stringify(rawRef.current)) } catch { /* quota/disabled storage — non-fatal */ }
+  }, [userId, events])
+
+  // Instant paint from cache — ONLY while the network is still in flight AND we
+  // have a resolved user id whose cached payload we can safely show. This turns
+  // a repeat open from "skeleton → wait" into "real content immediately".
+  useEffect(() => {
+    if (!userId || !loading) return
+    try {
+      const cached = localStorage.getItem(LIST_CACHE_PREFIX + userId)
+      if (!cached) return
+      const raw = JSON.parse(cached)
+      if (!Array.isArray(raw)) return
+      const now = new Date()
+      const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 7, 1)
+      const expanded = expandRecurringEvents(raw, rangeStart, rangeEnd)
+      setEvents(getUpcomingEvents(expanded, 20))
+      setLoading(false)
+    } catch { /* corrupt cache — ignore, network will fill in */ }
+  }, [userId, loading])
 
   const dateGroups = groupEventsByDateLabel(events)
   const nextEvent = events[0] || null
