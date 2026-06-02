@@ -3,7 +3,7 @@ import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { db } from '@/lib/db';
 import { events, rsvps, type Member } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
-import { asc } from 'drizzle-orm';
+import { asc, inArray } from 'drizzle-orm';
 import { addMonths } from 'date-fns';
 import { NavBar } from '@/components/NavBar';
 import { SubscribeBanner } from '@/components/SubscribeBanner';
@@ -51,9 +51,11 @@ export default async function HomePage() {
       : publicOnlyEventsCondition();
     const allEvents = await db.select().from(events).where(visibilityCond).orderBy(asc(events.startsAt));
 
-    // Fetch all RSVPs in one query
-    const allRsvps = allEvents.length > 0
-      ? await db.select().from(rsvps)
+    // Fetch RSVPs only for the loaded events (not the whole table) — keeps the
+    // home-page render cheap as the rsvps table grows. Mirrors /api/events.
+    const eventIds = allEvents.map((e) => e.id);
+    const allRsvps = eventIds.length > 0
+      ? await db.select().from(rsvps).where(inArray(rsvps.eventId, eventIds))
       : [];
 
     // Group RSVPs by event ID
