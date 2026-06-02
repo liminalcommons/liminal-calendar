@@ -1,11 +1,64 @@
-// Service worker with push notification support
+// Service worker with push notification support + app-shell precache.
+
+// Bump this to force-evict the old cache after changing what/how we cache.
+const CACHE_VERSION = 'liminal-calendar-static-v1';
 
 self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
-// Intentionally no 'fetch' handler. A passthrough `event.respondWith(fetch(event.request))`
-// breaks Chrome OAuth callbacks: the SW re-fetches the navigation request and the 302
-// + Set-Cookie response handling diverges from Firefox, dropping the session cookie.
-// Push + notificationclick below do not require fetch interception.
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      // Drop any cache that isn't the current version (clears stale builds).
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+    })()
+  );
+});
+
+// Cache-first for content-hashed static assets ONLY. Everything else
+// (navigations/HTML, /api, /ws, OAuth/OIDC, manifest, sw.js, non-GET) is NOT
+// intercepted — we don't call respondWith, so the browser handles it natively.
+// This is deliberate: a blanket `respondWith(fetch(req))` passthrough drops
+// Set-Cookie on Chrome OAuth 302 callbacks. Hashed filenames mean cache-first
+// can never serve a stale build — a new build = a new URL.
+function isCacheable(url) {
+  return (
+    url.pathname.startsWith('/_next/static/') ||           // Next.js hashed bundle
+    /\.(woff2|woff|ttf)$/.test(url.pathname) ||             // fonts
+    /^\/(icon-192|icon-512)\.png$/.test(url.pathname) ||    // PWA icons
+    url.pathname === '/favicon.svg'                         // brand favicon
+  );
+}
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;                  // never touch POST/PUT/etc.
+  let url;
+  try { url = new URL(req.url); } catch { return; }
+  if (url.origin !== self.location.origin) return;   // leave third-party alone
+  if (!isCacheable(url)) return;                      // navigations, /api, oauth → native
+
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE_VERSION);
+      const hit = await cache.match(req);
+      if (hit) return hit;                            // instant: no network on repeat launch
+      const res = await fetch(req);
+      if (res && res.status === 200) cache.put(req, res.clone());
+      return res;
+    })()
+  );
+});
+
+// Recovery path: clear the cache on demand (belt-and-suspenders kill switch).
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'PURGE') {
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))));
+  }
+});
 
 // Handle incoming push notifications
 self.addEventListener('push', (event) => {
