@@ -12,6 +12,15 @@ import { RuneAccent } from './RuneAccent';
 import { MoonPhase } from './MoonPhase';
 import { LiminalWebBackdrop } from './LiminalWebBackdrop';
 
+/**
+ * Chrome fix banner is a one-time migration aid for users trapped behind a
+ * pre-`a8c58de` service worker (stale SW shadowing the deployed fix — only a
+ * local Chrome reset evicts it). It self-retires a week after posting so it
+ * doesn't outlive the trapped population. Evaluated server-side per request
+ * (page is `force-dynamic`), so this is a live clock, not a build-time freeze.
+ */
+const CHROME_FIX_BANNER_EXPIRES = new Date('2026-06-16T23:59:59Z');
+
 /** Runic hairline divider — a glyph flanked by fading rules, marking a turn
  *  between movements of the text. */
 function GlyphDivider({ seed }: { seed: number }) {
@@ -25,10 +34,38 @@ function GlyphDivider({ seed }: { seed: number }) {
 }
 
 export function MarketingLanding() {
+  const showChromeFix = new Date() < CHROME_FIX_BANNER_EXPIRES;
   return (
     <div className="relative min-h-screen overflow-hidden bg-grove-bg text-grove-text font-liminal flex flex-col">
       {/* Living constellation behind everything */}
       <LiminalWebBackdrop className="absolute inset-0 h-full w-full opacity-50" />
+
+      {/* Chrome fix notice — instructions for Chrome users hitting the
+          stuck-on-landing / stale-cache issue (supplied by Roger, 2026-06-09). */}
+      {showChromeFix && (
+      <aside
+        role="note"
+        data-testid="chrome-fix-banner"
+        className="relative z-20 border-b border-grove-accent/40 bg-grove-accent/10 px-6 py-4 text-sm text-grove-text"
+      >
+        <p className="font-semibold not-italic">
+          Using Google Chrome and the calendar won&rsquo;t load? Reset Chrome to fix it:
+        </p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5 leading-relaxed">
+          <li>Open Google Chrome.</li>
+          <li>Click the three dots in the top-right corner of the browser.</li>
+          <li>Select <strong>Settings</strong> from the drop-down menu.</li>
+          <li>In the left sidebar, click on <strong>Reset settings</strong>.</li>
+          <li>Click <strong>Restore settings to their original defaults</strong>.</li>
+          <li>Confirm by clicking <strong>Reset settings</strong>.</li>
+        </ol>
+        <p className="mt-2 leading-relaxed text-grove-text-muted">
+          The action will disable your extensions and clear temporary data like
+          cookies, but your bookmarks, history, and saved passwords will remain
+          intact.
+        </p>
+      </aside>
+      )}
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-grove-border/60">
         <div className="flex items-center gap-2">
