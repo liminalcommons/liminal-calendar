@@ -43,28 +43,33 @@ export function MarketingLanding() {
       {/* Chrome fix notice — instructions for Chrome users hitting the
           stuck-on-landing / stale-cache issue (supplied by Roger, 2026-06-09). */}
       {showChromeFix && (
-      <aside
-        role="note"
+      <details
         data-testid="chrome-fix-banner"
-        className="relative z-20 border-b border-grove-accent/40 bg-grove-accent/10 px-6 py-4 text-sm text-grove-text"
+        className="relative z-20 mx-auto mt-4 w-full max-w-2xl rounded-md border border-grove-border/60 bg-grove-bg/40 px-4 py-3 text-sm text-grove-text"
       >
-        <p className="font-semibold not-italic">
-          Using Google Chrome and the calendar won&rsquo;t load? Reset Chrome to fix it:
-        </p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 leading-relaxed">
-          <li>Open Google Chrome.</li>
-          <li>Click the three dots in the top-right corner of the browser.</li>
-          <li>Select <strong>Settings</strong> from the drop-down menu.</li>
-          <li>In the left sidebar, click on <strong>Reset settings</strong>.</li>
-          <li>Click <strong>Restore settings to their original defaults</strong>.</li>
-          <li>Confirm by clicking <strong>Reset settings</strong>.</li>
-        </ol>
-        <p className="mt-2 leading-relaxed text-grove-text-muted">
-          The action will disable your extensions and clear temporary data like
-          cookies, but your bookmarks, history, and saved passwords will remain
-          intact.
-        </p>
-      </aside>
+        <summary className="cursor-pointer italic text-grove-text-muted hover:text-grove-text">
+          Having problems? Open here.
+        </summary>
+        <div className="mt-3">
+          <p className="not-italic">
+            Using Google Chrome and the calendar won&rsquo;t load? Reset Chrome
+            to fix it:
+          </p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 leading-relaxed">
+            <li>Open Google Chrome.</li>
+            <li>Click the three dots in the top-right corner of the browser.</li>
+            <li>Select <strong>Settings</strong> from the drop-down menu.</li>
+            <li>In the left sidebar, click on <strong>Reset settings</strong>.</li>
+            <li>Click <strong>Restore settings to their original defaults</strong>.</li>
+            <li>Confirm by clicking <strong>Reset settings</strong>.</li>
+          </ol>
+          <p className="mt-2 leading-relaxed text-grove-text-muted">
+            The action will disable your extensions and clear temporary data
+            like cookies, but your bookmarks, history, and saved passwords will
+            remain intact.
+          </p>
+        </div>
+      </details>
       )}
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-grove-border/60">
