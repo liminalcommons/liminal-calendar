@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { events, rsvps, members } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
-import type { DisplayEvent } from '@/lib/display-event';
+import { redactEventUrlForNonMembers, type DisplayEvent } from '@/lib/display-event';
 import { and, eq } from 'drizzle-orm';
 import {
   diffEventForNotification,
@@ -140,7 +140,10 @@ export async function GET(
         }));
     }
 
-    return NextResponse.json({ ...resolved, cancelledByName, upcomingOccurrences });
+    // Non-members can read public events but not their meeting links.
+    const fenced = authed?.memberId ? resolved : redactEventUrlForNonMembers(resolved);
+
+    return NextResponse.json({ ...fenced, cancelledByName, upcomingOccurrences });
   } catch (err) {
     console.error('[GET /api/events/[id]]', err);
     return NextResponse.json({ error: 'Failed to fetch event' }, { status: 500 });

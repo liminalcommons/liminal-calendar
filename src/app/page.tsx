@@ -17,7 +17,7 @@ import { BookingOnboardingNudge } from '@/components/booking/BookingOnboardingNu
 import { YourBookingHomeBanner } from '@/components/booking/YourBookingHomeBanner';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
 import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
-import type { DisplayEvent } from '@/lib/display-event';
+import { redactEventUrlForNonMembers, type DisplayEvent } from '@/lib/display-event';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,6 +84,11 @@ export default async function HomePage() {
     const rangeStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // 1 month ago
     const rangeEnd = addMonths(now, 6);
     displayEvents = expandRecurringEvents(baseEvents, rangeStart, rangeEnd);
+    // Guests can read public events but not their meeting links — mirrors the
+    // /api/events fence (see redactEventUrlForNonMembers).
+    if (!authed?.memberId) {
+      displayEvents = displayEvents.map(redactEventUrlForNonMembers);
+    }
   } catch (e) {
     console.error('Failed to load events:', e instanceof Error ? e.message : String(e));
   }

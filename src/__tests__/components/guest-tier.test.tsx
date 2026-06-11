@@ -1,8 +1,10 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { GUEST_COOKIE } from '@/lib/guest';
+import {
+  redactEventUrlForNonMembers,
+  type DisplayEvent,
+} from '@/lib/display-event';
 import { EventCard } from '@/components/events/EventCard';
-import type { DisplayEvent } from '@/lib/display-event';
 
 const baseEvent = {
   id: 1,
@@ -16,34 +18,35 @@ const baseEvent = {
   attendees: { total: 0, going: 0, interested: 0 },
 } as unknown as DisplayEvent;
 
-function setGuestCookie(on: boolean) {
-  document.cookie = on
-    ? `${GUEST_COOKIE}=1`
-    : `${GUEST_COOKIE}=; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-}
-
-describe('guest tier — Join Meeting gating', () => {
-  afterEach(() => setGuestCookie(false));
-
-  // The whole card is wrapped in a Link to /events/:id, so query by href.
-  const meetingLink = () =>
-    screen
-      .queryAllByRole('link')
-      .find((l) => l.getAttribute('href') === baseEvent.event_url);
-
-  it('renders the Join Meeting link for non-guests', () => {
-    setGuestCookie(false);
-    render(<EventCard event={baseEvent} />);
-    expect(meetingLink()).toBeDefined();
+describe('redactEventUrlForNonMembers', () => {
+  it('strips the URL and sets the redaction flag', () => {
+    const redacted = redactEventUrlForNonMembers(baseEvent);
+    expect(redacted.event_url).toBeNull();
+    expect(redacted.event_url_redacted).toBe(true);
   });
 
-  it('disables Join Meeting for guests', () => {
-    setGuestCookie(true);
+  it('is a no-op for events without a meeting link', () => {
+    const noUrl = { ...baseEvent, event_url: null };
+    const out = redactEventUrlForNonMembers(noUrl);
+    expect(out).toBe(noUrl);
+    expect(out.event_url_redacted).toBeUndefined();
+  });
+});
+
+describe('guest tier — Join Meeting gating (server-redaction driven)', () => {
+  // The whole card is wrapped in a Link to /events/:id, so query by href.
+  const linkWithHref = (href: string) =>
+    screen.queryAllByRole('link').find((l) => l.getAttribute('href') === href);
+
+  it('renders the Join Meeting link for members (unredacted payload)', () => {
     render(<EventCard event={baseEvent} />);
-    expect(meetingLink()).toBeUndefined();
-    expect(
-      screen.getByRole('button', { name: /Join Meeting/i }),
-    ).toBeDisabled();
-    expect(screen.getByText(/sign up to join/i)).toBeInTheDocument();
+    expect(linkWithHref(baseEvent.event_url!)).toBeDefined();
+  });
+
+  it('renders a sign-up door instead when the URL is redacted', () => {
+    render(<EventCard event={redactEventUrlForNonMembers(baseEvent)} />);
+    expect(linkWithHref('https://meet.example.com/open-circle')).toBeUndefined();
+    const signup = screen.getByText(/Sign up to join this event/i).closest('a');
+    expect(signup).toHaveAttribute('href', '/welcome');
   });
 });

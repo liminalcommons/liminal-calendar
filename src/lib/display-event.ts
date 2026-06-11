@@ -25,4 +25,16 @@ export interface DisplayEvent {
    * response when the viewer is the host (owner) — keeps it out of
    * cross-tenant peeks even if rendering happens to leak. */
   noteFromBooker?: string | null;
+  /** True when the event HAS a meeting link but the viewer is not a member
+   * (guest/anonymous), so `event_url` was stripped server-side. Lets the UI
+   * render a "sign up to join" affordance without exposing the URL. */
+  event_url_redacted?: boolean;
+}
+
+/** Server-side fence: strip the meeting link for non-member viewers while
+ * signalling that one exists. Applied at every response boundary that can
+ * serve anonymous/guest traffic (home SSR, /api/events, /api/events/[id]). */
+export function redactEventUrlForNonMembers(event: DisplayEvent): DisplayEvent {
+  if (!event.event_url) return event;
+  return { ...event, event_url: null, event_url_redacted: true };
 }

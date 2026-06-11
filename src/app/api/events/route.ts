@@ -5,6 +5,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
 import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
+import { redactEventUrlForNonMembers } from '@/lib/display-event';
 import { asc, inArray, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { visibleEventsForMemberCondition, publicOnlyEventsCondition, eventsStartingOnOrAfter } from '@/lib/events/visibility';
@@ -62,9 +63,14 @@ export async function GET(request: NextRequest) {
       rsvpsByEvent.set(rsvp.eventId, list);
     }
 
-    const displayEvents = allEvents.map((event) =>
+    let displayEvents = allEvents.map((event) =>
       dbEventToDisplayEvent(event, rsvpsByEvent.get(event.id) ?? [], currentUserId),
     );
+    // Non-members (guests/anonymous) can read public events but not their
+    // meeting links — joining requires sign-up.
+    if (!authed?.memberId) {
+      displayEvents = displayEvents.map(redactEventUrlForNonMembers);
+    }
 
     return NextResponse.json(displayEvents);
   } catch (err) {

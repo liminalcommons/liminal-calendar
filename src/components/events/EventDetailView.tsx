@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useIsGuest } from '@/lib/use-is-guest';
 import Link from 'next/link';
 import { useResolvedProfile } from '@/lib/use-resolved-role';
 import type { DisplayEvent } from '@/lib/display-event';
@@ -66,7 +65,6 @@ function weekChip(occStart: Date, now: Date): string | null {
 export function EventDetailView({ eventId }: EventDetailViewProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const isGuest = useIsGuest();
   const user = session?.user;
 
   const [event, setEvent] = useState<DisplayEvent | null>(null);
@@ -394,8 +392,8 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
           </div>
         )}
 
-        {/* Meeting link — disabled for guests (sign up to participate) */}
-        {event.event_url && !isGuest && (
+        {/* Meeting link — non-members get a sign-up door (URL redacted server-side) */}
+        {event.event_url && (
           <a
             href={event.event_url}
             target="_blank"
@@ -409,13 +407,13 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
             {event.event_url.includes('castalia.one/') ? 'Join in Castalia →' : 'Join Meeting →'}
           </a>
         )}
-        {event.event_url && isGuest && (
-          <button
-            disabled
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-grove-border/30 text-grove-text-muted cursor-not-allowed opacity-70"
+        {event.event_url_redacted && (
+          <Link
+            href="/welcome"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-grove-accent text-grove-surface hover:opacity-90 transition-opacity"
           >
-            Join Meeting (sign up to join)
-          </button>
+            Sign up to join this event &rarr;
+          </Link>
         )}
 
         {/* RSVP section */}

@@ -9,6 +9,7 @@ import { RuneAccent } from './RuneAccent';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { NavGearMenu } from './NavGearMenu';
 import { NotificationButton } from './NotificationButton';
+import { useIsGuest } from '@/lib/use-is-guest';
 
 function getInitials(name?: string | null, email?: string | null): string {
   if (name) {
@@ -45,6 +46,8 @@ export function NavBar() {
   const initials = getInitials(user?.name, user?.email);
   const isAuthed = status === 'authenticated' || clerkSignedIn;
   const isUnauthed = status === 'unauthenticated' && clerkLoaded && !clerkSignedIn;
+  // Guest mode: cookie-flagged unauthenticated browsing (see lib/guest.ts).
+  const isGuest = useIsGuest() && !isAuthed;
 
   return (
     <nav className="flex items-center justify-between px-4 h-14 bg-grove-surface border-b border-grove-border">
@@ -58,6 +61,21 @@ export function NavBar() {
 
       {/* Right: controls */}
       <div className="flex items-center gap-3">
+        {/* Guest chip — explains why participation is locked + gives the exit */}
+        {isGuest && (
+          <span
+            data-testid="guest-chip"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-grove-border/60 bg-grove-border/15 px-3 py-1 text-[11px] text-grove-text-muted"
+          >
+            Browsing as guest
+            <Link
+              href="/welcome"
+              className="font-semibold text-grove-accent-deep hover:text-grove-accent underline underline-offset-2"
+            >
+              Sign up
+            </Link>
+          </span>
+        )}
         <ViewToggle />
 
         {/* Theme toggle */}
