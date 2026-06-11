@@ -10,6 +10,7 @@ import { useTheme } from '@/components/providers/ThemeProvider';
 import { NavGearMenu } from './NavGearMenu';
 import { NotificationButton } from './NotificationButton';
 import { useIsGuest } from '@/lib/use-is-guest';
+import { IntroStrip } from './IntroStrip';
 
 function getInitials(name?: string | null, email?: string | null): string {
   if (name) {
@@ -50,13 +51,20 @@ export function NavBar() {
   const isGuest = useIsGuest() && !isAuthed;
 
   return (
+    <>
     <nav className="flex items-center justify-between px-4 h-14 bg-grove-surface border-b border-grove-border">
-      {/* Left: rune glyph + title */}
+      {/* Left: rune glyph + title + About */}
       <div className="flex items-center gap-2">
         <RuneAccent size="md" seed={2} />
         <span className="hidden sm:inline text-grove-text font-semibold text-sm tracking-wide">
           Liminal Commons
         </span>
+        <Link
+          href="/about"
+          className="ml-1 text-xs italic text-grove-text-muted hover:text-grove-text underline decoration-grove-accent/60 underline-offset-4"
+        >
+          About
+        </Link>
       </div>
 
       {/* Right: controls */}
@@ -128,5 +136,8 @@ export function NavBar() {
         ) : null}
       </div>
     </nav>
+    {/* One-time intro for non-members who skipped the landing page */}
+    <IntroStrip show={isUnauthed} />
+    </>
   );
 }
