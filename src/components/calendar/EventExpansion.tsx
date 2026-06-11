@@ -4,6 +4,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import Link from 'next/link';
 import { X, Edit2, Trash2, ExternalLink, MapPin, Video, Clock, Users, Repeat, Bell, BellOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useIsGuest } from '@/lib/use-is-guest';
 import { useResolvedProfile } from '@/lib/use-resolved-role';
 import type { DisplayEvent } from '@/lib/display-event';
 import { calendarSFX } from '@/lib/sound-manager';
@@ -41,6 +42,7 @@ function computePosition(anchorRect: DOMRect): { top: number; left: number } {
 
 export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate }: EventExpansionProps) {
   const { data: session } = useSession();
+  const isGuest = useIsGuest();
   const router = useRouter();
   const popoverRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -339,8 +341,8 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
           </div>
         )}
 
-        {/* Meeting link */}
-        {event.event_url && (
+        {/* Meeting link — guests get a disabled affordance, no URL exposure */}
+        {event.event_url && !isGuest && (
           <div className="rounded-lg bg-grove-green/10 border border-grove-green/30 px-3 py-2 space-y-1.5">
             <a
               href={event.event_url}
@@ -368,6 +370,17 @@ export function EventExpansion({ event, anchorRect, onClose, onDelete, onUpdate 
                 Copy
               </button>
             </div>
+          </div>
+        )}
+        {event.event_url && isGuest && (
+          <div className="rounded-lg bg-grove-border/15 border border-grove-border/40 px-3 py-2">
+            <button
+              disabled
+              className="flex items-center gap-2 text-xs font-semibold text-grove-text-muted cursor-not-allowed opacity-70"
+            >
+              <Video size={14} className="shrink-0" />
+              Join Meeting (sign up to join)
+            </button>
           </div>
         )}
 

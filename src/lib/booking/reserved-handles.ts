@@ -17,6 +17,7 @@ export const RESERVED_HANDLES = new Set<string>([
   'booking',
   'embed',
   'events',
+  'guest',
   'list',
   'login',
   'logout',

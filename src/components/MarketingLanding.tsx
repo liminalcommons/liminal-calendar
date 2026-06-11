@@ -41,17 +41,20 @@ export function MarketingLanding() {
       <LiminalWebBackdrop className="absolute inset-0 h-full w-full opacity-50" />
 
       {/* Chrome fix notice — instructions for Chrome users hitting the
-          stuck-on-landing / stale-cache issue (supplied by Roger, 2026-06-09). */}
+          stuck-on-landing / stale-cache issue (supplied by Roger, 2026-06-09).
+          Redesigned 2026-06-10 per feedback: highly-visible callout box with a
+          red attention header, replacing the collapsed disclosure. */}
       {showChromeFix && (
-      <details
+      <div
         data-testid="chrome-fix-banner"
-        className="relative z-20 mx-auto mt-4 w-full max-w-2xl rounded-md border border-grove-border/60 bg-grove-bg/40 px-4 py-3 text-sm text-grove-text"
+        className="relative z-20 mx-auto mt-4 w-full max-w-2xl rounded-lg border-2 border-red-500/70 bg-grove-bg/80 shadow-lg"
       >
-        <summary className="cursor-pointer italic text-grove-text-muted hover:text-grove-text">
-          Having problems? Open here.
-        </summary>
-        <div className="mt-3">
-          <p className="not-italic">
+        <p className="rounded-t-md bg-red-600 px-5 py-2.5 text-base font-semibold text-white">
+          If you&rsquo;re struggling to access the calendar, here&rsquo;s how
+          to fix it.
+        </p>
+        <div className="px-5 py-4 text-base text-grove-text">
+          <p>
             Using Google Chrome and the calendar won&rsquo;t load? Reset Chrome
             to fix it:
           </p>
@@ -69,7 +72,7 @@ export function MarketingLanding() {
             remain intact.
           </p>
         </div>
-      </details>
+      </div>
       )}
 
       <header className="relative z-10 flex items-center justify-between px-6 py-5 border-b border-grove-border/60">
@@ -114,6 +117,20 @@ export function MarketingLanding() {
             explore and collaborate with each other more deeply.
           </p>
 
+          {/* Guest path — browse the calendar without an account (read-only:
+              Join Meeting is disabled for guests; see lib/guest.ts). */}
+          <div className="pt-1 text-center">
+            {/* prefetch={false}: /guest is a cookie-setting route handler —
+                prefetching it would enter guest mode on hover. */}
+            <Link
+              href="/guest"
+              prefetch={false}
+              className="inline-block rounded-lg border border-grove-border bg-grove-bg/60 px-6 py-2.5 text-sm italic text-grove-text hover:border-grove-accent hover:text-grove-accent transition-colors"
+            >
+              Enter as Guest &rarr;
+            </Link>
+          </div>
+
           <GlyphDivider seed={3} />
 
           {/* Movement II — crossing the threshold */}
@@ -129,6 +146,15 @@ export function MarketingLanding() {
             Please feel free to be yourself and to get the most out of the rich
             and varied experiences available here.
           </p>
+
+          <div className="pt-1 text-center">
+            <Link
+              href="/welcome"
+              className="inline-block rounded-lg bg-grove-accent px-6 py-2.5 text-sm font-medium text-grove-surface hover:opacity-90 transition-opacity"
+            >
+              Sign Up &rarr;
+            </Link>
+          </div>
 
           <GlyphDivider seed={5} />
 

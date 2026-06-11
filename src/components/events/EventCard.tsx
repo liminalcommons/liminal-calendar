@@ -7,6 +7,7 @@ import { RuneAccent } from '@/components/RuneAccent'
 import { formatTimeInTimezone, getUserTimezone } from '@/lib/timezone-utils'
 import { formatDuration } from '@/lib/calendar-utils'
 import type { DisplayEvent } from '@/lib/display-event'
+import { useIsGuest } from '@/lib/use-is-guest'
 
 function getRelativeTime(startsAt: string): string {
   const now = Date.now()
@@ -28,6 +29,7 @@ interface EventCardProps {
 export function EventCard({ event }: EventCardProps) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+  const isGuest = useIsGuest()
 
   const tz = mounted ? getUserTimezone() : 'UTC'
   const startDate = new Date(event.starts_at)
@@ -80,8 +82,8 @@ export function EventCard({ event }: EventCardProps) {
             </p>
           )}
 
-          {/* Meeting link */}
-          {event.event_url && (
+          {/* Meeting link — guests see a disabled affordance instead */}
+          {event.event_url && !isGuest && (
             <a
               href={event.event_url}
               target="_blank"
@@ -94,6 +96,17 @@ export function EventCard({ event }: EventCardProps) {
               Join Meeting
               <ExternalLink size={9} className="shrink-0 opacity-60" />
             </a>
+          )}
+          {event.event_url && isGuest && (
+            <button
+              disabled
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-grove-text-muted
+                         bg-grove-border/20 border border-grove-border/40 rounded px-2 py-1 mt-1.5 cursor-not-allowed opacity-70"
+            >
+              <Video size={12} className="shrink-0" />
+              Join Meeting (sign up to join)
+            </button>
           )}
 
           {/* Bottom row: attendees + relative time */}

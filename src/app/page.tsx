@@ -1,4 +1,6 @@
+import { cookies } from 'next/headers';
 import { getAuthedUser, type AuthedUser } from '@/lib/auth/get-authed-user';
+import { GUEST_COOKIE } from '@/lib/guest';
 import { getCurrentMember } from '@/lib/auth/get-current-member';
 import { db } from '@/lib/db';
 import { events, rsvps, type Member } from '@/lib/db/schema';
@@ -10,6 +12,7 @@ import { SubscribeBanner } from '@/components/SubscribeBanner';
 import { AvailabilityBanner } from '@/components/availability/AvailabilityBanner';
 import { WeeklyGrid } from '@/components/calendar/WeeklyGrid';
 import { MarketingLanding } from '@/components/MarketingLanding';
+import { ClearGuestCookie } from '@/components/ClearGuestCookie';
 import { BookingOnboardingNudge } from '@/components/booking/BookingOnboardingNudge';
 import { YourBookingHomeBanner } from '@/components/booking/YourBookingHomeBanner';
 import { expandRecurringEvents } from '@/lib/recurrence-expander';
@@ -30,15 +33,21 @@ export default async function HomePage() {
   } catch (err) {
     console.error('[HomePage] getAuthedUser failed:', err instanceof Error ? err.message : String(err));
   }
-  if (!authed) {
+  // Guest tier: an unauthenticated visitor who clicked "Enter as Guest" gets
+  // the calendar in read-only mode (public events only; Join Meeting disabled
+  // client-side via the same cookie — see lib/guest.ts).
+  const isGuest = (await cookies()).get(GUEST_COOKIE)?.value === '1';
+  if (!authed && !isGuest) {
     return <MarketingLanding />;
   }
   const currentUserId = authed?.id;
   let member: Member | null = null;
-  try {
-    member = await getCurrentMember(db);
-  } catch (err) {
-    console.error('[HomePage] getCurrentMember failed:', err instanceof Error ? err.message : String(err));
+  if (authed) {
+    try {
+      member = await getCurrentMember(db);
+    } catch (err) {
+      console.error('[HomePage] getCurrentMember failed:', err instanceof Error ? err.message : String(err));
+    }
   }
   const showBookingNudge = !!member && !member.handle;
   const memberHandle = member?.handle ?? null;
@@ -81,6 +90,7 @@ export default async function HomePage() {
 
   return (
     <div className="h-screen bg-grove-bg flex flex-col overflow-hidden p-2 pt-0">
+      {authed && <ClearGuestCookie />}
       <NavBar />
       <AvailabilityBanner />
       <SubscribeBanner />
