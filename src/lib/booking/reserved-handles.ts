@@ -11,6 +11,7 @@
  * `reserved-handles.test.ts` filesystem check fails CI otherwise.
  */
 export const RESERVED_HANDLES = new Set<string>([
+  'about',
   'admin',
   'api',
   'book',
@@ -29,5 +30,6 @@ export const RESERVED_HANDLES = new Set<string>([
   'sign-in',
   'sign-up',
   'topics',
+  'week',
   'welcome',
 ]);
