@@ -149,7 +149,13 @@ export const notificationPreferences = pgTable('notification_preferences', {
 export const newsletterSubscribers = pgTable('newsletter_subscribers', {
   id: serial('id').primaryKey(),
   email: text('email').notNull().unique(),
-  source: text('source').notNull(), // 'rsvp' | 'signup' | 'manual'
+  source: text('source').notNull(), // 'rsvp' | 'signup' | 'manual' | 'unsubscribe'
+  // Suppression marker. Non-null = this email has opted out and must be
+  // excluded from every send, regardless of whether it also appears in the
+  // members table. A member with no prior subscriber row who unsubscribes
+  // gets a row inserted here (source='unsubscribe') purely to carry this
+  // flag. Null = active recipient.
+  unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
@@ -343,3 +349,34 @@ export const eventMutes = pgTable(
   (table) => [unique('event_mutes_member_event_unique').on(table.memberId, table.eventId)],
 );
 export type EventMute = typeof eventMutes.$inferSelect;
+
+// First-party, privacy-light traffic analytics. One row per tracked
+// interaction. No PII beyond an anonymous, client-minted `visitor_id`
+// (a random localStorage token — not tied to identity). Powers the
+// /admin?tab=analytics dashboard along three axes the community asked for:
+//   - traffic       → 'pageview' rows (+ distinct visitor_id for uniques)
+//   - guest counts  → is_guest flag on pageviews and 'guest_enter' rows
+//   - clicks        → 'click' rows, `target` naming the CTA that was clicked
+// Independent of the members table; member_id is left null on the collection
+// path (the public beacon does no auth resolution) — guest vs. non-guest is
+// the distinction that matters here and is captured by is_guest.
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: serial('id').primaryKey(),
+    type: text('type').notNull(), // 'pageview' | 'guest_enter' | 'click'
+    path: text('path'), // pathname the event occurred on
+    target: text('target'), // click label / CTA target (null for pageviews)
+    visitorId: text('visitor_id'), // anonymous per-browser id (localStorage)
+    isGuest: boolean('is_guest').notNull().default(false),
+    memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('analytics_events_type_created_idx').on(table.type, table.createdAt),
+    index('analytics_events_created_idx').on(table.createdAt),
+  ],
+);
+
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;

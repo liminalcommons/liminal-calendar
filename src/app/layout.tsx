@@ -10,6 +10,7 @@ import { MobileRedirect } from "@/components/MobileRedirect";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { RouteHistoryTracker } from "@/components/RouteHistoryTracker";
+import { AnalyticsTracker } from "@/components/AnalyticsTracker";
 
 export const metadata: Metadata = {
   title: "Liminal Commons Calendar",
@@ -45,6 +46,9 @@ export default function RootLayout({
             {/* Suspense boundary required by useSearchParams in App Router. */}
             <Suspense fallback={null}>
               <RouteHistoryTracker />
+            </Suspense>
+            <Suspense fallback={null}>
+              <AnalyticsTracker />
             </Suspense>
             {children}
             <MobileRedirect />

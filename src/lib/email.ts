@@ -9,10 +9,16 @@ function getResend(): Resend | null {
 
 const EMAIL_FROM = process.env.EMAIL_FROM || 'Liminal Calendar <calendar@liminalcommons.com>';
 
+export interface SendEmailOptions {
+  /** Extra SMTP headers, e.g. List-Unsubscribe for one-click opt-out. */
+  headers?: Record<string, string>;
+}
+
 export async function sendEmail(
   to: string,
   subject: string,
   html: string,
+  opts: SendEmailOptions = {},
 ): Promise<{ success: boolean; error?: string }> {
   const resend = getResend();
   if (!resend) {
@@ -25,6 +31,7 @@ export async function sendEmail(
       to,
       subject,
       html,
+      ...(opts.headers ? { headers: opts.headers } : {}),
     });
     if (error) {
       console.error('[email] Resend error:', error);

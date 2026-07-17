@@ -125,6 +125,7 @@ export function MarketingLanding() {
             <Link
               href="/guest"
               prefetch={false}
+              data-track="landing:enter-guest"
               className="inline-block rounded-lg border border-grove-border bg-grove-bg/60 px-6 py-2.5 text-sm italic text-grove-text hover:border-grove-accent hover:text-grove-accent transition-colors"
             >
               Enter as Guest &rarr;
@@ -150,6 +151,7 @@ export function MarketingLanding() {
           <div className="pt-1 text-center">
             <Link
               href="/welcome"
+              data-track="landing:sign-up"
               className="inline-block rounded-lg bg-grove-accent px-6 py-2.5 text-sm font-medium text-grove-surface hover:opacity-90 transition-opacity"
             >
               Sign Up &rarr;
