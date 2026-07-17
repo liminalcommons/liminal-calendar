@@ -142,6 +142,8 @@ async function runMigrationsInner(sql: any) {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+  // Suppression marker for unsubscribes (added after initial table creation).
+  await sql`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribed_at TIMESTAMPTZ`;
 
   // Logto identity column. First Logto signin attaches logto_id to an
   // existing row by email match, or creates a new Logto-only row.
@@ -313,6 +315,25 @@ async function runMigrationsInner(sql: any) {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS event_mutes_member_idx ON event_mutes(member_id)`;
+
+  // First-party analytics events — pageviews, guest entries, and CTA clicks.
+  // See src/lib/db/schema.ts for the canonical Drizzle definition. Written by
+  // the public /api/analytics/collect beacon and the /guest route; read by the
+  // admin analytics dashboard.
+  await sql`
+    CREATE TABLE IF NOT EXISTS analytics_events (
+      id SERIAL PRIMARY KEY,
+      type TEXT NOT NULL,
+      path TEXT,
+      target TEXT,
+      visitor_id TEXT,
+      is_guest BOOLEAN NOT NULL DEFAULT FALSE,
+      member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events(type, created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)`;
 
   // Booking note + cancellation lifecycle. Note from booker travels with
   // the event forever (visible in emails + event detail). Cancellation

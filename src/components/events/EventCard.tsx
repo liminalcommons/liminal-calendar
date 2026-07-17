@@ -87,6 +87,7 @@ export function EventCard({ event }: EventCardProps) {
               href={event.event_url}
               target="_blank"
               rel="noopener noreferrer"
+              data-track="join-meeting"
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-grove-green hover:text-grove-green-deep
                          bg-grove-green/10 border border-grove-green/20 rounded px-2 py-1 mt-1.5 transition-colors"

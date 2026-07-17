@@ -10,6 +10,8 @@ import { apiFetch } from '@/lib/api-fetch';
 import { AvailabilityTimeline } from '@/components/availability/AvailabilityTimeline';
 import { ReportsPanel } from '@/components/admin/ReportsPanel';
 import { TopicSubmissionsPanel } from '@/components/admin/TopicSubmissionsPanel';
+import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
+import { NewsletterPanel } from '@/components/admin/NewsletterPanel';
 
 interface Member {
   id: number;
@@ -86,8 +88,16 @@ function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: 'members' | 'reports' | 'topics' =
-    tabParam === 'reports' ? 'reports' : tabParam === 'topics' ? 'topics' : 'members';
+  const tab: 'members' | 'reports' | 'topics' | 'analytics' | 'newsletter' =
+    tabParam === 'reports'
+      ? 'reports'
+      : tabParam === 'topics'
+        ? 'topics'
+        : tabParam === 'analytics'
+          ? 'analytics'
+          : tabParam === 'newsletter'
+            ? 'newsletter'
+            : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
@@ -222,6 +232,30 @@ function AdminPageInner() {
           >
             Topics
           </Link>
+          <Link
+            href="/admin?tab=analytics"
+            role="tab"
+            aria-selected={tab === 'analytics'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'analytics'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Analytics
+          </Link>
+          <Link
+            href="/admin?tab=newsletter"
+            role="tab"
+            aria-selected={tab === 'newsletter'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'newsletter'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Mailing List
+          </Link>
         </nav>
 
         {tab === 'reports' ? (
@@ -231,6 +265,14 @@ function AdminPageInner() {
         ) : tab === 'topics' ? (
           <section role="tabpanel" aria-label="Show & Tell Topic submissions">
             <TopicSubmissionsPanel />
+          </section>
+        ) : tab === 'analytics' ? (
+          <section role="tabpanel" aria-label="Traffic analytics">
+            <AnalyticsPanel />
+          </section>
+        ) : tab === 'newsletter' ? (
+          <section role="tabpanel" aria-label="Mailing list">
+            <NewsletterPanel />
           </section>
         ) : (
           <section role="tabpanel" aria-label="Member directory" className="mb-2">
