@@ -79,6 +79,26 @@ describe('generateCalendarFeed', () => {
     expect(ics).toContain('DTSTART:20260329T180000Z');
     expect(ics).toContain('DTEND:20260329T190000Z');
   });
+
+  it('emits INTERVAL for every_N_weeks', () => {
+    const ics = generateCalendarFeed([{ ...sampleEvent, recurrenceRule: 'every_4_weeks' }]);
+    expect(ics).toContain('RRULE:FREQ=WEEKLY;INTERVAL=4');
+  });
+
+  it('emits BYDAY for monthly_pos_weekday ("last Thursday")', () => {
+    const ics = generateCalendarFeed([{ ...sampleEvent, recurrenceRule: 'monthly_-1_thu' }]);
+    expect(ics).toContain('RRULE:FREQ=MONTHLY;BYDAY=-1TH');
+  });
+
+  it('emits BYDAY for the first Monday of the month', () => {
+    const ics = generateCalendarFeed([{ ...sampleEvent, recurrenceRule: 'monthly_1_mon' }]);
+    expect(ics).toContain('RRULE:FREQ=MONTHLY;BYDAY=1MO');
+  });
+
+  it('omits RRULE for an unrecognized recurrence rule', () => {
+    const ics = generateCalendarFeed([{ ...sampleEvent, recurrenceRule: 'garbage' }]);
+    expect(ics).not.toContain('RRULE');
+  });
 });
 
 describe('generateICS (single event, existing)', () => {

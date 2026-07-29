@@ -33,9 +33,10 @@ export function canPromoteMembers(role: UserRole): boolean {
 
 export function canEditEvent(role: UserRole, isCreator: boolean): boolean {
   // Any creator may edit their own event, regardless of tier (members included).
-  // Non-creators — including admins — cannot edit others' events; admins delete
-  // rather than edit. (Product 2026-05-30: members can edit their own events.)
-  return isCreator;
+  // Admins may also edit events they didn't create — mirrors canDeleteEvent so
+  // admins aren't limited to delete-only when a member-run event needs a fix.
+  // (Product 2026-07-29: restore admin edit-any-event, previously delete-only.)
+  return role === 'admin' || isCreator;
 }
 
 export function canDeleteEvent(role: UserRole, isCreator: boolean): boolean {

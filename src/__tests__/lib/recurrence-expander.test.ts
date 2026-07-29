@@ -1,4 +1,4 @@
-import { expandRecurringEvents } from '../../lib/recurrence-expander';
+import { expandRecurringEvents, parseRecurrenceRule, describeRecurrenceRule } from '../../lib/recurrence-expander';
 import type { DisplayEvent } from '../../lib/display-event';
 import { formatInTimeZone } from 'date-fns-tz';
 
@@ -92,5 +92,119 @@ describe('expandRecurringEvents — timezone determinism across DST', () => {
     for (const ev of expanded) {
       expect(wallClock(ev.starts_at, london)).toMatch(/-15 19:00$/);
     }
+  });
+});
+
+describe('parseRecurrenceRule', () => {
+  it('parses the four legacy literal values', () => {
+    expect(parseRecurrenceRule('daily')).toEqual({ kind: 'interval-days', days: 1 });
+    expect(parseRecurrenceRule('weekly')).toEqual({ kind: 'interval-days', days: 7 });
+    expect(parseRecurrenceRule('fortnightly')).toEqual({ kind: 'interval-days', days: 14 });
+    expect(parseRecurrenceRule('monthly')).toEqual({ kind: 'interval-months' });
+  });
+
+  it('parses every_N_weeks', () => {
+    expect(parseRecurrenceRule('every_4_weeks')).toEqual({ kind: 'interval-days', days: 28 });
+    expect(parseRecurrenceRule('every_1_weeks')).toEqual({ kind: 'interval-days', days: 7 });
+  });
+
+  it('rejects every_0_weeks', () => {
+    expect(parseRecurrenceRule('every_0_weeks')).toBeNull();
+  });
+
+  it('parses monthly_pos_weekday, including last (-1)', () => {
+    expect(parseRecurrenceRule('monthly_-1_thu')).toEqual({ kind: 'monthly-weekday', pos: -1, weekday: 4 });
+    expect(parseRecurrenceRule('monthly_2_mon')).toEqual({ kind: 'monthly-weekday', pos: 2, weekday: 1 });
+  });
+
+  it('rejects out-of-range position or bad weekday', () => {
+    expect(parseRecurrenceRule('monthly_5_thu')).toBeNull();
+    expect(parseRecurrenceRule('monthly_-1_xyz')).toBeNull();
+  });
+
+  it('returns null for unrecognized strings', () => {
+    expect(parseRecurrenceRule('none')).toBeNull();
+    expect(parseRecurrenceRule('yearly')).toBeNull();
+  });
+});
+
+describe('describeRecurrenceRule', () => {
+  it('labels legacy values', () => {
+    expect(describeRecurrenceRule('daily')).toBe('Daily');
+    expect(describeRecurrenceRule('fortnightly')).toBe('Fortnightly');
+  });
+
+  it('labels every_N_weeks', () => {
+    expect(describeRecurrenceRule('every_4_weeks')).toBe('Every 4 weeks');
+  });
+
+  it('labels monthly_pos_weekday', () => {
+    expect(describeRecurrenceRule('monthly_-1_thu')).toBe('Monthly — Last Thursday');
+    expect(describeRecurrenceRule('monthly_1_mon')).toBe('Monthly — First Monday');
+  });
+});
+
+describe('expandRecurringEvents — every_N_weeks', () => {
+  const london = 'Europe/London';
+
+  test('every_4_weeks advances 28 days at a time, preserving wall-clock time', () => {
+    const events = [baseEvent({
+      starts_at: '2026-01-01T19:00:00.000Z',
+      ends_at: '2026-01-01T20:00:00.000Z',
+      recurrenceRule: 'every_4_weeks',
+    })];
+    const expanded = expandRecurringEvents(
+      events,
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-04-01T00:00:00Z'),
+    );
+    expect(expanded.map((e) => e.starts_at)).toEqual([
+      '2026-01-01T19:00:00.000Z',
+      '2026-01-29T19:00:00.000Z',
+      '2026-02-26T19:00:00.000Z',
+      '2026-03-26T19:00:00.000Z',
+    ]);
+    for (const ev of expanded) {
+      expect(wallClock(ev.starts_at, london)).toMatch(/ 19:00$/);
+    }
+  });
+});
+
+describe('expandRecurringEvents — monthly_pos_weekday', () => {
+  const london = 'Europe/London';
+
+  test('monthly_-1_thu lands on the last Thursday of each month', () => {
+    const events = [baseEvent({
+      starts_at: '2026-01-01T19:00:00.000Z',
+      ends_at: '2026-01-01T20:00:00.000Z',
+      recurrenceRule: 'monthly_-1_thu',
+    })];
+    const expanded = expandRecurringEvents(
+      events,
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-05-01T00:00:00Z'),
+    );
+    // Last Thursdays: Jan 29, Feb 26, Mar 26, Apr 30 (2026)
+    const dates = expanded.map((e) => e.starts_at.slice(0, 10));
+    expect(dates).toEqual(['2026-01-29', '2026-02-26', '2026-03-26', '2026-04-30']);
+    for (const d of dates) {
+      expect(new Date(`${d}T12:00:00Z`).getUTCDay()).toBe(4); // Thursday
+    }
+  });
+
+  test('monthly_1_mon lands on the first Monday of each month', () => {
+    const events = [baseEvent({
+      starts_at: '2026-01-01T19:00:00.000Z',
+      ends_at: '2026-01-01T20:00:00.000Z',
+      recurrenceRule: 'monthly_1_mon',
+    })];
+    const expanded = expandRecurringEvents(
+      events,
+      new Date('2026-01-01T00:00:00Z'),
+      new Date('2026-04-01T00:00:00Z'),
+    );
+    const dates = expanded.map((e) => e.starts_at.slice(0, 10));
+    // First Mondays: Jan 5, Feb 2, Mar 2 (2026)
+    expect(dates).toEqual(['2026-01-05', '2026-02-02', '2026-03-02']);
   });
 });

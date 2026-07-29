@@ -91,12 +91,12 @@ describe('canPromoteMembers', () => {
 });
 
 describe('canEditEvent', () => {
-  // Policy (2026-05-30): edit requires ownership — ANY creator may edit their own
-  // event, regardless of tier. Non-creators (incl. admins) cannot edit others'
-  // events. Members can now edit their own events (was restricted "until UX
-  // finalized"; product confirmed enabling it).
-  it('admin who is not creator cannot edit', () => {
-    expect(canEditEvent('admin', false)).toBe(false);
+  // Policy (2026-07-29): any creator may edit their own event, regardless of
+  // tier. Admins may additionally edit events they didn't create, mirroring
+  // canDeleteEvent's admin-any-event policy (previously admins could delete
+  // but not edit others' events — restored on user feedback).
+  it('admin who is not creator can edit', () => {
+    expect(canEditEvent('admin', false)).toBe(true);
   });
 
   it('admin who is creator can edit', () => {

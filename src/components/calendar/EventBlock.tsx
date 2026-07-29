@@ -80,7 +80,7 @@ function getRecurrenceLabel(rule?: string): string | null {
   if (!rule) return null;
   const lower = rule.toLowerCase();
   if (lower.includes('daily')) return 'daily';
-  if (lower.includes('weekly')) return 'weekly';
+  if (lower.includes('weekly') || /^every_\d+_weeks$/.test(lower)) return 'weekly';
   if (lower.includes('monthly')) return 'monthly';
   if (lower.includes('yearly') || lower.includes('annual')) return 'yearly';
   return 'recurring';

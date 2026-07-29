@@ -54,6 +54,10 @@ function foldLine(line: string): string {
   return lines.join('\r\n');
 }
 
+const ICS_WEEKDAY: Record<string, string> = {
+  sun: 'SU', mon: 'MO', tue: 'TU', wed: 'WE', thu: 'TH', fri: 'FR', sat: 'SA',
+};
+
 // Map recurrence rule string to RRULE line
 function buildRRule(recurrenceRule: string): string | null {
   switch (recurrenceRule) {
@@ -65,9 +69,21 @@ function buildRRule(recurrenceRule: string): string | null {
       return 'RRULE:FREQ=WEEKLY;INTERVAL=2';
     case 'monthly':
       return 'RRULE:FREQ=MONTHLY';
-    default:
-      return null;
   }
+
+  const everyWeeks = recurrenceRule.match(/^every_(\d+)_weeks$/);
+  if (everyWeeks) {
+    return `RRULE:FREQ=WEEKLY;INTERVAL=${everyWeeks[1]}`;
+  }
+
+  const monthlyWeekday = recurrenceRule.match(/^monthly_(-?\d+)_([a-z]{3})$/);
+  if (monthlyWeekday) {
+    const pos = monthlyWeekday[1];
+    const day = ICS_WEEKDAY[monthlyWeekday[2]];
+    if (day) return `RRULE:FREQ=MONTHLY;BYDAY=${pos}${day}`;
+  }
+
+  return null;
 }
 
 export function generateICS(event: ICSEvent): string {

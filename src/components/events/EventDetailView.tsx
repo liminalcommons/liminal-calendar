@@ -19,20 +19,10 @@ import { CommentSection } from '@/components/comments/CommentSection';
 import { AttendanceReportSection } from '@/components/attendance-reports/AttendanceReportSection';
 import { EmbedSnippet } from '@/components/embed/EmbedSnippet';
 import { CancelBookingButton } from '@/components/booking/CancelBookingButton';
+import { describeRecurrenceRule as recurrenceLabel } from '@/lib/recurrence-expander';
 
 interface EventDetailViewProps {
   eventId: string;
-}
-
-// Map recurrenceRule to a human-readable badge
-function recurrenceLabel(rule: string): string {
-  switch (rule) {
-    case 'daily': return 'Daily';
-    case 'weekly': return 'Weekly';
-    case 'fortnightly': return 'Fortnightly';
-    case 'monthly': return 'Monthly';
-    default: return rule;
-  }
 }
 
 function getInitials(name: string): string {
@@ -178,7 +168,7 @@ export function EventDetailView({ eventId }: EventDetailViewProps) {
     || (!profile && user && String(user.id) === String(event.creator_id))
   );
   const isAdmin = isLoaded && role === 'admin';
-  const canEdit = isOwner;
+  const canEdit = isOwner || isAdmin;
   const canDelete = isOwner || isAdmin;
 
   // Loading skeleton
