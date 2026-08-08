@@ -20,6 +20,16 @@ interface RepairFailure {
   error: string;
 }
 
+interface DatabaseTargets {
+  app?: string;
+  appSource?: string;
+  migration?: string;
+  migrationSource?: string;
+  sameTarget?: boolean;
+  warning?: string;
+  error?: string;
+}
+
 interface RepairResult {
   success: boolean;
   message: string;
@@ -27,6 +37,8 @@ interface RepairResult {
   tables: Record<string, boolean>;
   missing: string[];
   repaired: boolean;
+  database?: DatabaseTargets;
+  warning?: string;
 }
 
 type State =
@@ -94,6 +106,35 @@ export function SchemaRepairBanner({
               ? 'Schema repaired — every expected table is present. Reload to see data.'
               : `Still missing: ${state.result.missing.join(', ') || 'none'}`}
           </p>
+
+          {/* Migrations succeeding while tables stay missing means DDL and
+              reads landed in different databases. Name both so the stale
+              connection string is identifiable, not inferred. */}
+          {state.result.database?.sameTarget === false && (
+            <div className="rounded bg-black/30 p-2 space-y-1">
+              <p className="text-[11px] font-medium text-red-200">
+                Migrations and the app are pointed at different databases.
+              </p>
+              <p className="text-[10px] text-red-200/80">
+                App reads <code className="px-1 rounded bg-black/40">{state.result.database.app}</code>{' '}
+                (from {state.result.database.appSource}) · migrations wrote{' '}
+                <code className="px-1 rounded bg-black/40">{state.result.database.migration}</code>{' '}
+                (from {state.result.database.migrationSource}).
+              </p>
+            </div>
+          )}
+
+          {(state.result.warning || state.result.database?.warning) && (
+            <p className="text-[10px] text-amber-300/90">
+              {state.result.warning || state.result.database?.warning}
+            </p>
+          )}
+
+          {state.result.database?.app && state.result.database.sameTarget !== false && (
+            <p className="text-[10px] text-red-200/60">
+              Target database: <code className="px-1 rounded bg-black/30">{state.result.database.app}</code>
+            </p>
+          )}
 
           {state.result.failures.length > 0 && (
             <details className="text-xs">

@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { describeDatabaseTarget, resolveMigrationDatabaseUrl } from './url';
 
 export interface MigrationFailure {
   /** Truncated, whitespace-collapsed SQL so the report stays readable. */
@@ -10,6 +11,12 @@ export interface MigrationResult {
   success: boolean;
   message: string;
   failures: MigrationFailure[];
+  /** `host:port/database` the DDL was applied to. Never includes credentials. */
+  target?: string;
+  /** Which env var supplied the connection string. */
+  targetSource?: string;
+  /** Present when a stale non-pooling URL was ignored — see lib/db/url.ts. */
+  warning?: string;
 }
 
 /**
@@ -23,24 +30,28 @@ export interface MigrationResult {
  * Statements are also INDEPENDENT: see `step` in runMigrationsInner.
  */
 export async function runMigrations(): Promise<MigrationResult> {
-  // Prefer non-pooling for DDL — direct connection, no pgbouncer in the
-  // middle. Pooled URLs still work with `prepare: false`, but DDL belongs
-  // on a real session.
-  const url =
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.calender_DATABASE_URL ||
-    process.env.calender_POSTGRES_URL;
-  if (!url) throw new Error('No database URL found');
-  const sql = postgres(url, {
+  // Resolution is shared with the app (lib/db/url.ts) so DDL can never land in
+  // a different database than the one being read. A direct/non-pooling URL is
+  // still preferred for DDL, but only when it names the same database.
+  const target = resolveMigrationDatabaseUrl();
+  if (target.ignoredNonPooling) {
+    console.error('[migrate] ignoring stale connection string:', target.ignoredNonPooling.reason);
+  }
+
+  const sql = postgres(target.url, {
     ssl: 'require',
     max: 1,
     connect_timeout: 10,
     prepare: false,
   });
   try {
-    return await runMigrationsInner(sql);
+    const result = await runMigrationsInner(sql);
+    return {
+      ...result,
+      target: describeDatabaseTarget(target.url),
+      targetSource: target.source,
+      ...(target.ignoredNonPooling ? { warning: target.ignoredNonPooling.reason } : {}),
+    };
   } finally {
     await sql.end({ timeout: 5 });
   }

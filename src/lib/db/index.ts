@@ -1,23 +1,16 @@
 import postgres from 'postgres';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from './schema';
+import { resolveAppDatabaseUrl } from './url';
 
 let _db: PostgresJsDatabase<typeof schema> | null = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _sql: any = null;
 
+// Resolution lives in ./url so migrations resolve identically — see the note
+// there on how a diverging non-pooling URL silently split writes from reads.
 function envUrl(): string {
-  const url =
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.calender_DATABASE_URL ||
-    process.env.calender_POSTGRES_URL;
-  if (!url) {
-    throw new Error(
-      'No Postgres URL found (checked DATABASE_URL, POSTGRES_URL, calender_*)',
-    );
-  }
-  return url;
+  return resolveAppDatabaseUrl().url;
 }
 
 export function getDb(): PostgresJsDatabase<typeof schema> {

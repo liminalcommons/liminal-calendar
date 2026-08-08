@@ -18,6 +18,11 @@ import { sql } from 'drizzle-orm';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { runMigrations } from '@/lib/db/migrate';
+import {
+  describeDatabaseTarget,
+  resolveAppDatabaseUrl,
+  resolveMigrationDatabaseUrl,
+} from '@/lib/db/url';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -58,12 +63,35 @@ async function tablePresence(): Promise<Record<string, boolean>> {
   return present;
 }
 
+/**
+ * Which database reads and writes each go to. Host/port/database only — never
+ * credentials. `sameTarget: false` means migrations are being applied
+ * somewhere the app doesn't read, which presents as "migration succeeded,
+ * table still missing".
+ */
+function databaseTargets() {
+  try {
+    const app = resolveAppDatabaseUrl();
+    const migration = resolveMigrationDatabaseUrl();
+    return {
+      app: describeDatabaseTarget(app.url),
+      appSource: app.source,
+      migration: describeDatabaseTarget(migration.url),
+      migrationSource: migration.source,
+      sameTarget: describeDatabaseTarget(app.url) === describeDatabaseTarget(migration.url),
+      ...(migration.ignoredNonPooling ? { warning: migration.ignoredNonPooling.reason } : {}),
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function GET() {
   const gate = await requireAdmin();
   if (gate.error) return gate.error;
 
   try {
-    return NextResponse.json({ tables: await tablePresence() });
+    return NextResponse.json({ tables: await tablePresence(), database: databaseTargets() });
   } catch (err) {
     console.error('[GET /api/admin/schema-repair]', err);
     return NextResponse.json({ error: 'Failed to inspect schema' }, { status: 500 });
@@ -92,6 +120,11 @@ export async function POST() {
       tables,
       missing,
       repaired: missing.length === 0,
+      // Reported on every run: a migration that succeeds while tables stay
+      // missing means DDL and reads went to different databases, and that is
+      // otherwise indistinguishable from a silent no-op.
+      database: databaseTargets(),
+      ...(result.warning ? { warning: result.warning } : {}),
     });
   } catch (err) {
     console.error('[POST /api/admin/schema-repair]', err);
