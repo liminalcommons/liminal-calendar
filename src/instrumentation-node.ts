@@ -23,6 +23,12 @@ if (process.env.SKIP_BOOT_MIGRATE !== 'true') {
   runMigrations()
     .then((result) => {
       console.warn('[boot-migrate]', JSON.stringify(result));
+      // Individual statements can fail without failing the run (see migrate.ts).
+      // Log each one at error level so a partially-applied schema is greppable
+      // in the platform logs rather than buried inside one JSON blob.
+      for (const f of result.failures) {
+        console.error('[boot-migrate] statement failed:', f.statement, '→', f.error);
+      }
     })
     .catch((err) => {
       console.error(

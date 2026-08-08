@@ -7,8 +7,9 @@
  * sparkline keeps this self-contained).
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
+import { ANALYTICS_ENDPOINT } from '@/lib/analytics/track';
 
 interface WindowStats {
   pageviews: number;
@@ -18,14 +19,35 @@ interface WindowStats {
   guestPageviews: number;
 }
 
+interface AnalyticsHealth {
+  status: 'ok' | 'table_missing';
+  tableExists: boolean;
+  lastEventAt: string | null;
+  totalEvents: number;
+}
+
 interface AnalyticsData {
   generatedAt: string;
+  health?: AnalyticsHealth;
   allTime: { pageviews: number; uniqueVisitors: number; guestEntries: number; clicks: number };
   windows: { day: WindowStats; week: WindowStats; month: WindowStats };
   topPaths: { path: string; views: number }[];
   topClicks: { target: string; clicks: number }[];
   dailyPageviews: { date: string; views: number; guestViews: number }[];
 }
+
+/**
+ * Outcome of the end-to-end pipeline test. The three failure kinds map to the
+ * three places collection can break, which is the whole point — an empty
+ * dashboard alone can't tell them apart.
+ */
+type SelfTest =
+  | { kind: 'idle' }
+  | { kind: 'running' }
+  | { kind: 'blocked' }        // beacon never left this browser (content blocker)
+  | { kind: 'not_recorded' }   // server took it, DB row didn't appear
+  | { kind: 'ok' }
+  | { kind: 'error'; message: string };
 
 type WindowKey = 'day' | 'week' | 'month' | 'all';
 
@@ -122,17 +144,20 @@ function RankedList({
 export function AnalyticsPanel() {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
   const [win, setWin] = useState<WindowKey>('week');
+  const [selfTest, setSelfTest] = useState<SelfTest>({ kind: 'idle' });
+
+  const load = useCallback(async (): Promise<AnalyticsData | null> => {
+    const r = await apiFetch('/api/admin/analytics', { method: 'GET' });
+    if (!r.ok) return null;
+    return (await r.json()) as AnalyticsData;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch('/api/admin/analytics', { method: 'GET' })
-      .then(async (r) => {
+    load()
+      .then((data) => {
         if (cancelled) return;
-        if (!r.ok) {
-          setState({ kind: 'error', message: 'Failed to load analytics' });
-          return;
-        }
-        setState({ kind: 'ok', data: (await r.json()) as AnalyticsData });
+        setState(data ? { kind: 'ok', data } : { kind: 'error', message: 'Failed to load analytics' });
       })
       .catch(() => {
         if (!cancelled) setState({ kind: 'error', message: 'Failed to load analytics' });
@@ -140,7 +165,45 @@ export function AnalyticsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [load]);
+
+  /**
+   * Push one real event through the live beacon, then re-read the totals to
+   * see whether it landed. This separates the three failure modes that all
+   * look identical on the dashboard:
+   *   - fetch throws          → a content blocker ate it in THIS browser
+   *   - fetch ok, count flat  → server accepted but the write didn't persist
+   *   - count went up         → collection works end to end
+   */
+  const runSelfTest = useCallback(async () => {
+    setSelfTest({ kind: 'running' });
+    const before = state.kind === 'ok' ? (state.data.health?.totalEvents ?? 0) : 0;
+
+    try {
+      await fetch(ANALYTICS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'click', target: 'admin:self-test', path: '/admin' }),
+      });
+    } catch {
+      // A blocked request rejects before reaching the network.
+      setSelfTest({ kind: 'blocked' });
+      return;
+    }
+
+    try {
+      const data = await load();
+      if (!data) {
+        setSelfTest({ kind: 'error', message: 'Could not re-read analytics' });
+        return;
+      }
+      setState({ kind: 'ok', data });
+      const after = data.health?.totalEvents ?? 0;
+      setSelfTest(after > before ? { kind: 'ok' } : { kind: 'not_recorded' });
+    } catch {
+      setSelfTest({ kind: 'error', message: 'Could not re-read analytics' });
+    }
+  }, [load, state]);
 
   if (state.kind === 'loading') {
     return <p className="text-sm text-grove-text-muted italic py-8 text-center">Loading…</p>;
@@ -155,9 +218,81 @@ export function AnalyticsPanel() {
       ? { ...data.allTime, guestPageviews: 0 }
       : data.windows[win];
   const guestSub = win === 'all' ? undefined : `${stats.guestPageviews.toLocaleString()} guest views`;
+  const health = data.health;
 
   return (
     <div className="space-y-6">
+      {/* Pipeline health — shown whenever collection can't be assumed healthy.
+          An empty dashboard is ambiguous on its own, so say which case it is. */}
+      {health?.status === 'table_missing' ? (
+        <div role="alert" className="bg-red-950/40 border border-red-700/50 rounded-xl p-4 space-y-1">
+          <p className="text-sm font-medium text-red-300">
+            The analytics_events table doesn’t exist — nothing can be recorded.
+          </p>
+          <p className="text-xs text-red-200/80">
+            Migrations run automatically on each deploy, but a statement earlier in the
+            chain can fail against existing data. Redeploy and check the logs for
+            <code className="mx-1 px-1 rounded bg-black/30">[boot-migrate] statement failed</code>
+            lines, or POST <code className="px-1 rounded bg-black/30">/api/db-migrate</code> with the
+            CRON_SECRET bearer token to run them on demand and see the failure list.
+          </p>
+        </div>
+      ) : health && health.totalEvents === 0 ? (
+        <div className="bg-grove-surface border border-amber-700/40 rounded-xl p-4 space-y-1">
+          <p className="text-sm font-medium text-grove-text">
+            No events recorded yet.
+          </p>
+          <p className="text-xs text-grove-text-muted">
+            The table exists and is readable — it’s simply empty. Run the pipeline test below
+            to confirm collection is working before assuming this is a traffic problem.
+          </p>
+        </div>
+      ) : null}
+
+      {/* End-to-end pipeline test */}
+      <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium text-grove-text">Pipeline test</h3>
+            <p className="text-xs text-grove-text-muted mt-0.5">
+              Sends one real event and checks that it lands in the database.
+            </p>
+          </div>
+          <button
+            onClick={runSelfTest}
+            disabled={selfTest.kind === 'running'}
+            className="px-3 py-1.5 text-xs font-medium rounded-md border border-grove-border text-grove-text hover:bg-grove-border/20 disabled:opacity-50 shrink-0"
+          >
+            {selfTest.kind === 'running' ? 'Testing…' : 'Run test'}
+          </button>
+        </div>
+
+        {selfTest.kind === 'ok' && (
+          <p role="status" className="text-xs text-emerald-400 mt-3">
+            Collection works end to end — the test event was written and read back. An empty
+            dashboard means low traffic, not a broken pipeline.
+          </p>
+        )}
+        {selfTest.kind === 'blocked' && (
+          <p role="status" className="text-xs text-amber-400 mt-3">
+            The beacon was blocked before leaving this browser — a content blocker or privacy
+            extension. Visitors running one are invisible to analytics; everyone else is still
+            counted normally. Whitelist the site to check your own visits.
+          </p>
+        )}
+        {selfTest.kind === 'not_recorded' && (
+          <p role="status" className="text-xs text-red-400 mt-3">
+            The request was accepted but no row appeared — the write is failing server-side.
+            Check the platform logs for
+            <code className="mx-1 px-1 rounded bg-black/30">[analytics collect]</code> and
+            <code className="mx-1 px-1 rounded bg-black/30">[boot-migrate]</code> entries.
+          </p>
+        )}
+        {selfTest.kind === 'error' && (
+          <p role="alert" className="text-xs text-red-400 mt-3">{selfTest.message}</p>
+        )}
+      </div>
+
       {/* Window selector */}
       <div className="flex flex-wrap gap-1.5">
         {(Object.keys(WINDOW_LABELS) as WindowKey[]).map((k) => (
@@ -205,6 +340,7 @@ export function AnalyticsPanel() {
 
       <p className="text-[11px] text-grove-text-dim text-center">
         First-party, cookieless traffic analytics · generated {new Date(data.generatedAt).toLocaleString()}
+        {health?.lastEventAt && ` · last event ${new Date(health.lastEventAt).toLocaleString()}`}
       </p>
     </div>
   );

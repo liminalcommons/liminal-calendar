@@ -10,7 +10,14 @@
 import type { AnalyticsEventType } from './events';
 
 const VISITOR_KEY = 'liminal_vid';
-const ENDPOINT = '/api/analytics/collect';
+
+// Not `/api/analytics/collect`: that path matches what content blockers filter
+// on (EasyPrivacy and uBlock's built-in lists target the `analytics` segment,
+// and `collect` is Google Analytics' own hit endpoint). A blocked beacon never
+// leaves the browser, so the server sees nothing and the dashboard reads zero
+// with no error anywhere. `/api/pulse` is a first-party path that doesn't look
+// like a tracker. The old route still accepts posts for cached bundles.
+export const ANALYTICS_ENDPOINT = '/api/pulse';
 
 function randomId(): string {
   try {
@@ -55,10 +62,10 @@ function send(payload: TrackPayload): void {
     // and doesn't block. Fall back to keepalive fetch where it's unavailable.
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
       const blob = new Blob([body], { type: 'application/json' });
-      const ok = navigator.sendBeacon(ENDPOINT, blob);
+      const ok = navigator.sendBeacon(ANALYTICS_ENDPOINT, blob);
       if (ok) return;
     }
-    void fetch(ENDPOINT, {
+    void fetch(ANALYTICS_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,

@@ -47,6 +47,28 @@ export async function fetchRecentAnalyticsRows(
   }));
 }
 
+/**
+ * True when the error is Postgres 42P01 (undefined_table) — i.e. the
+ * analytics_events table doesn't exist because migrations never created it.
+ * Distinguishing this from a generic DB error is what lets the admin panel
+ * say "run migrations" instead of "something went wrong".
+ */
+export function isMissingTableError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  return code === '42P01';
+}
+
+/** Timestamp of the most recent row, or null when the table is empty. */
+export async function fetchLastEventAt(db: Db): Promise<string | null> {
+  const [row] = await db
+    .select({ createdAt: analyticsEvents.createdAt })
+    .from(analyticsEvents)
+    .orderBy(desc(analyticsEvents.createdAt))
+    .limit(1);
+  if (!row?.createdAt) return null;
+  return row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt);
+}
+
 export interface AllTimeTotals {
   pageviews: number;
   uniqueVisitors: number;

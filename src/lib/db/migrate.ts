@@ -1,5 +1,17 @@
 import postgres from 'postgres';
 
+export interface MigrationFailure {
+  /** Truncated, whitespace-collapsed SQL so the report stays readable. */
+  statement: string;
+  error: string;
+}
+
+export interface MigrationResult {
+  success: boolean;
+  message: string;
+  failures: MigrationFailure[];
+}
+
 /**
  * Run database migrations — creates tables if they don't exist.
  * Uses raw SQL since Drizzle Kit push/migrate requires CLI or node adapter.
@@ -7,8 +19,10 @@ import postgres from 'postgres';
  * Idempotent — every CREATE / ALTER uses IF NOT EXISTS or DO-block guards.
  * Safe to call against either a fresh DB (bootstraps everything) or a
  * partially-migrated DB (skips already-present objects).
+ *
+ * Statements are also INDEPENDENT: see `step` in runMigrationsInner.
  */
-export async function runMigrations() {
+export async function runMigrations(): Promise<MigrationResult> {
   // Prefer non-pooling for DDL — direct connection, no pgbouncer in the
   // middle. Pooled URLs still work with `prepare: false`, but DDL belongs
   // on a real session.
@@ -33,10 +47,38 @@ export async function runMigrations() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runMigrationsInner(sql: any) {
+async function runMigrationsInner(sql: any): Promise<MigrationResult> {
+  const failures: MigrationFailure[] = [];
+
+  // Every DDL statement below runs INDEPENDENTLY: a failure is recorded and
+  // the run continues to the next statement.
+  //
+  // Previously these were bare `await sql\`...\`` calls, so the first throw
+  // aborted every statement after it. That is not hypothetical — several
+  // statements here add UNIQUE constraints/indexes (members_handle_key,
+  // members_clerk_id_key, members_logto_id_unique, members_feed_token_key,
+  // events_booking_owner_starts_unique) which throw against live data that
+  // already contains duplicates. Anything declared after the first such
+  // failure silently never got created, and because the only caller
+  // (instrumentation-node) just console.error's the rejection, production
+  // looked healthy while missing tables. That is how `analytics_events`
+  // (declared 2/3 of the way down this file) went missing in production
+  // while every older table was fine — the admin analytics dashboard had
+  // nothing to read and no way to say so.
+  //
+  // Results are unused for every statement here (all DDL), so resolving a
+  // failed step to null is safe.
+  const step = (strings: TemplateStringsArray, ...values: unknown[]) =>
+    sql(strings, ...values).catch((err: unknown) => {
+      failures.push({
+        statement: strings.join(' ? ').replace(/\s+/g, ' ').trim().slice(0, 160),
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    });
 
   // Create events table
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS events (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
@@ -56,7 +98,7 @@ async function runMigrationsInner(sql: any) {
   `;
 
   // Create rsvps table
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS rsvps (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -70,7 +112,7 @@ async function runMigrationsInner(sql: any) {
   `;
 
   // Create members table
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS members (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -83,16 +125,16 @@ async function runMigrationsInner(sql: any) {
   `;
 
   // Add timezone and availability columns to members (idempotent)
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'`;
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT '[]'`;
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'UTC'`;
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT '[]'`;
 
   // Clerk identity column — nullable so existing identity-less rows are
   // unaffected.
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS clerk_id TEXT`;
 
   // Handle — optional public-facing username, unique when present.
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS handle TEXT`;
-  await sql`
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS handle TEXT`;
+  await step`
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
@@ -117,7 +159,7 @@ async function runMigrationsInner(sql: any) {
   // NULL` is now redundant — drop it before/after adding the
   // constraint. This silently broke every fresh Clerk-only signup
   // (the webhook's syncClerkMember.insert path) until 2026-05-02.
-  await sql`
+  await step`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -130,11 +172,11 @@ async function runMigrationsInner(sql: any) {
       END IF;
     END $$
   `;
-  await sql`DROP INDEX IF EXISTS idx_members_clerk_id_unique`;
+  await step`DROP INDEX IF EXISTS idx_members_clerk_id_unique`;
 
   // Newsletter opt-in list — populated from RSVP, signup, or admin actions.
   // Independent of members table so non-member visitors can subscribe.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS newsletter_subscribers (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
@@ -143,12 +185,12 @@ async function runMigrationsInner(sql: any) {
     )
   `;
   // Suppression marker for unsubscribes (added after initial table creation).
-  await sql`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribed_at TIMESTAMPTZ`;
+  await step`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS unsubscribed_at TIMESTAMPTZ`;
 
   // Logto identity column. First Logto signin attaches logto_id to an
   // existing row by email match, or creates a new Logto-only row.
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS logto_id TEXT`;
-  await sql`
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS logto_id TEXT`;
+  await step`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -161,18 +203,18 @@ async function runMigrationsInner(sql: any) {
       END IF;
     END $$
   `;
-  await sql`CREATE INDEX IF NOT EXISTS idx_members_logto_id ON members(logto_id)`;
+  await step`CREATE INDEX IF NOT EXISTS idx_members_logto_id ON members(logto_id)`;
 
   // Create indexes for common queries
-  await sql`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_event_id ON rsvps(event_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_rsvps_user_id ON rsvps(user_id)`;
+  await step`CREATE INDEX IF NOT EXISTS idx_events_starts_at ON events(starts_at)`;
+  await step`CREATE INDEX IF NOT EXISTS idx_events_creator_id ON events(creator_id)`;
+  await step`CREATE INDEX IF NOT EXISTS idx_rsvps_event_id ON rsvps(event_id)`;
+  await step`CREATE INDEX IF NOT EXISTS idx_rsvps_user_id ON rsvps(user_id)`;
 
   // Event comments — flat list, soft-deletable. See
   // src/lib/db/migrations/event-comments-reports.sql for the canonical
   // statement; this is the runtime mirror so /api/db-migrate is one call.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS event_comments (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -184,10 +226,10 @@ async function runMigrationsInner(sql: any) {
       deleted_at TIMESTAMPTZ
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS event_comments_event_idx ON event_comments(event_id, created_at)`;
+  await step`CREATE INDEX IF NOT EXISTS event_comments_event_idx ON event_comments(event_id, created_at)`;
 
   // Post-event attendance reports — one row per (event, reporter), upsert.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS attendance_reports (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -201,13 +243,13 @@ async function runMigrationsInner(sql: any) {
       CONSTRAINT attendance_report_event_reporter_unique UNIQUE (event_id, reporter_id)
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS attendance_reports_event_idx ON attendance_reports(event_id)`;
+  await step`CREATE INDEX IF NOT EXISTS attendance_reports_event_idx ON attendance_reports(event_id)`;
 
   // Inbox notifications — sibling of notification_log. Each row is one thing
   // the user should be aware of, with denormalized title/url for fast render
   // and seen_at for read state. event_id is nullable so future system-level
   // notifications (e.g., welcome, push-permission-restored) can land here.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS notifications (
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -223,12 +265,12 @@ async function runMigrationsInner(sql: any) {
       seen_at TIMESTAMPTZ
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS notifications_user_recent_idx ON notifications(user_id, created_at DESC)`;
+  await step`CREATE INDEX IF NOT EXISTS notifications_user_recent_idx ON notifications(user_id, created_at DESC)`;
 
   // Show & Tell Topic submissions — TED-style 10-min presentations submitted
   // for the biweekly hour. Host triages via /admin?tab=topics. See
   // src/lib/db/schema.ts for the canonical Drizzle definition.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS topic_submissions (
       id SERIAL PRIMARY KEY,
       submitter_id TEXT NOT NULL,
@@ -252,20 +294,20 @@ async function runMigrationsInner(sql: any) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
-  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_youtube BOOLEAN NOT NULL DEFAULT FALSE`;
-  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_telegram BOOLEAN NOT NULL DEFAULT FALSE`;
-  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_facebook BOOLEAN NOT NULL DEFAULT FALSE`;
-  await sql`CREATE INDEX IF NOT EXISTS topic_submissions_status_created_idx ON topic_submissions(status, created_at DESC)`;
+  await step`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_youtube BOOLEAN NOT NULL DEFAULT FALSE`;
+  await step`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_telegram BOOLEAN NOT NULL DEFAULT FALSE`;
+  await step`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS consent_facebook BOOLEAN NOT NULL DEFAULT FALSE`;
+  await step`CREATE INDEX IF NOT EXISTS topic_submissions_status_created_idx ON topic_submissions(status, created_at DESC)`;
 
   // Columns historically added by prior migrations; bootstrap path
   // (CREATE TABLE above) doesn't include them, so a fresh DB needs them
   // added before the unique index below can reference them.
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'`;
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS source_event_type_id INTEGER`;
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS feed_token TEXT`;
-  await sql`ALTER TABLE members ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ`;
-  await sql`
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public'`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS source_event_type_id INTEGER`;
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS feed_token TEXT`;
+  await step`ALTER TABLE members ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ`;
+  await step`
     DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
@@ -284,7 +326,7 @@ async function runMigrationsInner(sql: any) {
   // duplicate events at the same (owner, time). The partial predicate
   // limits the constraint to booking-source events only — manually
   // created events at coincident times are still allowed.
-  await sql`
+  await step`
     CREATE UNIQUE INDEX IF NOT EXISTS events_booking_owner_starts_unique
       ON events (member_id, starts_at)
       WHERE source_event_type_id IS NOT NULL
@@ -292,7 +334,7 @@ async function runMigrationsInner(sql: any) {
 
   // Web Push subscriptions. One row per (user, endpoint) — same user can
   // subscribe from multiple devices/browsers.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS push_subscriptions (
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -305,7 +347,7 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS event_mutes (
       id SERIAL PRIMARY KEY,
       member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -314,13 +356,13 @@ async function runMigrationsInner(sql: any) {
       UNIQUE(member_id, event_id)
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS event_mutes_member_idx ON event_mutes(member_id)`;
+  await step`CREATE INDEX IF NOT EXISTS event_mutes_member_idx ON event_mutes(member_id)`;
 
   // First-party analytics events — pageviews, guest entries, and CTA clicks.
   // See src/lib/db/schema.ts for the canonical Drizzle definition. Written by
   // the public /api/analytics/collect beacon and the /guest route; read by the
   // admin analytics dashboard.
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS analytics_events (
       id SERIAL PRIMARY KEY,
       type TEXT NOT NULL,
@@ -332,8 +374,8 @@ async function runMigrationsInner(sql: any) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
-  await sql`CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events(type, created_at)`;
-  await sql`CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)`;
+  await step`CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events(type, created_at)`;
+  await step`CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)`;
 
   // Booking note + cancellation lifecycle. Note from booker travels with
   // the event forever (visible in emails + event detail). Cancellation
@@ -341,11 +383,11 @@ async function runMigrationsInner(sql: any) {
   // is the actor (host or booker, either can cancel). The slot engine
   // filters cancelled_at IS NULL so cancelled slots return to the host's
   // availability immediately.
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS note_from_booker TEXT`;
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`;
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_by_member_id INTEGER`;
-  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`;
-  await sql`
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS note_from_booker TEXT`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancelled_by_member_id INTEGER`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS cancellation_reason TEXT`;
+  await step`
     DO $$ BEGIN
       ALTER TABLE events
         ADD CONSTRAINT events_cancelled_by_member_id_fkey
@@ -353,15 +395,15 @@ async function runMigrationsInner(sql: any) {
     EXCEPTION WHEN duplicate_object THEN NULL; END $$
   `;
 
-  await sql`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
-  await sql`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS remind_me BOOLEAN DEFAULT FALSE`;
-  await sql`ALTER TABLE event_comments ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
-  await sql`ALTER TABLE attendance_reports ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
-  await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE CASCADE`;
-  await sql`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
-  await sql`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE rsvps ADD COLUMN IF NOT EXISTS remind_me BOOLEAN DEFAULT FALSE`;
+  await step`ALTER TABLE event_comments ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE attendance_reports ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE CASCADE`;
+  await step`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS actor_member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE topic_submissions ADD COLUMN IF NOT EXISTS member_id INTEGER REFERENCES members(id) ON DELETE SET NULL`;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS notification_log (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -373,7 +415,7 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS notification_preferences (
       id SERIAL PRIMARY KEY,
       user_id TEXT NOT NULL UNIQUE,
@@ -388,7 +430,7 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS event_types (
       id SERIAL PRIMARY KEY,
       owner_id TEXT NOT NULL,
@@ -410,7 +452,7 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS bookable_windows (
       id SERIAL PRIMARY KEY,
       owner_id TEXT NOT NULL,
@@ -423,7 +465,7 @@ async function runMigrationsInner(sql: any) {
     )
   `;
 
-  await sql`
+  await step`
     CREATE TABLE IF NOT EXISTS event_invitations (
       id SERIAL PRIMARY KEY,
       event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -439,7 +481,18 @@ async function runMigrationsInner(sql: any) {
   // The legacy single-identity CHECK constraint is dropped because rows may
   // now legitimately carry only an email (no clerk/logto id) — e.g. members
   // pending re-signup. IF EXISTS keeps this idempotent.
-  await sql`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
+  await step`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_identity`;
 
-  return { success: true, message: 'Migrations complete' };
+  return {
+    // `success` now means "every statement applied", not "the run finished".
+    // A partial run still leaves the schema as complete as it can be, but the
+    // caller must be able to tell the difference — see /api/db-migrate and the
+    // admin analytics health panel.
+    success: failures.length === 0,
+    message:
+      failures.length === 0
+        ? 'Migrations complete'
+        : `Migrations completed with ${failures.length} failed statement(s)`,
+    failures,
+  };
 }
