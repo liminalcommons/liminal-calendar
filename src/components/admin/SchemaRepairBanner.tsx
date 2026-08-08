@@ -103,9 +103,18 @@ export function SchemaRepairBanner({
         <div className="space-y-2">
           <p className={`text-xs ${state.result.repaired ? 'text-emerald-400' : 'text-red-300'}`}>
             {state.result.repaired
-              ? 'Schema repaired — every expected table is present. Reload to see data.'
-              : `Still missing: ${state.result.missing.join(', ') || 'none'}`}
+              ? `Schema repaired — all ${Object.keys(state.result.tables).length} tables present. Reload to see data.`
+              : `Still missing ${state.result.missing.length} of ${Object.keys(state.result.tables).length} tables: ${state.result.missing.join(', ')}`}
           </p>
+
+          {/* Other missing tables mean other features are broken the same
+              silent way, so name them even though this panel only needed one. */}
+          {state.result.missing.filter((t) => t !== table).length > 0 && (
+            <p className="text-[10px] text-red-200/80">
+              Beyond this panel, these are also missing and their features will be failing:{' '}
+              {state.result.missing.filter((t) => t !== table).join(', ')}
+            </p>
+          )}
 
           {/* Migrations succeeding while tables stay missing means DDL and
               reads landed in different databases. Name both so the stale

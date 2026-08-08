@@ -14,9 +14,11 @@
  */
 
 import { NextResponse } from 'next/server';
-import { sql } from 'drizzle-orm';
+import { getTableName, is, sql } from 'drizzle-orm';
+import { PgTable } from 'drizzle-orm/pg-core';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
+import * as schema from '@/lib/db/schema';
 import { runMigrations } from '@/lib/db/migrate';
 import {
   describeDatabaseTarget,
@@ -27,15 +29,23 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Tables the admin panels depend on. newsletter_subscribers and
-// analytics_events are the two that sit behind failable UNIQUE statements in
-// the migration chain, so they are the ones that actually go missing.
-const EXPECTED_TABLES = [
-  'members',
-  'events',
-  'newsletter_subscribers',
-  'analytics_events',
-] as const;
+/**
+ * Every table the app declares, derived from the Drizzle schema rather than
+ * hand-listed.
+ *
+ * A hardcoded list is what made the first version of this endpoint report a
+ * false all-clear: it checked four tables, so "repaired" only ever meant
+ * "those four exist". The root cause here sends ALL post-move DDL to the
+ * wrong database, so any table added since could be missing — deriving the
+ * list means a newly declared table is covered the day it's added, with no
+ * second place to remember to update.
+ */
+function expectedTables(): string[] {
+  return Object.values(schema)
+    .filter((value) => is(value, PgTable))
+    .map((table) => getTableName(table as PgTable))
+    .sort();
+}
 
 async function requireAdmin() {
   const user = await getAuthedUser();
@@ -45,22 +55,21 @@ async function requireAdmin() {
 }
 
 /**
- * Presence of each expected table, via to_regclass — returns NULL rather than
- * throwing for a missing relation, so one query answers for all of them.
+ * Presence of every expected table. Reads pg_class once and compares in
+ * memory rather than probing each name, so adding tables doesn't add round
+ * trips. Runs through the app's `db` connection deliberately — the question
+ * is what the APP can see, which is what diverged from what migrations wrote.
  */
 async function tablePresence(): Promise<Record<string, boolean>> {
-  const present: Record<string, boolean> = {};
-  for (const name of EXPECTED_TABLES) {
-    try {
-      const rows = (await db.execute(
-        sql`SELECT to_regclass(${'public.' + name}) IS NOT NULL AS present`,
-      )) as unknown as Array<{ present: boolean }>;
-      present[name] = Boolean(rows?.[0]?.present);
-    } catch {
-      present[name] = false;
-    }
-  }
-  return present;
+  const rows = (await db.execute(sql`
+    SELECT c.relname AS name
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relkind = 'r'
+  `)) as unknown as Array<{ name: string }>;
+
+  const live = new Set((rows ?? []).map((r) => r.name));
+  return Object.fromEntries(expectedTables().map((name) => [name, live.has(name)]));
 }
 
 /**
