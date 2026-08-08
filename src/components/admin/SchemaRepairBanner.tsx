@@ -30,6 +30,14 @@ interface DatabaseTargets {
   error?: string;
 }
 
+interface RunRecord {
+  startedAt: string;
+  finishedAt: string | null;
+  target: string | null;
+  triggeredBy: string | null;
+  failureCount: number;
+}
+
 interface RepairResult {
   success: boolean;
   message: string;
@@ -38,6 +46,7 @@ interface RepairResult {
   missing: string[];
   repaired: boolean;
   database?: DatabaseTargets;
+  history?: RunRecord[];
   warning?: string;
 }
 
@@ -143,6 +152,28 @@ export function SchemaRepairBanner({
             <p className="text-[10px] text-red-200/60">
               Target database: <code className="px-1 rounded bg-black/30">{state.result.database.app}</code>
             </p>
+          )}
+
+          {/* Run history makes drift readable: which database each run wrote
+              to, what triggered it, and how many statements failed. */}
+          {state.result.history && state.result.history.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-red-200/90">
+                Migration history ({state.result.history.length} most recent runs)
+              </summary>
+              <ul className="mt-2 space-y-1">
+                {state.result.history.map((run, i) => (
+                  <li key={i} className="text-[10px] text-red-200/80 flex gap-2 flex-wrap">
+                    <span>{new Date(run.startedAt).toLocaleString()}</span>
+                    <span className="text-red-200/60">via {run.triggeredBy ?? 'unknown'}</span>
+                    <code className="px-1 rounded bg-black/30">{run.target ?? '?'}</code>
+                    <span className={run.failureCount > 0 ? 'text-amber-300' : 'text-emerald-400/80'}>
+                      {run.failureCount} failed
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
 
           {state.result.failures.length > 0 && (

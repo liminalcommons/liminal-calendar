@@ -14,11 +14,12 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getTableName, is, sql } from 'drizzle-orm';
+import { desc, getTableName, is, sql } from 'drizzle-orm';
 import { PgTable } from 'drizzle-orm/pg-core';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import * as schema from '@/lib/db/schema';
+import { migrationRuns } from '@/lib/db/schema';
 import { runMigrations } from '@/lib/db/migrate';
 import {
   describeDatabaseTarget,
@@ -95,12 +96,42 @@ function databaseTargets() {
   }
 }
 
+/**
+ * Recent migration runs. Best-effort: the ledger is itself created by a
+ * migration, so a database that has never successfully migrated won't have
+ * it — that's a valid answer (empty history), not an error.
+ */
+async function recentRuns() {
+  try {
+    const rows = await db
+      .select({
+        startedAt: migrationRuns.startedAt,
+        finishedAt: migrationRuns.finishedAt,
+        target: migrationRuns.target,
+        targetSource: migrationRuns.targetSource,
+        triggeredBy: migrationRuns.triggeredBy,
+        failureCount: migrationRuns.failureCount,
+        warning: migrationRuns.warning,
+      })
+      .from(migrationRuns)
+      .orderBy(desc(migrationRuns.startedAt))
+      .limit(10);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 export async function GET() {
   const gate = await requireAdmin();
   if (gate.error) return gate.error;
 
   try {
-    return NextResponse.json({ tables: await tablePresence(), database: databaseTargets() });
+    return NextResponse.json({
+      tables: await tablePresence(),
+      database: databaseTargets(),
+      history: await recentRuns(),
+    });
   } catch (err) {
     console.error('[GET /api/admin/schema-repair]', err);
     return NextResponse.json({ error: 'Failed to inspect schema' }, { status: 500 });
@@ -112,7 +143,7 @@ export async function POST() {
   if (gate.error) return gate.error;
 
   try {
-    const result = await runMigrations();
+    const result = await runMigrations('admin');
     const tables = await tablePresence();
     const missing = Object.entries(tables)
       .filter(([, present]) => !present)
@@ -133,6 +164,7 @@ export async function POST() {
       // missing means DDL and reads went to different databases, and that is
       // otherwise indistinguishable from a silent no-op.
       database: databaseTargets(),
+      history: await recentRuns(),
       ...(result.warning ? { warning: result.warning } : {}),
     });
   } catch (err) {

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runMigrations();
+    const result = await runMigrations('cron');
     return NextResponse.json(result);
   } catch (err) {
     console.error('[POST /api/db-migrate]', err);

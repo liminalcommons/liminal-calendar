@@ -105,3 +105,39 @@ describe('runMigrations — statement independence', () => {
     expect(mockSqlEnd).toHaveBeenCalled();
   });
 });
+
+describe('runMigrations — ledger', () => {
+  it('creates migration_runs before anything else, so a partial run is still recorded', async () => {
+    await runMigrations();
+    const createIdx = executed.findIndex((s) => s.includes('CREATE TABLE IF NOT EXISTS migration_runs'));
+    const eventsIdx = executed.findIndex((s) => s.includes('CREATE TABLE IF NOT EXISTS events'));
+    expect(createIdx).toBeGreaterThanOrEqual(0);
+    expect(createIdx).toBeLessThan(eventsIdx);
+  });
+
+  it('records the run with its trigger, target and failure count', async () => {
+    failingMarkers = ['members_clerk_id_key'];
+    const result = await runMigrations('admin');
+
+    const insert = executed.find((s) => s.includes('INSERT INTO migration_runs'));
+    expect(insert).toBeDefined();
+    expect(result.failures).toHaveLength(1);
+    // Target is reported without credentials.
+    expect(result.target).toBe('test:5432/test');
+    expect(result.targetSource).toBe('DATABASE_URL');
+  });
+
+  it('a failed ledger write never changes the migration outcome', async () => {
+    // Recording the run must not be able to report a successful schema as failed.
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    failingMarkers = ['INSERT INTO migration_runs'];
+    const result = await runMigrations();
+    expect(result.success).toBe(true);
+    expect(result.failures).toEqual([]);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining('could not record run'),
+      expect.any(String),
+    );
+    errSpy.mockRestore();
+  });
+});

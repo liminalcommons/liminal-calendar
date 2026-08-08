@@ -380,3 +380,31 @@ export const analyticsEvents = pgTable(
 
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;
+
+// Ledger of migration runs. Written by runMigrations (lib/db/migrate.ts) at
+// the end of every run — boot, admin repair, or cron — and read by the admin
+// schema panel. Exists so schema drift is a fact you can query rather than
+// something inferred from a feature that stopped working: each row records
+// which database the DDL was applied to, what triggered it, and every
+// statement that failed on the way.
+export const migrationRuns = pgTable(
+  'migration_runs',
+  {
+    id: serial('id').primaryKey(),
+    startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** `host:port/database` — never credentials. */
+    target: text('target'),
+    /** Env var that supplied the connection string. */
+    targetSource: text('target_source'),
+    /** 'boot' | 'admin' | 'cron' */
+    triggeredBy: text('triggered_by'),
+    failureCount: integer('failure_count').notNull().default(0),
+    /** Array of { statement, error }. */
+    failures: jsonb('failures'),
+    warning: text('warning'),
+  },
+  (table) => [index('migration_runs_started_idx').on(table.startedAt)],
+);
+
+export type MigrationRun = typeof migrationRuns.$inferSelect;

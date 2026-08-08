@@ -29,7 +29,10 @@ export interface MigrationResult {
  *
  * Statements are also INDEPENDENT: see `step` in runMigrationsInner.
  */
-export async function runMigrations(): Promise<MigrationResult> {
+export async function runMigrations(
+  /** What kicked this off — recorded in the ledger so runs are attributable. */
+  triggeredBy: 'boot' | 'admin' | 'cron' = 'boot',
+): Promise<MigrationResult> {
   // Resolution is shared with the app (lib/db/url.ts) so DDL can never land in
   // a different database than the one being read. A direct/non-pooling URL is
   // still preferred for DDL, but only when it names the same database.
@@ -37,6 +40,9 @@ export async function runMigrations(): Promise<MigrationResult> {
   if (target.ignoredNonPooling) {
     console.error('[migrate] ignoring stale connection string:', target.ignoredNonPooling.reason);
   }
+
+  const describedTarget = describeDatabaseTarget(target.url);
+  const startedAt = new Date();
 
   const sql = postgres(target.url, {
     ssl: 'require',
@@ -46,12 +52,35 @@ export async function runMigrations(): Promise<MigrationResult> {
   });
   try {
     const result = await runMigrationsInner(sql);
-    return {
+    const full: MigrationResult = {
       ...result,
-      target: describeDatabaseTarget(target.url),
+      target: describedTarget,
       targetSource: target.source,
       ...(target.ignoredNonPooling ? { warning: target.ignoredNonPooling.reason } : {}),
     };
+
+    // Ledger write is best-effort and never changes the outcome — a run that
+    // applied the schema must not be reported as failed because recording it
+    // didn't work.
+    try {
+      await sql`
+        INSERT INTO migration_runs
+          (started_at, finished_at, target, target_source, triggered_by,
+           failure_count, failures, warning)
+        VALUES (
+          ${startedAt}, ${new Date()}, ${describedTarget}, ${target.source},
+          ${triggeredBy}, ${full.failures.length},
+          ${JSON.stringify(full.failures)}::jsonb, ${full.warning ?? null}
+        )
+      `;
+    } catch (ledgerErr) {
+      console.error(
+        '[migrate] could not record run in migration_runs:',
+        ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr),
+      );
+    }
+
+    return full;
   } finally {
     await sql.end({ timeout: 5 });
   }
@@ -87,6 +116,25 @@ async function runMigrationsInner(sql: any): Promise<MigrationResult> {
       });
       return null;
     });
+
+  // Ledger of migration runs — FIRST, so a run that goes on to fail partway
+  // still has somewhere to record what happened. Without this, schema drift
+  // was only observable by finding a broken feature and working backwards;
+  // now "when did this table appear, and what failed on the way" is a query.
+  await step`
+    CREATE TABLE IF NOT EXISTS migration_runs (
+      id SERIAL PRIMARY KEY,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      finished_at TIMESTAMPTZ,
+      target TEXT,
+      target_source TEXT,
+      triggered_by TEXT,
+      failure_count INTEGER NOT NULL DEFAULT 0,
+      failures JSONB,
+      warning TEXT
+    )
+  `;
+  await step`CREATE INDEX IF NOT EXISTS migration_runs_started_idx ON migration_runs(started_at DESC)`;
 
   // Create events table
   await step`
