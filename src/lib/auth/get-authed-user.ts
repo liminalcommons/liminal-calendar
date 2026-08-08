@@ -30,14 +30,31 @@ export type AuthedUser = {
   email?: string | null;
 };
 
-async function lookupMemberIdByLogtoId(logtoId: string): Promise<number | null> {
+function normalizeRole(role: unknown): UserRole {
+  return role === 'admin' ? 'admin' : role === 'host' ? 'host' : 'member';
+}
+
+/**
+ * Canonical member id AND role for a Logto identity.
+ *
+ * Role comes from the database, not the session claim. The claim is minted
+ * when the session is issued and never refreshes, so promoting someone via
+ * /admin (which writes members.role) left their token still saying "member".
+ * /api/profile reads the table, so the admin page would render for them while
+ * every admin API returned 403 — the same shape of bug as a silent failure:
+ * working enough to look fine, broken where it counts. The table is the thing
+ * the admin UI writes, so the table wins.
+ */
+async function lookupMemberByLogtoId(
+  logtoId: string,
+): Promise<{ id: number; role: UserRole } | null> {
   try {
     const [row] = await db
-      .select({ id: members.id })
+      .select({ id: members.id, role: members.role })
       .from(members)
       .where(eq(members.logtoId, logtoId))
       .limit(1);
-    return row?.id ?? null;
+    return row ? { id: row.id, role: normalizeRole(row.role) } : null;
   } catch {
     return null;
   }
@@ -63,10 +80,8 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
       email?: string | null;
     };
     if (u.logtoUserId) {
-      const role: UserRole =
-        u.role === 'admin' ? 'admin' : u.role === 'host' ? 'host' : 'member';
-      let memberId = await lookupMemberIdByLogtoId(u.logtoUserId);
-      if (memberId === null) {
+      let member = await lookupMemberByLogtoId(u.logtoUserId);
+      if (member === null) {
         // Provision on read so a fresh Castalia user gets a canonical
         // memberId on their first request instead of memberId:null — which
         // would 401 every API call and bounce protected pages to the landing.
@@ -75,12 +90,15 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
           email: u.email ?? null,
           name: u.name ?? null,
         });
-        memberId = await lookupMemberIdByLogtoId(u.logtoUserId);
+        member = await lookupMemberByLogtoId(u.logtoUserId);
       }
       return {
-        memberId,
+        memberId: member?.id ?? null,
         id: u.logtoUserId,
-        role,
+        // Prefer the stored role; fall back to the session claim only when the
+        // row can't be read (fake db in tests, transient DB error), preserving
+        // the existing degrade-gracefully behaviour.
+        role: member?.role ?? normalizeRole(u.role),
         name: u.name ?? null,
         image: u.image ?? null,
         logtoUserId: u.logtoUserId,
@@ -97,12 +115,11 @@ export async function getAuthedUser(): Promise<AuthedUser | null> {
     console.error('[getAuthedUser] getCurrentMember threw:', err instanceof Error ? err.message : String(err));
   }
   if (!member) return null;
-  const role: UserRole =
-    member.role === 'admin' ? 'admin' : member.role === 'host' ? 'host' : 'member';
+  // Clerk path already reads the row, so its role was always the stored one.
   return {
     memberId: member.id,
     id: member.clerkId ?? String(member.id),
-    role,
+    role: normalizeRole(member.role),
     name: member.name,
     image: member.image,
     clerkId: member.clerkId ?? undefined,

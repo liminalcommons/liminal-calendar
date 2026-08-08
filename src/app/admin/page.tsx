@@ -100,6 +100,14 @@ function AdminPageInner() {
             : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  // Distinguishes "the request failed" from "there are no members". Without
+  // it, a 403 or a network blip rendered as "No members yet" — an empty state
+  // that reads as healthy. Same failure shape that hid the analytics outage.
+  const [membersError, setMembersError] = useState<string | null>(null);
+  // Set when /api/profile could not be reached at all, as opposed to
+  // answering "you are not an admin". Bouncing to the landing page on a
+  // transient error looks identical to being denied.
+  const [roleError, setRoleError] = useState(false);
   // Track in-flight role updates and expansion by `member.id` (numeric pk).
   const [updating, setUpdating] = useState<number | null>(null);
   const [expandedMember, setExpandedMember] = useState<number | null>(null);
@@ -108,9 +116,21 @@ function AdminPageInner() {
   useEffect(() => {
     let cancelled = false;
     apiFetch('/api/profile')
-      .then(r => r.ok ? r.json() : null)
-      .then(p => { if (!cancelled) { setResolvedRole(p?.role ?? null); setRoleResolved(true); } })
-      .catch(() => { if (!cancelled) { setResolvedRole(null); setRoleResolved(true); } });
+      .then(async r => {
+        if (cancelled) return;
+        if (!r.ok) {
+          // 401 is a real answer (not signed in) — anything else is a fault
+          // we shouldn't silently convert into "not an admin".
+          setRoleError(r.status !== 401);
+          setResolvedRole(null);
+          setRoleResolved(true);
+          return;
+        }
+        const p = await r.json();
+        setResolvedRole(p?.role ?? null);
+        setRoleResolved(true);
+      })
+      .catch(() => { if (!cancelled) { setRoleError(true); setResolvedRole(null); setRoleResolved(true); } });
     return () => { cancelled = true; };
   }, []);
 
@@ -118,24 +138,45 @@ function AdminPageInner() {
 
   useEffect(() => {
     if (status === 'loading' || !roleResolved) return;
+    // Don't bounce on a failed role lookup — that would hide the fault behind
+    // a redirect. The error is rendered instead.
+    if (roleError) return;
     if (userRole !== 'admin') {
       router.replace('/');
       return;
     }
 
+    let cancelled = false;
     apiFetch('/api/admin/members')
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setMembers(data.sort((a: Member, b: Member) => {
-            const order = { admin: 0, host: 1, member: 2 };
-            return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
-          }));
+      .then(async r => {
+        if (cancelled) return;
+        if (!r.ok) {
+          // Previously this went through r.json() unchecked; an error body is
+          // not an array, so it fell through to an empty member list.
+          setMembersError(`Could not load members (HTTP ${r.status})`);
+          setLoading(false);
+          return;
         }
+        const data = await r.json();
+        if (!Array.isArray(data)) {
+          setMembersError('Unexpected response from the members endpoint');
+          setLoading(false);
+          return;
+        }
+        setMembers(data.sort((a: Member, b: Member) => {
+          const order = { admin: 0, host: 1, member: 2 };
+          return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
+        }));
+        setMembersError(null);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, [status, roleResolved, userRole, router]);
+      .catch(() => {
+        if (cancelled) return;
+        setMembersError('Could not reach the members endpoint');
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [status, roleResolved, roleError, userRole, router]);
 
   const handleRoleChange = async (member: Member, newRole: string) => {
     setUpdating(member.id);
@@ -165,6 +206,31 @@ function AdminPageInner() {
       setUpdating(null);
     }
   };
+
+  // A failed role lookup is a fault, not a denial — say so instead of
+  // redirecting, which would be indistinguishable from not being an admin.
+  if (roleError) {
+    return (
+      <div className="min-h-screen bg-grove-bg">
+        <NavBar />
+        <div className="max-w-md mx-auto py-20 px-4 text-center space-y-3">
+          <p role="alert" className="text-sm text-red-400">
+            Couldn’t confirm your permissions.
+          </p>
+          <p className="text-xs text-grove-text-muted">
+            This is a problem reaching <code className="px-1 rounded bg-black/30">/api/profile</code>,
+            not a sign that you lack access.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-3 py-1.5 text-xs font-medium rounded-md border border-grove-border text-grove-text hover:bg-grove-border/20"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'loading' || !roleResolved || userRole !== 'admin') {
     return (
@@ -300,6 +366,13 @@ function AdminPageInner() {
             {[1, 2, 3].map(i => (
               <div key={i} className="h-16 bg-grove-surface rounded-lg animate-pulse" />
             ))}
+          </div>
+        ) : membersError ? (
+          <div role="alert" className="text-center py-12 space-y-2">
+            <p className="text-sm text-red-400">{membersError}</p>
+            <p className="text-xs text-grove-text-muted">
+              This is a load failure, not an empty directory.
+            </p>
           </div>
         ) : members.length === 0 ? (
           <div className="text-center py-12">
