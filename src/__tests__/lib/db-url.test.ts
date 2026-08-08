@@ -2,13 +2,14 @@ import {
   describeDatabaseTarget,
   resolveAppDatabaseUrl,
   resolveMigrationDatabaseUrl,
+  retiredUrlVarsPresent,
   sameDatabase,
 } from '../../lib/db/url';
 
 const ORIGINAL_ENV = process.env;
 
 const VPS = 'postgres://app:secret@db.chora.example:5432/calendar?sslmode=require';
-const STALE_SUPABASE = 'postgres://postgres:othersecret@db.abcdefg.supabase.co:5432/postgres';
+const STALE_NEON = 'postgres://postgres:othersecret@db.abcdefg.supabase.co:5432/postgres';
 const VPS_DIRECT = 'postgres://app:secret@db.chora.example:5432/calendar';
 
 beforeEach(() => {
@@ -53,7 +54,7 @@ describe('sameDatabase', () => {
   });
 
   it('distinguishes different hosts', () => {
-    expect(sameDatabase(VPS, STALE_SUPABASE)).toBe(false);
+    expect(sameDatabase(VPS, STALE_NEON)).toBe(false);
   });
 
   it('distinguishes different databases on the same host', () => {
@@ -68,21 +69,41 @@ describe('sameDatabase', () => {
 describe('resolveAppDatabaseUrl', () => {
   it('prefers DATABASE_URL and reports its source', () => {
     process.env.DATABASE_URL = VPS;
-    process.env.POSTGRES_URL = STALE_SUPABASE;
+    process.env.POSTGRES_URL = STALE_NEON;
     expect(resolveAppDatabaseUrl()).toEqual({ url: VPS, source: 'DATABASE_URL' });
   });
 
-  it('falls back through the legacy vars', () => {
-    process.env.calender_POSTGRES_URL = VPS;
-    expect(resolveAppDatabaseUrl().source).toBe('calender_POSTGRES_URL');
+  it('falls back to POSTGRES_URL', () => {
+    process.env.POSTGRES_URL = VPS;
+    expect(resolveAppDatabaseUrl().source).toBe('POSTGRES_URL');
   });
 
   it('throws when nothing is configured', () => {
     expect(() => resolveAppDatabaseUrl()).toThrow(/No Postgres URL found/);
   });
 
+  it('NEVER falls back to the retired Neon vars', () => {
+    // These are injected by the still-installed Neon integration. Falling
+    // through to them silently pointed preview deployments at a database
+    // nobody reads and kept it awake and billing.
+    process.env.calender_DATABASE_URL = STALE_NEON;
+    process.env.calender_POSTGRES_URL = STALE_NEON;
+    expect(() => resolveAppDatabaseUrl()).toThrow(/No Postgres URL found/);
+  });
+
+  it('names the retired vars in the error so the fix is obvious', () => {
+    process.env.calender_POSTGRES_URL = STALE_NEON;
+    expect(() => resolveAppDatabaseUrl()).toThrow(/retired Neon integration/);
+  });
+
+  it('reports retired vars that are still present', () => {
+    expect(retiredUrlVarsPresent()).toEqual([]);
+    process.env.calender_POSTGRES_URL = STALE_NEON;
+    expect(retiredUrlVarsPresent()).toEqual(['calender_POSTGRES_URL']);
+  });
+
   it('never considers POSTGRES_URL_NON_POOLING', () => {
-    process.env.POSTGRES_URL_NON_POOLING = STALE_SUPABASE;
+    process.env.POSTGRES_URL_NON_POOLING = STALE_NEON;
     expect(() => resolveAppDatabaseUrl()).toThrow(/No Postgres URL found/);
   });
 });
@@ -109,7 +130,7 @@ describe('resolveMigrationDatabaseUrl', () => {
     // migrations create tables where nothing reads, so every run reported
     // success while the app still saw no analytics_events.
     process.env.DATABASE_URL = VPS;
-    process.env.POSTGRES_URL_NON_POOLING = STALE_SUPABASE;
+    process.env.POSTGRES_URL_NON_POOLING = STALE_NEON;
 
     const target = resolveMigrationDatabaseUrl();
 
@@ -122,7 +143,7 @@ describe('resolveMigrationDatabaseUrl', () => {
 
   it('does not leak credentials in the warning', () => {
     process.env.DATABASE_URL = VPS;
-    process.env.POSTGRES_URL_NON_POOLING = STALE_SUPABASE;
+    process.env.POSTGRES_URL_NON_POOLING = STALE_NEON;
     const reason = resolveMigrationDatabaseUrl().ignoredNonPooling!.reason;
     expect(reason).not.toContain('othersecret');
     expect(reason).not.toContain('secret');

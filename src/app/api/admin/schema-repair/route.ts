@@ -25,6 +25,7 @@ import {
   describeDatabaseTarget,
   resolveAppDatabaseUrl,
   resolveMigrationDatabaseUrl,
+  retiredUrlVarsPresent,
 } from '@/lib/db/url';
 
 export const dynamic = 'force-dynamic';
@@ -89,6 +90,9 @@ function databaseTargets() {
       migration: describeDatabaseTarget(migration.url),
       migrationSource: migration.source,
       sameTarget: describeDatabaseTarget(app.url) === describeDatabaseTarget(migration.url),
+      // Retired Neon integration vars. Present means Vercel is still injecting
+      // them, which means the integration is still installed and billing.
+      retiredVarsPresent: retiredUrlVarsPresent(),
       ...(migration.ignoredNonPooling ? { warning: migration.ignoredNonPooling.reason } : {}),
     };
   } catch (err) {

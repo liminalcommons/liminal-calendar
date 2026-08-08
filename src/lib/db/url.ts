@@ -16,13 +16,31 @@
  * (direct session instead of pgbouncer, same data).
  */
 
-/** Env vars the application reads, in precedence order. */
-const APP_URL_VARS = [
-  'DATABASE_URL',
-  'POSTGRES_URL',
-  'calender_DATABASE_URL',
-  'calender_POSTGRES_URL',
-] as const;
+/**
+ * Env vars the application reads, in precedence order.
+ *
+ * `calender_DATABASE_URL` / `calender_POSTGRES_URL` used to sit at the end of
+ * this list. Those are the retired Neon integration's variables (see the
+ * removed db-restore-from-neon route, which named them as the Neon side of the
+ * migration). Vercel still injects them into every environment while the
+ * integration is installed, so any deployment where DATABASE_URL wasn't
+ * set — preview builds in particular — silently fell through to Neon and ran
+ * the full boot migration against it on every cold start. Neon bills compute
+ * and auto-suspends when idle, so that traffic kept a database nobody reads
+ * awake and billing.
+ *
+ * They are deliberately NOT fallbacks any more: a deployment with no database
+ * configured should fail loudly, not quietly write to a paid one.
+ */
+const APP_URL_VARS = ['DATABASE_URL', 'POSTGRES_URL'] as const;
+
+/** Retired connection strings — reported if present, never connected to. */
+const RETIRED_URL_VARS = ['calender_DATABASE_URL', 'calender_POSTGRES_URL'] as const;
+
+/** Retired vars still present in the environment, for diagnostics. */
+export function retiredUrlVarsPresent(): string[] {
+  return RETIRED_URL_VARS.filter((k) => Boolean(process.env[k]));
+}
 
 /** Direct-session URL, preferred for DDL when it agrees with the app's URL. */
 const NON_POOLING_VAR = 'POSTGRES_URL_NON_POOLING';
@@ -47,8 +65,14 @@ export function resolveAppDatabaseUrl(): ResolvedUrl {
     const url = process.env[key];
     if (url) return { url, source: key };
   }
+  const retired = retiredUrlVarsPresent();
   throw new Error(
-    `No Postgres URL found (checked ${APP_URL_VARS.join(', ')})`,
+    `No Postgres URL found (checked ${APP_URL_VARS.join(', ')})` +
+      (retired.length
+        ? `. ${retired.join(', ')} is set but belongs to the retired Neon ` +
+          `integration and is deliberately not used — set DATABASE_URL for ` +
+          `this environment, and uninstall the Neon integration.`
+        : ''),
   );
 }
 

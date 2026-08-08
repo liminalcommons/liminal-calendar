@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { useUserTimezone } from '@/lib/timezone-utils';
@@ -131,7 +131,12 @@ const EventBlock = React.memo(function EventBlock({
   const widthPct = (1 / colTotal) * 100;
 
   const bgGradient = EVENT_GRADIENTS[hashId(event.id)];
-  const hasImage = !!event.imageUrl;
+  // A URL alone isn't a picture. If the asset 404s (moved bucket, expired
+  // link), the <img> renders nothing — and because the gradient was skipped
+  // for image-bearing events, the tile came out genuinely transparent. Track
+  // the load failure so the gradient comes back instead of a hole in the grid.
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = !!event.imageUrl && !imageFailed;
 
   const recurrenceLabel = getRecurrenceLabel(event.recurrenceRule);
 
@@ -166,7 +171,7 @@ const EventBlock = React.memo(function EventBlock({
         height: heightPx,
         left: `calc(${leftPct}% + 1px)`,
         width: `calc(${widthPct}% - 2px)`,
-        background: hasImage ? undefined : bgGradient,
+        background: showImage ? undefined : bgGradient,
         transition: transitionStyle,
         opacity: isDragging ? 0.30 : isMuted ? 0.45 : undefined,
         filter: isMuted ? 'grayscale(0.6)' : undefined,
@@ -179,15 +184,29 @@ const EventBlock = React.memo(function EventBlock({
       title={event.title}
     >
       {/* Banner image background */}
-      {hasImage && (
+      {showImage && (
         <>
           <img
             src={event.imageUrl}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
+            onError={() => setImageFailed(true)}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
         </>
+      )}
+
+      {/* No image: a faint initial so the tile reads as deliberate rather than
+          empty next to the photo-backed ones. Gated on height so it never
+          crowds a short block. */}
+      {!showImage && heightPx >= 34 && (
+        <span
+          aria-hidden="true"
+          className="absolute right-1 bottom-0 font-serif text-white/15 leading-none select-none pointer-events-none"
+          style={{ fontSize: Math.min(heightPx * 0.9, 44) }}
+        >
+          {event.title.trim().charAt(0).toUpperCase()}
+        </span>
       )}
 
       {/* Muted indicator */}
