@@ -17,6 +17,7 @@ import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { sendEmail } from '@/lib/email';
 import { fetchNewsletterAudience } from '@/lib/newsletter/repo';
+import { isMissingTableError } from '@/lib/db/errors';
 import { buildMonthlyEmail } from '@/lib/newsletter/monthly-email';
 import { unsubscribeToken, unsubscribeUrl } from '@/lib/newsletter/unsubscribe-token';
 
@@ -49,6 +50,21 @@ export async function GET() {
       sample: audience.entries.slice(0, 5).map((e) => ({ email: e.email, name: e.name })),
     });
   } catch (err) {
+    if (isMissingTableError(err)) {
+      // newsletter_subscribers is declared in the migration chain behind two
+      // UNIQUE constraints that can fail against live data, so it is one of
+      // the tables that actually goes missing. Report it as an actionable
+      // state the panel can act on (Repair schema) rather than an opaque 500.
+      console.error('[GET /api/admin/newsletter] newsletter_subscribers table missing');
+      return NextResponse.json({
+        schemaMissing: true,
+        totalRecipients: 0,
+        memberCount: 0,
+        subscriberCount: 0,
+        suppressedCount: 0,
+        sample: [],
+      });
+    }
     console.error('[GET /api/admin/newsletter]', err);
     return NextResponse.json({ error: 'Failed to load audience' }, { status: 500 });
   }

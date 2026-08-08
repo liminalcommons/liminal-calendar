@@ -97,3 +97,45 @@ describe('/api/admin/newsletter as admin', () => {
     expect(opts.headers['List-Unsubscribe']).toContain('/api/newsletter/unsubscribe');
   });
 });
+
+describe('/api/admin/newsletter — missing schema', () => {
+  beforeEach(() => {
+    mockAuth.mockResolvedValue({ memberId: 1, id: 'logto-admin', role: 'admin', name: 'Admin' });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    (console.error as jest.Mock).mockRestore?.();
+  });
+
+  it('reports schemaMissing instead of a 500 when newsletter_subscribers is absent', async () => {
+    // newsletter_subscribers is declared behind two failable UNIQUE statements
+    // in the migration chain, so a partial migration leaves it missing. The
+    // error arrives wrapped by Drizzle, with the pg code on `.cause`.
+    mockAudience.mockRejectedValue(
+      Object.assign(new Error('Failed query: select ... from "newsletter_subscribers"'), {
+        cause: Object.assign(new Error('relation "newsletter_subscribers" does not exist'), {
+          code: '42P01',
+        }),
+      }),
+    );
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.schemaMissing).toBe(true);
+    // Zeroed rather than absent, so the panel renders a repair prompt instead
+    // of an audience that looks like "nobody has signed up".
+    expect(body.totalRecipients).toBe(0);
+  });
+
+  it('still 500s on an unrelated database error', async () => {
+    mockAudience.mockRejectedValue(
+      Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' }),
+    );
+    const res = await GET();
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe('Failed to load audience');
+  });
+});

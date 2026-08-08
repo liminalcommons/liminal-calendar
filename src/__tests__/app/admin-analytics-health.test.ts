@@ -10,10 +10,10 @@ jest.mock('@/lib/analytics/repo', () => ({
   fetchRecentAnalyticsRows: jest.fn(),
   fetchAllTimeTotals: jest.fn(),
   fetchLastEventAt: jest.fn(),
-  // Keep the real predicate — the point of the test is that a 42P01 is
-  // classified as "table missing" rather than a generic failure.
-  isMissingTableError: (err: unknown) =>
-    (err as { code?: unknown } | null)?.code === '42P01',
+  // Use the REAL predicate. Stubbing it here previously hid the actual bug:
+  // the route classified fine against a hand-made `{code:'42P01'}`, while
+  // production errors arrive wrapped by Drizzle with the code on `.cause`.
+  isMissingTableError: jest.requireActual('@/lib/db/errors').isMissingTableError,
 }));
 
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
@@ -75,10 +75,17 @@ describe('GET /api/admin/analytics — health reporting', () => {
     expect(body.health.lastEventAt).toBeNull();
   });
 
-  it('returns an actionable table_missing payload (not a 500) on Postgres 42P01', async () => {
-    const undefinedTable = Object.assign(new Error('relation "analytics_events" does not exist'), {
-      code: '42P01',
-    });
+  it('returns an actionable table_missing payload (not a 500) on a Drizzle-wrapped 42P01', async () => {
+    // The production shape: DrizzleQueryError wrapping the postgres error.
+    // The top-level object carries no `code` — only `.cause` does.
+    const undefinedTable = Object.assign(
+      new Error('Failed query: select ... from "analytics_events"'),
+      {
+        cause: Object.assign(new Error('relation "analytics_events" does not exist'), {
+          code: '42P01',
+        }),
+      },
+    );
     mockRows.mockRejectedValue(undefinedTable);
 
     const res = await GET();

@@ -47,16 +47,8 @@ export async function fetchRecentAnalyticsRows(
   }));
 }
 
-/**
- * True when the error is Postgres 42P01 (undefined_table) — i.e. the
- * analytics_events table doesn't exist because migrations never created it.
- * Distinguishing this from a generic DB error is what lets the admin panel
- * say "run migrations" instead of "something went wrong".
- */
-export function isMissingTableError(err: unknown): boolean {
-  const code = (err as { code?: unknown } | null)?.code;
-  return code === '42P01';
-}
+// Re-exported so existing analytics callers keep a single import site.
+export { isMissingTableError } from '@/lib/db/errors';
 
 /** Timestamp of the most recent row, or null when the table is empty. */
 export async function fetchLastEventAt(db: Db): Promise<string | null> {

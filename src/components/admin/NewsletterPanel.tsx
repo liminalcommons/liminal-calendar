@@ -7,10 +7,13 @@
  * always in the loop — nothing sends without an explicit confirmed click.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
+import { SchemaRepairBanner } from './SchemaRepairBanner';
 
 interface AudienceSummary {
+  /** Set when newsletter_subscribers doesn't exist — see SchemaRepairBanner. */
+  schemaMissing?: boolean;
   totalRecipients: number;
   memberCount: number;
   subscriberCount: number;
@@ -41,22 +44,23 @@ export function NewsletterPanel() {
   const [error, setError] = useState<string | null>(null);
   const [confirmSend, setConfirmSend] = useState(false);
 
+  const loadAudience = useCallback(async () => {
+    const r = await apiFetch('/api/admin/newsletter', { method: 'GET' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return (await r.json()) as AudienceSummary;
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    apiFetch('/api/admin/newsletter', { method: 'GET' })
-      .then(async (r) => {
-        if (cancelled) return;
-        if (!r.ok) {
-          setLoadError('Failed to load audience');
-          return;
-        }
-        setSummary((await r.json()) as AudienceSummary);
+    loadAudience()
+      .then((data) => {
+        if (!cancelled) setSummary(data);
       })
       .catch(() => !cancelled && setLoadError('Failed to load audience'));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAudience]);
 
   const canSubmit = subject.trim().length > 0 && body.trim().length > 0;
 
@@ -82,6 +86,19 @@ export function NewsletterPanel() {
     } finally {
       setBusy(null);
     }
+  }
+
+  // The table is missing, not the data — offer the repair rather than an
+  // audience of zero that looks like "nobody has signed up".
+  if (summary?.schemaMissing) {
+    return (
+      <SchemaRepairBanner
+        table="newsletter_subscribers"
+        onRepaired={() => {
+          loadAudience().then(setSummary).catch(() => setLoadError('Failed to load audience'));
+        }}
+      />
+    );
   }
 
   return (

@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api-fetch';
 import { ANALYTICS_ENDPOINT } from '@/lib/analytics/track';
+import { SchemaRepairBanner } from './SchemaRepairBanner';
 
 interface WindowStats {
   pageviews: number;
@@ -225,18 +226,12 @@ export function AnalyticsPanel() {
       {/* Pipeline health — shown whenever collection can't be assumed healthy.
           An empty dashboard is ambiguous on its own, so say which case it is. */}
       {health?.status === 'table_missing' ? (
-        <div role="alert" className="bg-red-950/40 border border-red-700/50 rounded-xl p-4 space-y-1">
-          <p className="text-sm font-medium text-red-300">
-            The analytics_events table doesn’t exist — nothing can be recorded.
-          </p>
-          <p className="text-xs text-red-200/80">
-            Migrations run automatically on each deploy, but a statement earlier in the
-            chain can fail against existing data. Redeploy and check the logs for
-            <code className="mx-1 px-1 rounded bg-black/30">[boot-migrate] statement failed</code>
-            lines, or POST <code className="px-1 rounded bg-black/30">/api/db-migrate</code> with the
-            CRON_SECRET bearer token to run them on demand and see the failure list.
-          </p>
-        </div>
+        <SchemaRepairBanner
+          table="analytics_events"
+          onRepaired={() => {
+            load().then((d) => d && setState({ kind: 'ok', data: d })).catch(() => {});
+          }}
+        />
       ) : health && health.totalEvents === 0 ? (
         <div className="bg-grove-surface border border-amber-700/40 rounded-xl p-4 space-y-1">
           <p className="text-sm font-medium text-grove-text">
