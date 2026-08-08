@@ -18,11 +18,18 @@ export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
  * Client-supplied payload. Every string is length-bounded so a buggy or
  * hostile client can't bloat a row. Only `type` is required.
  */
+export const DEVICE_CLASSES = ['mobile', 'tablet', 'desktop'] as const;
+
 export const analyticsEventInputSchema = z.object({
   type: z.enum(ANALYTICS_EVENT_TYPES),
   path: z.string().max(512).optional(),
   target: z.string().max(256).optional(),
   visitorId: z.string().max(64).optional(),
+  /** Host only — the client never sends a full referring URL. */
+  referrer: z.string().max(128).optional(),
+  device: z.enum(DEVICE_CLASSES).optional(),
+  /** Per-tab visit id; groups pageviews into visits. */
+  visitId: z.string().max(64).optional(),
 });
 
 export type AnalyticsEventInput = z.infer<typeof analyticsEventInputSchema>;
@@ -32,6 +39,10 @@ export interface RecordContext {
   isGuest?: boolean;
   /** Canonical member id, when cheaply known. Left null on the beacon path. */
   memberId?: number | null;
+  /** 'member' | 'guest' | 'anonymous', from cookie presence — no DB lookup. */
+  viewer?: string | null;
+  /** ISO-3166 alpha-2 resolved by the platform edge. The IP is never stored. */
+  country?: string | null;
 }
 
 /**
@@ -53,5 +64,10 @@ export async function recordAnalyticsEvent(
     visitorId: input.visitorId ?? null,
     isGuest: ctx.isGuest ?? false,
     memberId: ctx.memberId ?? null,
+    referrerHost: input.referrer ?? null,
+    device: input.device ?? null,
+    visitId: input.visitId ?? null,
+    viewer: ctx.viewer ?? null,
+    country: ctx.country ?? null,
   });
 }

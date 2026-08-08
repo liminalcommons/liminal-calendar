@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { GUEST_COOKIE } from '@/lib/guest';
 import { analyticsEventInputSchema, recordAnalyticsEvent } from '@/lib/analytics/events';
+import { requestContext } from '@/lib/analytics/context';
 
 /**
  * Shared handler for the public analytics beacon. Served from two paths:
@@ -50,9 +50,11 @@ export async function handleCollect(request: NextRequest) {
       return new NextResponse(null, { status: 204 });
     }
 
-    const isGuest = request.cookies.get(GUEST_COOKIE)?.value === '1';
+    // Server-known context: guest flag, viewer kind from cookie presence, and
+    // the country the platform edge already resolved. No DB lookup, no IP.
+    const ctx = requestContext(request);
 
-    await recordAnalyticsEvent(db, parsed.data, { isGuest });
+    await recordAnalyticsEvent(db, parsed.data, ctx);
   } catch (err) {
     // Swallow — a missing table (pre-migration) or transient DB error must not
     // surface as a failed request in the visitor's console. The admin health

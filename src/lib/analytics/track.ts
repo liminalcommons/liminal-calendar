@@ -8,6 +8,7 @@
  */
 
 import type { AnalyticsEventType } from './events';
+import { clientContext } from './client-context';
 
 const VISITOR_KEY = 'liminal_vid';
 
@@ -52,11 +53,21 @@ interface TrackPayload {
   path?: string;
   target?: string;
   visitorId?: string;
+  referrer?: string;
+  device?: string;
+  visitId?: string;
 }
 
 function send(payload: TrackPayload): void {
   if (typeof window === 'undefined') return;
-  const body = JSON.stringify({ ...payload, visitorId: getVisitorId() });
+  const { referrer, device, visitId } = clientContext();
+  const body = JSON.stringify({
+    ...payload,
+    visitorId: getVisitorId(),
+    referrer,
+    device,
+    visitId,
+  });
   try {
     // sendBeacon survives page unload (important for click-through navigations)
     // and doesn't block. Fall back to keepalive fetch where it's unavailable.

@@ -69,3 +69,103 @@ describe('computeAnalyticsSummary', () => {
     expect(last.guestViews).toBe(1);
   });
 });
+
+describe('computeAnalyticsSummary — visit-shaped metrics', () => {
+  const NOW = Date.parse('2026-08-08T12:00:00.000Z');
+  const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
+
+  function pv(over: Partial<AnalyticsRow> = {}): AnalyticsRow {
+    return {
+      type: 'pageview',
+      path: '/',
+      target: null,
+      visitorId: 'v1',
+      isGuest: false,
+      createdAt: ago(10),
+      ...over,
+    };
+  }
+
+  it('counts visits by visitId, not raw pageviews', () => {
+    const rows = [
+      pv({ visitId: 'a' }), pv({ visitId: 'a' }), pv({ visitId: 'a' }),
+      pv({ visitId: 'b' }),
+    ];
+    const { windows } = computeAnalyticsSummary(rows, NOW);
+    expect(windows.day.pageviews).toBe(4);
+    expect(windows.day.visits).toBe(2);
+    expect(windows.day.pagesPerVisit).toBe(2);
+  });
+
+  it('treats single-page visits as bounces', () => {
+    const rows = [
+      pv({ visitId: 'a' }), pv({ visitId: 'a' }), // engaged
+      pv({ visitId: 'b' }),                        // bounce
+      pv({ visitId: 'c' }),                        // bounce
+    ];
+    const { windows } = computeAnalyticsSummary(rows, NOW);
+    expect(windows.day.bounceRate).toBe(67); // 2 of 3
+  });
+
+  it('splits new from returning by first-ever appearance', () => {
+    const rows = [
+      // Seen three weeks ago and again today → returning.
+      pv({ visitorId: 'old', visitId: 'x', createdAt: ago(60 * 24 * 21) }),
+      pv({ visitorId: 'old', visitId: 'y' }),
+      // First appearance is inside the day window → new.
+      pv({ visitorId: 'fresh', visitId: 'z' }),
+    ];
+    const { windows } = computeAnalyticsSummary(rows, NOW);
+    expect(windows.day.newVisitors).toBe(1);
+    expect(windows.day.returningVisitors).toBe(1);
+  });
+
+  it('reports zeroed visit metrics rather than dividing by zero', () => {
+    const { windows } = computeAnalyticsSummary([], NOW);
+    expect(windows.day.visits).toBe(0);
+    expect(windows.day.pagesPerVisit).toBe(0);
+    expect(windows.day.bounceRate).toBe(0);
+  });
+});
+
+describe('computeAnalyticsSummary — breakdowns', () => {
+  const NOW = Date.parse('2026-08-08T12:00:00.000Z');
+  const recent = new Date(NOW - 60_000).toISOString();
+
+  function row(over: Partial<AnalyticsRow>): AnalyticsRow {
+    return {
+      type: 'pageview', path: '/', target: null, visitorId: 'v',
+      isGuest: false, createdAt: recent, ...over,
+    };
+  }
+
+  it('ranks referrers, countries, devices and viewers', () => {
+    const rows = [
+      row({ referrerHost: 'google.com', country: 'GB', device: 'mobile', viewer: 'anonymous' }),
+      row({ referrerHost: 'google.com', country: 'GB', device: 'mobile', viewer: 'member' }),
+      row({ referrerHost: '(direct)', country: 'BR', device: 'desktop', viewer: 'guest' }),
+    ];
+    const s = computeAnalyticsSummary(rows, NOW);
+    expect(s.topReferrers[0]).toEqual({ label: 'google.com', count: 2 });
+    expect(s.topCountries[0]).toEqual({ label: 'GB', count: 2 });
+    expect(s.devices[0]).toEqual({ label: 'mobile', count: 2 });
+    expect(s.viewers.map((v) => v.label).sort()).toEqual(['anonymous', 'guest', 'member']);
+  });
+
+  it('folds pre-enrichment nulls into (unknown) instead of dropping them', () => {
+    // Rows recorded before these columns existed must not silently shrink totals.
+    const rows = [row({ referrerHost: null, country: null }), row({ referrerHost: 'x.com', country: 'US' })];
+    const s = computeAnalyticsSummary(rows, NOW);
+    const total = s.topReferrers.reduce((a, r) => a + r.count, 0);
+    expect(total).toBe(2);
+    expect(s.topReferrers.some((r) => r.label === '(unknown)')).toBe(true);
+  });
+
+  it('counts only pageviews, not clicks', () => {
+    const rows = [
+      row({ referrerHost: 'a.com' }),
+      row({ type: 'click', target: 'cta', referrerHost: 'a.com' }),
+    ];
+    expect(computeAnalyticsSummary(rows, NOW).topReferrers[0].count).toBe(1);
+  });
+});

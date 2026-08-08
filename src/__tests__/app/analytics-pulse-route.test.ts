@@ -16,6 +16,11 @@ interface Inserted {
   visitorId: string | null;
   isGuest: boolean;
   memberId: number | null;
+  referrerHost: string | null;
+  device: string | null;
+  country: string | null;
+  visitId: string | null;
+  viewer: string | null;
 }
 
 function installDb(): Inserted[] {
@@ -31,10 +36,15 @@ function installDb(): Inserted[] {
   return inserts;
 }
 
-function makeReq(body: unknown, guest = false): import('next/server').NextRequest {
+function makeReq(
+  body: unknown,
+  guest = false,
+  headers: Record<string, string> = {},
+): import('next/server').NextRequest {
   return {
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(JSON.stringify(body)),
+    headers: new Headers(headers),
     cookies: {
       get: (name: string) => (guest && name === GUEST_COOKIE ? { value: '1' } : undefined),
     },
@@ -86,5 +96,56 @@ describe('analytics beacon endpoint', () => {
     const res = await pulsePost(makeReq({ type: 'pageview', path: '/' }));
     expect(res.status).toBe(204);
     (console.error as jest.Mock).mockRestore();
+  });
+
+  it('persists the enrichment the client sends', async () => {
+    const inserts = installDb();
+    await pulsePost(
+      makeReq({
+        type: 'pageview',
+        path: '/about',
+        visitorId: 'v1',
+        referrer: 'google.com',
+        device: 'mobile',
+        visitId: 'visit-1',
+      }),
+    );
+    expect(inserts[0].referrerHost).toBe('google.com');
+    expect(inserts[0].device).toBe('mobile');
+    expect(inserts[0].visitId).toBe('visit-1');
+  });
+
+  it('attaches server-side country and viewer kind, never the IP', async () => {
+    const inserts = installDb();
+    await pulsePost(
+      makeReq({ type: 'pageview', path: '/' }, false, {
+        'x-vercel-ip-country': 'GB',
+        cookie: '__session=abc.def',
+        'x-forwarded-for': '203.0.113.9',
+      }),
+    );
+    expect(inserts[0].country).toBe('GB');
+    expect(inserts[0].viewer).toBe('member');
+    // The address is available on the request and deliberately not stored.
+    expect(JSON.stringify(inserts[0])).not.toContain('203.0.113.9');
+  });
+
+  it('marks an unauthenticated guest as guest, and no cookies as anonymous', async () => {
+    let inserts = installDb();
+    await pulsePost(makeReq({ type: 'pageview', path: '/' }, true));
+    expect(inserts[0].viewer).toBe('guest');
+
+    inserts = installDb();
+    await pulsePost(makeReq({ type: 'pageview', path: '/' }));
+    expect(inserts[0].viewer).toBe('anonymous');
+  });
+
+  it('rejects an out-of-range device value rather than storing it', async () => {
+    const inserts = installDb();
+    // Schema-invalid payloads are dropped whole (204, no row) — the beacon
+    // never partially records a malformed event.
+    const res = await pulsePost(makeReq({ type: 'pageview', device: 'fridge' }));
+    expect(res.status).toBe(204);
+    expect(inserts).toHaveLength(0);
   });
 });

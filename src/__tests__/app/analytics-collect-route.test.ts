@@ -29,10 +29,15 @@ function installDb(): Inserted[] {
   return inserts;
 }
 
-function makeReq(body: unknown, guest = false): import('next/server').NextRequest {
+function makeReq(
+  body: unknown,
+  guest = false,
+  headers: Record<string, string> = {},
+): import('next/server').NextRequest {
   return {
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(JSON.stringify(body)),
+    headers: new Headers(headers),
     cookies: {
       get: (name: string) => (guest && name === GUEST_COOKIE ? { value: '1' } : undefined),
     },

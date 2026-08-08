@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { GUEST_COOKIE } from '@/lib/guest';
 import { db } from '@/lib/db';
 import { recordAnalyticsEvent } from '@/lib/analytics/events';
+import { countryFromHeaders } from '@/lib/analytics/context';
 
 /**
  * "Enter as Guest" — sets the guest cookie and bounces to the calendar.
@@ -23,7 +24,11 @@ export async function GET(request: Request) {
   // serverless function terminates right after the redirect; guarded so a
   // tracking failure can never block entering the calendar.
   try {
-    await recordAnalyticsEvent(db, { type: 'guest_enter', path: '/guest' }, { isGuest: true });
+    await recordAnalyticsEvent(
+      db,
+      { type: 'guest_enter', path: '/guest' },
+      { isGuest: true, viewer: 'guest', country: countryFromHeaders(request.headers) },
+    );
   } catch (err) {
     console.error('[GET /guest] analytics record failed:', err);
   }

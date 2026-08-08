@@ -18,6 +18,16 @@ interface WindowStats {
   guestEntries: number;
   clicks: number;
   guestPageviews: number;
+  visits: number;
+  pagesPerVisit: number;
+  bounceRate: number;
+  newVisitors: number;
+  returningVisitors: number;
+}
+
+interface Breakdown {
+  label: string;
+  count: number;
 }
 
 interface AnalyticsHealth {
@@ -35,6 +45,10 @@ interface AnalyticsData {
   topPaths: { path: string; views: number }[];
   topClicks: { target: string; clicks: number }[];
   dailyPageviews: { date: string; views: number; guestViews: number }[];
+  topReferrers?: Breakdown[];
+  topCountries?: Breakdown[];
+  devices?: Breakdown[];
+  viewers?: Breakdown[];
 }
 
 /**
@@ -214,9 +228,16 @@ export function AnalyticsPanel() {
   }
 
   const { data } = state;
-  const stats =
+  // All-time totals come from cheap COUNTs, which can't produce visit-shaped
+  // metrics — those tiles are hidden for this window rather than shown as 0.
+  const stats: WindowStats =
     win === 'all'
-      ? { ...data.allTime, guestPageviews: 0 }
+      ? {
+          ...data.allTime,
+          guestPageviews: 0,
+          visits: 0, pagesPerVisit: 0, bounceRate: 0,
+          newVisitors: 0, returningVisitors: 0,
+        }
       : data.windows[win];
   const guestSub = win === 'all' ? undefined : `${stats.guestPageviews.toLocaleString()} guest views`;
   const health = data.health;
@@ -313,6 +334,22 @@ export function AnalyticsPanel() {
         <StatTile label="CTA clicks" value={stats.clicks} />
       </div>
 
+      {/* Visit-shaped metrics — "how many people and how deep did they go",
+          which raw hit counts can't answer. Hidden for the all-time window,
+          where only cheap COUNTs are available. */}
+      {win !== 'all' && 'visits' in stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatTile
+            label="Visits"
+            value={stats.visits}
+            sub={stats.visits > 0 ? `${stats.pagesPerVisit} pages each` : undefined}
+          />
+          <StatTile label="Bounce rate" value={stats.bounceRate} sub="% seeing one page" />
+          <StatTile label="New visitors" value={stats.newVisitors} />
+          <StatTile label="Returning" value={stats.returningVisitors} />
+        </div>
+      )}
+
       {/* 30-day trend */}
       <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
         <h3 className="text-sm font-medium text-grove-text mb-3">Pageviews — last 30 days</h3>
@@ -333,10 +370,45 @@ export function AnalyticsPanel() {
         />
       </div>
 
-      <p className="text-[11px] text-grove-text-dim text-center">
-        First-party, cookieless traffic analytics · generated {new Date(data.generatedAt).toLocaleString()}
-        {health?.lastEventAt && ` · last event ${new Date(health.lastEventAt).toLocaleString()}`}
-      </p>
+      {/* Who and where from — the question that prompted analytics in the
+          first place. All four are 30-day windows regardless of the selector,
+          since these need volume to be meaningful. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <RankedList
+          title="Where visitors came from (30d)"
+          rows={(data.topReferrers ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          emptyLabel="No referrer data yet."
+        />
+        <RankedList
+          title="Countries (30d)"
+          rows={(data.topCountries ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          emptyLabel="No country data yet."
+        />
+        <RankedList
+          title="Devices (30d)"
+          rows={(data.devices ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          emptyLabel="No device data yet."
+        />
+        <RankedList
+          title="Member vs guest vs anonymous (30d)"
+          rows={(data.viewers ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          emptyLabel="No viewer data yet."
+        />
+      </div>
+
+      <div className="text-[11px] text-grove-text-dim text-center space-y-1">
+        <p>
+          First-party, self-hosted analytics · generated {new Date(data.generatedAt).toLocaleString()}
+          {health?.lastEventAt && ` · last event ${new Date(health.lastEventAt).toLocaleString()}`}
+        </p>
+        {/* State plainly what is and isn't kept — this is the answer to "what
+            are you collecting about me" without reading the source. */}
+        <p>
+          Stored: page path, referring site’s host, country, device size bucket, and an
+          anonymous per-browser id. Not stored: IP addresses, user-agent strings, full
+          referring URLs, or any tracking cookie.
+        </p>
+      </div>
     </div>
   );
 }

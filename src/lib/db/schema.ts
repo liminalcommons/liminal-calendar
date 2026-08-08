@@ -370,6 +370,15 @@ export const analyticsEvents = pgTable(
     visitorId: text('visitor_id'), // anonymous per-browser id (localStorage)
     isGuest: boolean('is_guest').notNull().default(false),
     memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+    // Enrichment (added 2026-08). All coarse and PII-free: host-only referrer,
+    // viewport-derived device bucket, platform-resolved country (never the IP),
+    // a per-tab visit id that turns pageviews into visits, and who the viewer
+    // was without a members lookup on the hot path.
+    referrerHost: text('referrer_host'),
+    device: text('device'), // 'mobile' | 'tablet' | 'desktop'
+    country: text('country'), // ISO-3166 alpha-2
+    visitId: text('visit_id'),
+    viewer: text('viewer'), // 'member' | 'guest' | 'anonymous'
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

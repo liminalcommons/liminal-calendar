@@ -31,6 +31,11 @@ export async function fetchRecentAnalyticsRows(
       visitorId: analyticsEvents.visitorId,
       isGuest: analyticsEvents.isGuest,
       createdAt: analyticsEvents.createdAt,
+      referrerHost: analyticsEvents.referrerHost,
+      device: analyticsEvents.device,
+      country: analyticsEvents.country,
+      visitId: analyticsEvents.visitId,
+      viewer: analyticsEvents.viewer,
     })
     .from(analyticsEvents)
     .where(gte(analyticsEvents.createdAt, since))
@@ -44,6 +49,11 @@ export async function fetchRecentAnalyticsRows(
     visitorId: (r.visitorId as string | null) ?? null,
     isGuest: Boolean(r.isGuest),
     createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    referrerHost: (r.referrerHost as string | null) ?? null,
+    device: (r.device as string | null) ?? null,
+    country: (r.country as string | null) ?? null,
+    visitId: (r.visitId as string | null) ?? null,
+    viewer: (r.viewer as string | null) ?? null,
   }));
 }
 

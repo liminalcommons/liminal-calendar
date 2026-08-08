@@ -433,6 +433,14 @@ async function runMigrationsInner(sql: any): Promise<MigrationResult> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  // Enrichment columns — added after the table shipped, so ALTERs rather than
+  // a wider CREATE. Idempotent like everything else here.
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS referrer_host TEXT`;
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS device TEXT`;
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS country TEXT`;
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS visit_id TEXT`;
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS viewer TEXT`;
+  await step`CREATE INDEX IF NOT EXISTS analytics_events_visit_idx ON analytics_events(visit_id)`;
   await step`CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events(type, created_at)`;
   await step`CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)`;
 
