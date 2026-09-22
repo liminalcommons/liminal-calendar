@@ -11,10 +11,16 @@ import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { visibleEventsForMemberCondition, publicOnlyEventsCondition, eventsStartingOnOrAfter } from '@/lib/events/visibility';
 import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
 import { fanoutInvitationReceived } from '@/lib/notifications/fanout';
+import { judgeEvent, moderationAction } from '@/lib/moderation/jev';
 
 export async function GET(request: NextRequest) {
   try {
-    const url = new URL(request.url);
+    let url: URL;
+    try {
+      url = new URL(request.url);
+    } catch {
+      return NextResponse.json({ error: 'Malformed request URL' }, { status: 400 });
+    }
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
@@ -183,6 +189,26 @@ export async function POST(request: NextRequest) {
       } catch (fanoutErr) {
         console.error('[POST /api/events] invitation fanout failed', fanoutErr);
       }
+    }
+
+    // Advisory moderation (Jev): best-effort verdict for the log. Changes
+    // nothing about the created event — the human review loop owns actions
+    // until thresholds are validated against production data.
+    try {
+      const judged = await judgeEvent({
+        title: created.title,
+        description: created.description,
+        visibility: created.visibility,
+        creatorName: created.creatorName,
+      });
+      if (judged) {
+        console.log(
+          `[moderation] event ${created.id} verdict=${judged.verdict.verdict} ` +
+            `conf=${judged.verdict.confidence.toFixed(2)} action=${moderationAction(judged.verdict, judged.probs)}`,
+        );
+      }
+    } catch {
+      // Advisory only — never fail creation.
     }
 
     // Invalidate Full Route Cache for views that list events so the freshly

@@ -62,6 +62,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   logger: {
     error(error: Error & { cause?: unknown; type?: string; kind?: string }) {
+      // Routine session noise (expired/stale/malformed cookies) is operational,
+      // not actionable — log at warn so real auth failures stay visible.
+      const msg = `${error?.name ?? ''} ${error?.message ?? ''} ${error?.type ?? ''}`;
+      if (/JWTSessionError|JWT_SESSION_ERROR|OAuthAccountNotLinked/i.test(msg)) {
+        console.warn('[auth][session-noise]', error?.name ?? 'AuthError');
+        return;
+      }
       const safeStringify = (obj: unknown): string => {
         const seen = new WeakSet();
         return JSON.stringify(
