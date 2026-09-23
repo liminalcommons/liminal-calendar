@@ -61,7 +61,7 @@ button,input{font:inherit;color:inherit}
 
 /* ---------- demo controls (outside the book) ---------- */
 .demo{
-  max-width:880px;margin:0 auto 22px;display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;
+  max-width:880px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;
   font:13px/1.3 var(--mono);color:var(--ink-soft);
 }
 .demo b{font-weight:500;color:var(--ink);letter-spacing:.08em;text-transform:uppercase;font-size:11px}
@@ -72,6 +72,20 @@ button,input{font:inherit;color:inherit}
 .demo input:checked+span{color:var(--page)}
 .demo label:has(input:checked){background:var(--ink);border-color:var(--ink);color:var(--page)}
 .demo label:has(input:focus-visible){outline:2px solid var(--copper);outline-offset:2px}
+
+.demo-wrap{max-width:880px;margin:0 auto 18px}
+.demo-wrap summary{cursor:pointer;font:12px/1.4 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);padding:6px 0;list-style-position:inside}
+.demo-wrap summary span{text-transform:none;letter-spacing:0;color:var(--ink-soft);margin-left:6px}
+.demo-wrap .demo{margin-top:8px}
+h2 small{font:13px/1 var(--mono);font-style:normal;color:var(--ink-soft);margin-left:8px;letter-spacing:0}
+.legend{display:none;margin:0 0 18px;border:1px solid var(--rule);padding:8px 12px;font-size:14.5px}
+.legend summary{cursor:pointer;font:italic 15px var(--display);color:var(--copper)}
+.legend ul{margin:8px 0 2px;padding-left:18px;display:grid;gap:6px;color:var(--ink-soft)}
+.legend b{color:var(--ink);font-weight:500}
+.rsvpbar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--page);border-top:1px solid var(--rule);
+  box-shadow:0 -10px 24px -12px rgba(0,0,0,.35);font:italic 16px var(--display)}
+.rsvpbar[hidden]{display:none!important}
 
 /* ---------- the leaf ---------- */
 .leaf{
@@ -234,7 +248,26 @@ h1 .inked::after{content:"";}
 
 .caption{max-width:880px;margin:22px auto 0;font:italic 14px/1.5 var(--display);color:var(--ink-soft);text-align:center}
 
+@media (max-width:859px){
+  .explain{display:none}
+  .legend{display:block}
+  .row + .row{margin-top:0}
+  .section{margin-top:26px}
+}
 @media (max-width:600px){
+  body{padding-bottom:96px}
+  .plate{margin:22px 0 6px;gap:14px}
+  .day{font-size:76px}
+  .moon svg{width:40px;height:40px}
+  .season{display:none}
+  .weekday{font-size:20px}
+  .titlewrap{margin-top:12px}
+  h1{font-size:36px}
+  .particulars{grid-template-columns:max-content minmax(0,1fr)!important;gap:8px 14px!important}
+  .particulars dt{margin-top:0!important;font-size:11px;letter-spacing:.08em;padding-top:3px}
+  .particulars dd{font-size:15.5px;line-height:1.5}
+  .mono{font-size:13px}
+  .pressed{bottom:auto;top:150px;width:80px}
   .plate{flex-wrap:wrap}
   .moon{margin-left:0;grid-auto-flow:column;align-items:center}
   .head{margin-right:44px;font-size:11px}
@@ -255,22 +288,24 @@ h1 .inked::after{content:"";}
   </filter>
 </svg>
 
+<details class="demo-wrap" id="demowrap">
+<summary>Demo controls <span>try the states this page can be in</span></summary>
 <form class="demo" id="demo" aria-label="Demo controls">
-  <b>Demo</b>
   <fieldset>
     <legend>Lifecycle</legend>
-    <label><input type="radio" name="life" id="life-auto" value="auto" checked><span>as of today</span></label>
-    <label><input type="radio" name="life" id="life-proposed" value="proposed"><span>pencilled</span></label>
-    <label><input type="radio" name="life" id="life-confirmed" value="confirmed"><span>inked</span></label>
-    <label><input type="radio" name="life" id="life-past" value="past"><span>pressed</span></label>
+    <label><input type="radio" name="life" id="life-auto" value="auto" checked><span>auto (by date)</span></label>
+    <label><input type="radio" name="life" id="life-proposed" value="proposed"><span>proposed</span></label>
+    <label><input type="radio" name="life" id="life-confirmed" value="confirmed"><span>confirmed</span></label>
+    <label><input type="radio" name="life" id="life-past" value="past"><span>past</span></label>
   </fieldset>
   <fieldset>
     <legend>Visibility</legend>
-    <label><input type="radio" name="vis" id="vis-public" value="public" checked><span>open page</span></label>
-    <label><input type="radio" name="vis" id="vis-members" value="members"><span>sealed</span></label>
-    <label><input type="radio" name="vis" id="vis-invite" value="invite"><span>addressed</span></label>
+    <label><input type="radio" name="vis" id="vis-public" value="public" checked><span>public</span></label>
+    <label><input type="radio" name="vis" id="vis-members" value="members"><span>members</span></label>
+    <label><input type="radio" name="vis" id="vis-invite" value="invite"><span>invite-only</span></label>
   </fieldset>
 </form>
+</details>
 
 <div id="book" data-life="confirmed" data-vis="public">
 <article class="leaf" aria-labelledby="title">
@@ -315,8 +350,18 @@ h1 .inked::after{content:"";}
         <span class="stamp" id="stamp"><svg viewBox="0 0 20 20" id="stamp-icon" aria-hidden="true"></svg><span id="stamp-text">inked</span></span>
       </div>
       <p class="life-note" id="life-note">Inked. It's within fourteen days, so it's happening.</p>
+      <details class="legend">
+        <summary>How to read this page</summary>
+        <ul>
+          <li><b>Pencil → ink → sepia:</b> proposed (more than 14 days out), confirmed (within 14 days), past.</li>
+          <li><b>Red ribbon:</b> a repeating event. The next dates are under <i>Repeats</i>.</li>
+          <li><b>Wax seal:</b> members-only.</li>
+          <li><b>Signing the register</b> is your RSVP.</li>
+          <li><b>Lamplit hours:</b> when Europe, Brazil and the Americas are all awake.</li>
+        </ul>
+      </details>
     </div>
-    <aside class="gloss" aria-label="Gloss">
+    <aside class="gloss explain" aria-label="Gloss">
       <p style="margin:34px 0 0">Entries go in pencil while they're more than a fortnight away. At fourteen days they're inked. Once they've passed, they fade to sepia and a leaf gets pressed between the pages.</p>
     </aside>
   </div>
@@ -329,30 +374,16 @@ h1 .inked::after{content:"";}
       <dd>The Hearth · the small fire at the edge of the clearing</dd>
       <dt>Kind</dt>
       <dd><i>ritual</i>, social · two hours</dd>
-      <dt>Hosted by</dt>
+      <dt>Host</dt>
       <dd>Victor, who chose the date and unlocked the door</dd>
-      <dt>Keeps its place</dt>
-      <dd><span style="display:block;font-style:italic;margin-bottom:2px">monthly. The ribbon marks its next pages:</span><span class="ribbon-dates" id="ribbon-dates"></span></dd>
-      <dt>Read by</dt>
+      <dt>Repeats</dt>
+      <dd><span style="display:block;margin-bottom:2px">Monthly. Next:</span><span class="ribbon-dates" id="ribbon-dates"></span></dd>
+      <dt>Who can see</dt>
       <dd id="vis-line">anyone. This is an open page.</dd>
     </dl>
-    <aside class="gloss">
+    <aside class="gloss explain">
       <p style="margin:16px 0 0">Times are shown in your own hour. The stored time is <span class="mono" style="font-style:normal;font-size:12.5px">19:00 UTC</span>, and your almanac does the arithmetic.</p>
-      <p class="addressed" style="margin:14px 0 0">Addressed to: Ana, Bruno, Kaito, Maëlle, Victor, and the four who carried wood last month.</p>
     </aside>
-  </div>
-
-  <div class="row golden">
-    <div>
-      <h2>The lamplit hours</h2>
-      <div class="strip" id="strip" role="img" aria-label="A 24-hour strip in UTC. The lamplit band, when Europe, Brazil and the Americas are all awake, runs from 15:00 to 21:00. The fire is lit at 19:00, inside the band.">
-        <div class="band" style="left:calc(100%/24*15);width:calc(100%/24*6)"></div>
-        <div class="mark" style="left:calc(100%/24*19)"></div>
-      </div>
-      <div class="axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24 UTC</span></div>
-      <div class="cities" id="cities"></div>
-    </div>
-    <aside class="gloss"><p style="margin:38px 0 0">The lamp is lit while Lisbon, São Paulo, New York and San Francisco are all awake. If you set a gathering outside it, you're writing in the dark: that's allowed, it's just quieter.</p></aside>
   </div>
 
   <div class="row section prose">
@@ -360,12 +391,12 @@ h1 .inked::after{content:"";}
       <p>Once a month, when the moon is full, someone lights the small fire at the Hearth and we sit around it for two hours. Bring something to burn: a note, a worry, a draft of something you've been meaning to finish. Nothing is recorded. The only rule is that you stay until the fire goes down.</p>
       <p>Latecomers are welcome, and so is leaving quietly. If you have wood, bring wood. If you have a song, it will be asked for.</p>
     </div>
-    <aside class="gloss"><p style="margin:0">A <i>ritual</i> is an event that keeps its place on the calendar because people keep coming, not because someone schedules it.</p></aside>
+    <aside class="gloss explain"><p style="margin:0">A <i>ritual</i> is an event that keeps its place on the calendar because people keep coming, not because someone schedules it.</p></aside>
   </div>
 
   <div class="row section">
     <div>
-      <h2>The register</h2>
+      <h2>The register <small>RSVP by signing</small></h2>
       <ol class="register" id="register"></ol>
       <p class="count" id="count"></p>
       <form class="sign" id="signform">
@@ -385,6 +416,19 @@ h1 .inked::after{content:"";}
     </aside>
   </div>
 
+  <div class="row golden">
+    <div>
+      <h2>Time zones <small>inside the lamplit hours</small></h2>
+      <div class="strip" id="strip" role="img" aria-label="A 24-hour strip in UTC. The lamplit band, when Europe, Brazil and the Americas are all awake, runs from 15:00 to 21:00. The fire is lit at 19:00, inside the band.">
+        <div class="band" style="left:calc(100%/24*15);width:calc(100%/24*6)"></div>
+        <div class="mark" style="left:calc(100%/24*19)"></div>
+      </div>
+      <div class="axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24 UTC</span></div>
+      <div class="cities" id="cities"></div>
+    </div>
+    <aside class="gloss explain"><p style="margin:38px 0 0">The lamp is lit while Lisbon, São Paulo, New York and San Francisco are all awake. If you set a gathering outside it, you're writing in the dark: that's allowed, it's just quieter.</p></aside>
+  </div>
+
   <footer class="foot">
     <div class="actions">
       <button class="btn" type="button" id="ics">Copy into your almanac</button>
@@ -397,6 +441,11 @@ h1 .inked::after{content:"";}
 </div>
 
 <p class="caption">A design study for the Liminal Calendar event page, recast as a leaf from a shared almanac. Everything on it maps to an existing feature: lifecycle, RSVP, recurrence, visibility, timezones, comments, .ics export, embed, and the per-event bell.</p>
+
+<div class="rsvpbar" id="rsvpbar" hidden>
+  <span id="barcount">4 going</span>
+  <button class="btn primary" type="button" id="barsign">Sign the register</button>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -465,7 +514,7 @@ h1 .inked::after{content:"";}
     confirmed: `Inked. It's within fourteen days, so it's happening${daysOut >= 0 && daysOut <= 14 ? ' in ' + (n === 0 ? 'less than a day' : n + (n === 1 ? ' day' : ' days')) : ''}.`,
     past: `Pressed. The fire has burned down${daysOut < 0 ? ', ' + n + (n === 1 ? ' day' : ' days') + ' ago' : ''}. The register now reads as a record of who came.`
   };
-  const LABEL = {proposed:'pencilled in', confirmed:'inked', past:'pressed'};
+  const LABEL = {proposed:'proposed · in pencil', confirmed:'confirmed · inked', past:'past · pressed'};
   function setLife(v){
     const life = v === 'auto' ? auto : v;
     book.dataset.life = life;
@@ -480,7 +529,7 @@ h1 .inked::after{content:"";}
   book.dataset.life = 'proposed';
 
   /* ---------- visibility ---------- */
-  const VIS = {public:'anyone. This is an open page.', members:'members of the commons. Sealed with wax.', invite:'those it is addressed to (see the margin).'};
+  const VIS = {public:'Public: anyone with the link.', members:'Members of the commons only (the wax seal).', invite:'Invite-only: Ana, Bruno, Kaito, Maëlle, Victor.'};
   function setVis(v){ book.dataset.vis = v; $('#vis-line').textContent = VIS[v]; }
   (function seal(){ // irregular wax blob
     let d = ''; const pts = 22;
@@ -506,10 +555,12 @@ h1 .inked::after{content:"";}
   }
   function renderCount(){
     const c = people.filter(p => !p.struck).length;
+    const bc = document.getElementById('barcount'); if (bc) bc.textContent = c + ' going';
+    if (window.__syncBar) window.__syncBar();
     const past = book.dataset.life === 'past';
     $('#count').innerHTML = past
       ? `<b>${c}</b> came to the fire.`
-      : `<b>${c}</b> have signed, the host included. Victor can plan the wood.`;
+      : `<b>${c}</b> going, host included. Victor can plan the wood.`;
   }
   const esc = s => s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   $('#signform').addEventListener('submit', e => {
@@ -564,6 +615,15 @@ h1 .inked::after{content:"";}
   });
 
   renderRegister(); renderNotes(); setVis('public');
+  try { if (matchMedia('(min-width:860px)').matches) $('#demowrap').open = true; } catch(e){}
+  const bar = $('#rsvpbar'), regSec = $('#register').closest('.section');
+  const mq = matchMedia('(max-width:859px)');
+  let regVisible = false;
+  function syncBar(){ bar.hidden = !mq.matches || regVisible || book.dataset.life === 'past' || !!mine; }
+  if ('IntersectionObserver' in window) new IntersectionObserver(es => { regVisible = es[0].isIntersecting; syncBar(); }).observe(regSec);
+  mq.addEventListener && mq.addEventListener('change', syncBar);
+  $('#barsign').addEventListener('click', () => { regSec.scrollIntoView({behavior:'smooth', block:'start'}); setTimeout(() => $('#signname').focus({preventScroll:true}), 450); });
+  window.__syncBar = syncBar; syncBar();
   $('#stamp-icon').innerHTML = ICONS.proposed; $('#stamp-text').textContent = LABEL.proposed;
   requestAnimationFrame(() => setTimeout(() => setLife('auto'), 700));
 })();
