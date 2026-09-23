@@ -1,0 +1,570 @@
+<title>The Liminal Almanac</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Homemade+Apple&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+/* ---------- tokens: daylight parchment (light) / lamplight (dark) ---------- */
+:root{
+  --ground:#e7dcc3;      /* the desk the almanac lies on */
+  --page:#f3ead6;        /* the leaf */
+  --page-edge:#d9c9a6;
+  --ink:#2b2117;         /* iron-gall ink */
+  --ink-soft:#5a4a39;
+  --copper:#94582a;      /* rubric / accent */
+  --moss:#4f6d36;        /* growing */
+  --sepia:#8d7556;       /* past */
+  --graphite:#77746d;    /* pencil */
+  --seal:#8a2c21;        /* wax */
+  --rule:rgba(43,33,23,.18);
+  --lamp:rgba(214,150,60,.22);
+  --shadow:0 1px 0 rgba(255,255,255,.5) inset, 0 2px 4px rgba(60,40,15,.10), 0 24px 48px -24px rgba(60,40,15,.35);
+  --grain-op:.35;
+  --display:"IM Fell English","Iowan Old Style",Palatino,Georgia,serif;
+  --display-sc:"IM Fell English SC","IM Fell English",Palatino,Georgia,serif;
+  --body:"Iowan Old Style","Palatino Linotype",Palatino,"EB Garamond",Georgia,serif;
+  --hand:"Homemade Apple","Segoe Script","Bradley Hand",cursive;
+  --mono:ui-monospace,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --ground:#110d09; --page:#1f1912; --page-edge:#3a2f22;
+    --ink:#ecdfc4; --ink-soft:#b8a687; --copper:#d39c5e; --moss:#93b36c;
+    --sepia:#9f8a6a; --graphite:#9b978e; --seal:#b3473a;
+    --rule:rgba(236,223,196,.14); --lamp:rgba(226,160,70,.20);
+    --shadow:0 0 0 1px rgba(236,223,196,.04) inset, 0 30px 60px -20px rgba(0,0,0,.7), 0 0 120px -30px rgba(211,156,94,.25);
+    --grain-op:.18;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ground:#110d09; --page:#1f1912; --page-edge:#3a2f22;
+  --ink:#ecdfc4; --ink-soft:#b8a687; --copper:#d39c5e; --moss:#93b36c;
+  --sepia:#9f8a6a; --graphite:#9b978e; --seal:#b3473a;
+  --rule:rgba(236,223,196,.14); --lamp:rgba(226,160,70,.20);
+  --shadow:0 0 0 1px rgba(236,223,196,.04) inset, 0 30px 60px -20px rgba(0,0,0,.7), 0 0 120px -30px rgba(211,156,94,.25);
+  --grain-op:.18;
+}
+
+/* ---------- base ---------- */
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font:17px/1.6 var(--body);
+  padding:28px 16px 64px;
+  -webkit-font-smoothing:antialiased;
+}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--copper);outline-offset:3px;border-radius:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- demo controls (outside the book) ---------- */
+.demo{
+  max-width:880px;margin:0 auto 22px;display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;
+  font:13px/1.3 var(--mono);color:var(--ink-soft);
+}
+.demo b{font-weight:500;color:var(--ink);letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+.demo fieldset{border:0;margin:0;padding:0;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.demo legend{float:left;margin-right:8px;letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+.demo label{cursor:pointer;padding:4px 9px;border:1px solid var(--rule);border-radius:999px}
+.demo input{position:absolute;opacity:0;pointer-events:none}
+.demo input:checked+span{color:var(--page)}
+.demo label:has(input:checked){background:var(--ink);border-color:var(--ink);color:var(--page)}
+.demo label:has(input:focus-visible){outline:2px solid var(--copper);outline-offset:2px}
+
+/* ---------- the leaf ---------- */
+.leaf{
+  position:relative;max-width:880px;margin:0 auto;
+  background:var(--page);
+  box-shadow:var(--shadow);
+  padding:34px clamp(20px,5vw,64px) 40px;
+  border-radius:2px 3px 3px 2px;
+  isolation:isolate;
+}
+.leaf::before{ /* paper grain */
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:var(--grain-op);mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .16 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.leaf::after{ /* double frame rule, like a printed plate */
+  content:"";position:absolute;inset:12px;border:1px solid var(--rule);outline:1px solid var(--rule);outline-offset:3px;pointer-events:none;z-index:-1;
+}
+
+/* ribbon bookmark = recurrence */
+.ribbon{
+  position:absolute;top:-6px;right:clamp(28px,7vw,84px);width:24px;height:88px;
+  background:linear-gradient(90deg,rgba(0,0,0,.18),transparent 30%,transparent 70%,rgba(0,0,0,.18)),var(--seal);
+  clip-path:polygon(0 0,100% 0,100% 100%,50% 86%,0 100%);
+  box-shadow:0 2px 3px rgba(0,0,0,.25);
+  transform-origin:top center;animation:sway 7s ease-in-out infinite;
+}
+@keyframes sway{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1.2deg)}}
+
+/* running head */
+.head{
+  display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  font:13px/1.2 var(--display-sc);letter-spacing:.12em;color:var(--ink-soft);
+  border-bottom:1px solid var(--rule);padding-bottom:10px;margin-right:clamp(40px,8vw,90px);
+}
+.head .tonight{display:flex;align-items:center;gap:8px;font-family:var(--display);font-style:italic;letter-spacing:0;font-size:14px}
+.head svg{width:16px;height:16px}
+
+/* two-column body: text + margin */
+.row{display:grid;grid-template-columns:minmax(0,1fr);gap:6px 44px}
+@media (min-width:860px){.row{grid-template-columns:minmax(0,1fr) 190px}}
+.gloss{
+  font:italic 13.5px/1.5 var(--display);color:var(--ink-soft);
+}
+@media (max-width:859px){.gloss{padding-left:14px;border-left:1px solid var(--rule)}}
+
+/* date plate */
+.plate{display:flex;align-items:center;gap:clamp(16px,4vw,34px);margin:30px 0 10px}
+.day{font:clamp(84px,15vw,132px)/.8 var(--display);color:var(--copper);font-variant-numeric:oldstyle-nums;letter-spacing:-.02em}
+.plate .when{display:grid;gap:2px}
+.weekday{font:italic 22px/1.2 var(--display)}
+.month{font:15px/1.2 var(--display-sc);letter-spacing:.2em;color:var(--ink-soft)}
+.season{font:italic 14.5px/1.4 var(--display);color:var(--ink-soft);margin-top:6px;max-width:34ch}
+.moon{margin-left:auto;display:grid;justify-items:center;gap:4px;font:italic 13px/1.2 var(--display);color:var(--ink-soft);text-align:center}
+.moon svg{width:64px;height:64px}
+
+/* title in pencil / ink / sepia */
+.titlewrap{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 22px;margin:18px 0 6px}
+h1{margin:0;font:400 clamp(38px,7vw,60px)/1.02 var(--display);text-wrap:balance;display:grid}
+h1>span{grid-area:1/1}
+h1 .pencil{color:var(--graphite);filter:url(#pencil);opacity:.9;font-style:italic}
+h1 .inked{color:var(--ink);clip-path:inset(0 100% 0 0);transition:clip-path 1.6s cubic-bezier(.6,.05,.3,1),color .8s}
+h1 .inked::after{content:"";}
+[data-life="confirmed"] h1 .inked,[data-life="past"] h1 .inked{clip-path:inset(0 0 0 0)}
+[data-life="past"] h1 .inked{color:var(--sepia)}
+[data-life="confirmed"] h1 .pencil,[data-life="past"] h1 .pencil{opacity:0;transition:opacity 1.2s .9s}
+
+.stamp{display:inline-flex;align-items:center;gap:8px;font:italic 14px/1.2 var(--display);padding:4px 12px 4px 8px;border:1px solid currentColor;border-radius:999px;white-space:nowrap}
+.stamp svg{width:18px;height:18px}
+[data-life="proposed"] .stamp{color:var(--graphite);border-style:dashed}
+[data-life="confirmed"] .stamp{color:var(--moss)}
+[data-life="past"] .stamp{color:var(--sepia)}
+.life-note{font:italic 14px/1.4 var(--display);color:var(--ink-soft);margin:0 0 22px}
+
+/* past: the whole leaf browns a little */
+.leaf{transition:filter 1.2s}
+[data-life="past"] .leaf{filter:sepia(.35) saturate(.8)}
+.pressed{position:absolute;right:clamp(18px,6vw,70px);bottom:120px;width:110px;opacity:0;transform:rotate(-18deg) scale(.9);transition:opacity 1s,transform 1s;pointer-events:none}
+[data-life="past"] .pressed{opacity:.55;transform:rotate(-12deg) scale(1)}
+
+/* particulars */
+.particulars{margin:0;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 22px;padding:16px 0;border-block:1px solid var(--rule)}
+.particulars dt{font:13px/1.6 var(--display-sc);letter-spacing:.12em;color:var(--ink-soft)}
+.particulars dd{margin:0}
+.mono{font:14.5px/1.6 var(--mono);font-variant-numeric:tabular-nums}
+[data-life="proposed"] .particulars dd{color:var(--graphite)}
+.ribbon-dates{display:flex;flex-wrap:wrap;gap:4px 14px}
+.ribbon-dates span::before{content:"❧ ";color:var(--seal)}
+
+/* golden hours strip */
+.golden{margin:22px 0 4px}
+.golden h2,.section h2{font:400 22px/1.2 var(--display);font-style:italic;margin:0 0 10px}
+.strip{position:relative;height:34px;border:1px solid var(--rule);background:
+  repeating-linear-gradient(90deg,transparent 0 calc(100%/24 - 1px),var(--rule) calc(100%/24 - 1px) calc(100%/24))}
+.strip .band{position:absolute;top:0;bottom:0;background:linear-gradient(180deg,var(--lamp),transparent 120%);box-shadow:0 0 22px 4px var(--lamp)}
+.strip .mark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--copper);transform:translateX(-1px)}
+.strip .mark::after{content:"";position:absolute;top:-5px;left:-4px;width:10px;height:10px;border-radius:50%;background:var(--copper)}
+.axis{display:flex;justify-content:space-between;font:11px/1.8 var(--mono);color:var(--ink-soft)}
+.cities{display:flex;flex-wrap:wrap;gap:4px 20px;margin-top:8px;font:13.5px/1.6 var(--mono);color:var(--ink-soft)}
+.cities b{font-weight:500;color:var(--ink)}
+.cities .you b{color:var(--copper)}
+
+/* prose */
+.prose p{margin:0 0 14px;max-width:62ch}
+.prose > div > p:first-of-type::first-letter{float:left;font:400 58px/.82 var(--display);color:var(--copper);padding:6px 8px 0 0}
+.section{margin-top:30px}
+
+/* visibility seal */
+.seal{position:absolute;left:clamp(8px,3vw,36px);top:210px;width:74px;height:74px;opacity:0;transform:scale(1.4) rotate(-10deg);transition:opacity .5s,transform .5s cubic-bezier(.3,1.6,.5,1);pointer-events:none}
+[data-vis="members"] .seal,[data-vis="invite"] .seal{opacity:1;transform:scale(1) rotate(-10deg)}
+@media (max-width:859px){.seal{top:auto;bottom:-22px;left:auto;right:18px}}
+.addressed{display:none}
+[data-vis="invite"] .addressed{display:block}
+
+/* register (RSVP) */
+.register{list-style:none;margin:0;padding:0;counter-reset:sig}
+.register li{
+  counter-increment:sig;display:grid;grid-template-columns:2.2em minmax(0,1fr) auto;align-items:end;gap:10px;
+  min-height:46px;border-bottom:1px solid var(--rule);padding:4px 0 2px;
+}
+.register li::before{content:counter(sig,lower-roman)".";font:italic 14px/1 var(--display);color:var(--ink-soft);padding-bottom:8px}
+.sig{font:19px/1.6 var(--hand);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:6px}
+.sig.writing{animation:write 1.3s steps(22,end) both}
+@keyframes write{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.role{font:italic 13px/1 var(--display);color:var(--ink-soft);padding-bottom:9px}
+.register li.struck .sig{text-decoration:line-through;text-decoration-color:var(--copper);text-decoration-thickness:1.5px;opacity:.55}
+[data-life="past"] .sig{color:var(--sepia)}
+.count{font:italic 15px/1.4 var(--display);color:var(--ink-soft);margin:10px 0 0}
+.count b{font:500 15px var(--mono);color:var(--ink);font-style:normal}
+
+.sign{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px}
+.sign input{flex:1 1 200px;min-width:0;background:transparent;border:0;border-bottom:1px dashed var(--ink-soft);padding:6px 2px;font:18px var(--hand)}
+.sign input::placeholder{font:italic 15px var(--display);color:var(--ink-soft);opacity:.8}
+.btn{cursor:pointer;background:transparent;border:1px solid var(--ink);color:var(--ink);padding:8px 16px;border-radius:2px;font:15px/1 var(--display-sc);letter-spacing:.1em;transition:background .2s,color .2s}
+.btn:hover{background:var(--ink);color:var(--page)}
+.btn.primary{background:var(--copper);border-color:var(--copper);color:var(--page)}
+.btn.primary:hover{filter:brightness(1.08);background:var(--copper)}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+.linkish{cursor:pointer;background:none;border:0;padding:0;color:var(--copper);font:italic 14px var(--display);text-decoration:underline;text-underline-offset:3px}
+
+/* margin notes (comments) */
+.notes{display:grid;gap:14px;align-content:start}
+.note{font:italic 13.5px/1.5 var(--display);color:var(--ink-soft);position:relative;padding-left:14px}
+.note::before{content:"";position:absolute;left:0;top:.55em;width:7px;height:7px;border-radius:50%;background:var(--copper);opacity:.5}
+.note cite{display:block;font:13px/1.4 var(--hand);color:var(--ink);font-style:normal;margin-top:2px}
+.note.fresh{animation:bleed 1.2s ease-out}
+@keyframes bleed{from{opacity:0;filter:blur(3px)}to{opacity:1;filter:none}}
+.addnote{display:flex;gap:6px;border-bottom:1px dashed var(--ink-soft)}
+.addnote input{flex:1;min-width:0;background:transparent;border:0;padding:6px 0;font:italic 13.5px var(--display)}
+.addnote button{background:none;border:0;color:var(--copper);cursor:pointer;font:italic 13.5px var(--display)}
+
+/* colophon / actions */
+.foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;justify-content:space-between}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.folio{font:italic 14px var(--display);color:var(--ink-soft)}
+.bell[aria-pressed="true"]{color:var(--ink-soft);border-style:dashed}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;
+  background:var(--ink);color:var(--page);padding:10px 16px;font:italic 15px var(--display);border-radius:2px;transition:opacity .3s,transform .3s;max-width:calc(100% - 32px);pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+.caption{max-width:880px;margin:22px auto 0;font:italic 14px/1.5 var(--display);color:var(--ink-soft);text-align:center}
+
+@media (max-width:600px){
+  .plate{flex-wrap:wrap}
+  .moon{margin-left:0;grid-auto-flow:column;align-items:center}
+  .head{margin-right:44px;font-size:11px}
+  .particulars{grid-template-columns:minmax(0,1fr);gap:0 0}
+  .particulars dt{margin-top:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="pencil" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="4" result="t"/>
+    <feDisplacementMap in="SourceGraphic" in2="t" scale="1.6" result="d"/>
+    <feComponentTransfer in="t" result="grain"><feFuncA type="discrete" tableValues="0 .35 .8 1 1"/></feComponentTransfer>
+    <feComposite in="d" in2="grain" operator="in"/>
+  </filter>
+</svg>
+
+<form class="demo" id="demo" aria-label="Demo controls">
+  <b>Demo</b>
+  <fieldset>
+    <legend>Lifecycle</legend>
+    <label><input type="radio" name="life" id="life-auto" value="auto" checked><span>as of today</span></label>
+    <label><input type="radio" name="life" id="life-proposed" value="proposed"><span>pencilled</span></label>
+    <label><input type="radio" name="life" id="life-confirmed" value="confirmed"><span>inked</span></label>
+    <label><input type="radio" name="life" id="life-past" value="past"><span>pressed</span></label>
+  </fieldset>
+  <fieldset>
+    <legend>Visibility</legend>
+    <label><input type="radio" name="vis" id="vis-public" value="public" checked><span>open page</span></label>
+    <label><input type="radio" name="vis" id="vis-members" value="members"><span>sealed</span></label>
+    <label><input type="radio" name="vis" id="vis-invite" value="invite"><span>addressed</span></label>
+  </fieldset>
+</form>
+
+<div id="book" data-life="confirmed" data-vis="public">
+<article class="leaf" aria-labelledby="title">
+  <div class="ribbon" aria-hidden="true"></div>
+
+  <svg class="seal" viewBox="0 0 100 100" aria-hidden="true">
+    <path id="sealpath" fill="var(--seal)"/>
+    <circle cx="50" cy="50" r="30" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="2"/>
+    <circle cx="50" cy="50" r="26" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+    <text x="50" y="59" text-anchor="middle" font-family="IM Fell English, serif" font-size="26" fill="rgba(0,0,0,.35)">LC</text>
+    <text x="49" y="58" text-anchor="middle" font-family="IM Fell English, serif" font-size="26" fill="rgba(255,235,210,.35)">LC</text>
+  </svg>
+
+  <svg class="pressed" viewBox="0 0 120 160" aria-hidden="true">
+    <path d="M60 150 C58 110 60 70 62 20" stroke="var(--sepia)" stroke-width="2" fill="none"/>
+    <path d="M62 22 C20 40 14 90 58 132 C100 92 104 42 62 22Z" fill="var(--sepia)" opacity=".45"/>
+    <path d="M60 60 L38 48 M60 80 L32 70 M60 100 L38 94 M61 60 L84 46 M61 80 L90 68 M60 100 L84 92" stroke="var(--sepia)" stroke-width="1.2" fill="none"/>
+  </svg>
+
+  <header class="head">
+    <span>The Liminal Almanac · <span id="season-head">Autumn</span> <span id="year-head">2026</span></span>
+    <span class="tonight"><svg id="moon-tonight" viewBox="0 0 20 20" aria-hidden="true"></svg><span id="tonight-label">tonight</span></span>
+  </header>
+
+  <div class="row">
+    <div>
+      <div class="plate">
+        <div class="day" id="day">26</div>
+        <div class="when">
+          <div class="weekday" id="weekday">Saturday</div>
+          <div class="month" id="month">September</div>
+          <div class="season" id="season-line">Three days past the equinox. The nights are now longer than the days.</div>
+        </div>
+        <div class="moon" aria-label="Moon on the night of the event">
+          <svg id="moon-event" viewBox="0 0 64 64" aria-hidden="true"></svg>
+          <span id="moon-event-label">full moon</span>
+        </div>
+      </div>
+
+      <div class="titlewrap">
+        <h1 id="title"><span class="pencil" aria-hidden="true">The Full-Moon Fire</span><span class="inked">The Full-Moon Fire</span></h1>
+        <span class="stamp" id="stamp"><svg viewBox="0 0 20 20" id="stamp-icon" aria-hidden="true"></svg><span id="stamp-text">inked</span></span>
+      </div>
+      <p class="life-note" id="life-note">Inked. It's within fourteen days, so it's happening.</p>
+    </div>
+    <aside class="gloss" aria-label="Gloss">
+      <p style="margin:34px 0 0">Entries go in pencil while they're more than a fortnight away. At fourteen days they're inked. Once they've passed, they fade to sepia and a leaf gets pressed between the pages.</p>
+    </aside>
+  </div>
+
+  <div class="row">
+    <dl class="particulars">
+      <dt>When</dt>
+      <dd class="mono" id="when-local">—</dd>
+      <dt>Where</dt>
+      <dd>The Hearth · the small fire at the edge of the clearing</dd>
+      <dt>Kind</dt>
+      <dd><i>ritual</i>, social · two hours</dd>
+      <dt>Hosted by</dt>
+      <dd>Victor, who chose the date and unlocked the door</dd>
+      <dt>Keeps its place</dt>
+      <dd><span style="display:block;font-style:italic;margin-bottom:2px">monthly. The ribbon marks its next pages:</span><span class="ribbon-dates" id="ribbon-dates"></span></dd>
+      <dt>Read by</dt>
+      <dd id="vis-line">anyone. This is an open page.</dd>
+    </dl>
+    <aside class="gloss">
+      <p style="margin:16px 0 0">Times are shown in your own hour. The stored time is <span class="mono" style="font-style:normal;font-size:12.5px">19:00 UTC</span>, and your almanac does the arithmetic.</p>
+      <p class="addressed" style="margin:14px 0 0">Addressed to: Ana, Bruno, Kaito, Maëlle, Victor, and the four who carried wood last month.</p>
+    </aside>
+  </div>
+
+  <div class="row golden">
+    <div>
+      <h2>The lamplit hours</h2>
+      <div class="strip" id="strip" role="img" aria-label="A 24-hour strip in UTC. The lamplit band, when Europe, Brazil and the Americas are all awake, runs from 15:00 to 21:00. The fire is lit at 19:00, inside the band.">
+        <div class="band" style="left:calc(100%/24*15);width:calc(100%/24*6)"></div>
+        <div class="mark" style="left:calc(100%/24*19)"></div>
+      </div>
+      <div class="axis" aria-hidden="true"><span>00</span><span>06</span><span>12</span><span>18</span><span>24 UTC</span></div>
+      <div class="cities" id="cities"></div>
+    </div>
+    <aside class="gloss"><p style="margin:38px 0 0">The lamp is lit while Lisbon, São Paulo, New York and San Francisco are all awake. If you set a gathering outside it, you're writing in the dark: that's allowed, it's just quieter.</p></aside>
+  </div>
+
+  <div class="row section prose">
+    <div>
+      <p>Once a month, when the moon is full, someone lights the small fire at the Hearth and we sit around it for two hours. Bring something to burn: a note, a worry, a draft of something you've been meaning to finish. Nothing is recorded. The only rule is that you stay until the fire goes down.</p>
+      <p>Latecomers are welcome, and so is leaving quietly. If you have wood, bring wood. If you have a song, it will be asked for.</p>
+    </div>
+    <aside class="gloss"><p style="margin:0">A <i>ritual</i> is an event that keeps its place on the calendar because people keep coming, not because someone schedules it.</p></aside>
+  </div>
+
+  <div class="row section">
+    <div>
+      <h2>The register</h2>
+      <ol class="register" id="register"></ol>
+      <p class="count" id="count"></p>
+      <form class="sign" id="signform">
+        <label for="signname" class="sr">Your name</label>
+        <input id="signname" autocomplete="name" placeholder="your name, as you'd sign it" maxlength="28">
+        <button class="btn primary" id="signbtn" type="submit">Sign the register</button>
+      </form>
+    </div>
+    <aside>
+      <h2 class="gloss" style="font-size:15px;margin:6px 0 12px;font-style:italic;color:var(--ink)">In the margins</h2>
+      <div class="notes" id="notes"></div>
+      <form class="addnote" id="noteform" style="margin-top:14px">
+        <label for="notetext" class="sr">Add a note in the margin</label>
+        <input id="notetext" placeholder="add a note…" maxlength="140">
+        <button type="submit">pin</button>
+      </form>
+    </aside>
+  </div>
+
+  <footer class="foot">
+    <div class="actions">
+      <button class="btn" type="button" id="ics">Copy into your almanac</button>
+      <button class="btn" type="button" id="embed">Tear out a postcard</button>
+      <button class="btn bell" type="button" id="bell" aria-pressed="false">Ring the bell at start</button>
+    </div>
+    <span class="folio" id="folio">leaf 269</span>
+  </footer>
+</article>
+</div>
+
+<p class="caption">A design study for the Liminal Calendar event page, recast as a leaf from a shared almanac. Everything on it maps to an existing feature: lifecycle, RSVP, recurrence, visibility, timezones, comments, .ics export, embed, and the per-event bell.</p>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const EVENT = new Date(Date.UTC(2026, 8, 26, 19, 0)); // stored as UTC
+  const RECUR = [new Date(Date.UTC(2026,9,26,19)), new Date(Date.UTC(2026,10,26,19)), new Date(Date.UTC(2026,11,26,19)), new Date(Date.UTC(2027,0,26,19))];
+  const $ = s => document.querySelector(s);
+  const book = $('#book');
+
+  /* ---------- moon (same synodic approach as src/lib/moon-phase.ts, continuous) ---------- */
+  const phaseOf = d => { const days = (d.getTime() - Date.UTC(2000,0,6,18,14)) / 864e5; const p = days / 29.530588853; return p - Math.floor(p); };
+  const moonName = p => ['new moon','waxing crescent','first quarter','waxing gibbous','full moon','waning gibbous','last quarter','waning crescent'][Math.round(p*8)%8];
+  function drawMoon(svg, p, size){
+    const r = size/2 - 2, c = size/2;
+    const lit = 'var(--copper)', dark = 'var(--rule)';
+    // terminator: x-radius of inner ellipse
+    const k = Math.cos(p * 2 * Math.PI) * r;
+    const waxing = p < .5;
+    const sweepOuter = waxing ? 1 : 0;
+    const sweepInner = waxing ? (p < .25 ? 0 : 1) : (p < .75 ? 0 : 1);
+    const path = `M${c} ${c-r} A${r} ${r} 0 0 ${sweepOuter} ${c} ${c+r} A${Math.abs(k)} ${r} 0 0 ${sweepInner} ${c} ${c-r}Z`;
+    svg.innerHTML = `<circle cx="${c}" cy="${c}" r="${r}" fill="${dark}"/>` +
+      `<path d="${path}" fill="${lit}"/>` +
+      `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="var(--ink-soft)" stroke-width="${size>30?1:.8}" opacity=".6"/>`;
+  }
+  const pe = phaseOf(EVENT);
+  drawMoon($('#moon-event'), pe, 64);
+  $('#moon-event-label').textContent = moonName(pe);
+  const now = new Date();
+  const pt = phaseOf(now);
+  drawMoon($('#moon-tonight'), pt, 20);
+  $('#tonight-label').textContent = 'tonight: ' + moonName(pt);
+
+  /* ---------- dates in the viewer's own hour ---------- */
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'your zone';
+  const f = (opts, tzone) => new Intl.DateTimeFormat(undefined, Object.assign({timeZone: tzone}, opts)).format(EVENT);
+  $('#day').textContent = f({day:'numeric'});
+  $('#weekday').textContent = f({weekday:'long'});
+  $('#month').textContent = f({month:'long'});
+  const end = new Date(EVENT.getTime() + 2*36e5);
+  const hm = {hour:'2-digit', minute:'2-digit', hour12:false};
+  $('#when-local').textContent = `${f({weekday:'short', day:'numeric', month:'short'})} · ${f(hm)}–${new Intl.DateTimeFormat(undefined, hm).format(end)} · ${tz.replace(/_/g,' ')}`;
+  const doy = Math.round((Date.UTC(2026,8,26) - Date.UTC(2026,0,0)) / 864e5);
+  $('#folio').textContent = `leaf ${doy} of 365`;
+
+  const cities = [['Lisbon','Europe/Lisbon'],['São Paulo','America/Sao_Paulo'],['New York','America/New_York'],['San Francisco','America/Los_Angeles']];
+  const cityHtml = cities.map(([n,z]) => `<span><b>${f(hm, z)}</b> ${n}</span>`);
+  cityHtml.push(`<span class="you"><b>${f(hm)}</b> you</span>`);
+  $('#cities').innerHTML = cityHtml.join('');
+
+  $('#ribbon-dates').innerHTML = RECUR.map(d => `<span>${new Intl.DateTimeFormat(undefined,{month:'short', day:'numeric'}).format(d)}</span>`).join('');
+
+  /* ---------- lifecycle ---------- */
+  const DAY = 864e5;
+  const daysOut = (EVENT - now) / DAY;
+  const auto = daysOut < 0 ? 'past' : daysOut > 14 ? 'proposed' : 'confirmed';
+  const ICONS = {
+    proposed: '<path d="M10 18V9" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M10 10C6 10 4 7 4 4c4 0 6 2 6 6zM10 11c0-4 2-6 6-6 0 4-2 6-6 6z" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+    confirmed: '<path d="M4 17C8 13 11 9 16 3" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M7 13c-3-1-4-4-3-7 3 1 4 4 3 7zM10 9c0-3 2-5 5-5 0 3-2 5-5 5zM11 12c3-1 5 0 6 2-3 1-5 0-6-2z" fill="currentColor" opacity=".8"/>',
+    past: '<path d="M4 5c7-1 12 4 12 11-7 1-12-4-12-11z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5l12 11M8 8.5l-.5 3M11 11.5l3-.4" stroke="currentColor" stroke-width="1"/>'
+  };
+  const n = Math.round(Math.abs(daysOut));
+  const NOTES = {
+    proposed: `Pencilled in. ${daysOut > 14 ? n + ' days out; it will be inked at fourteen.' : 'It will be inked at fourteen days out.'}`,
+    confirmed: `Inked. It's within fourteen days, so it's happening${daysOut >= 0 && daysOut <= 14 ? ' in ' + (n === 0 ? 'less than a day' : n + (n === 1 ? ' day' : ' days')) : ''}.`,
+    past: `Pressed. The fire has burned down${daysOut < 0 ? ', ' + n + (n === 1 ? ' day' : ' days') + ' ago' : ''}. The register now reads as a record of who came.`
+  };
+  const LABEL = {proposed:'pencilled in', confirmed:'inked', past:'pressed'};
+  function setLife(v){
+    const life = v === 'auto' ? auto : v;
+    book.dataset.life = life;
+    $('#stamp-icon').innerHTML = ICONS[life];
+    $('#stamp-text').textContent = LABEL[life];
+    $('#life-note').textContent = NOTES[life];
+    $('#signbtn').disabled = life === 'past';
+    $('#signbtn').textContent = life === 'past' ? 'The register is closed' : 'Sign the register';
+    renderCount();
+  }
+  // start in pencil, then ink after load: the one orchestrated moment
+  book.dataset.life = 'proposed';
+
+  /* ---------- visibility ---------- */
+  const VIS = {public:'anyone. This is an open page.', members:'members of the commons. Sealed with wax.', invite:'those it is addressed to (see the margin).'};
+  function setVis(v){ book.dataset.vis = v; $('#vis-line').textContent = VIS[v]; }
+  (function seal(){ // irregular wax blob
+    let d = ''; const pts = 22;
+    for (let i=0;i<=pts;i++){ const a = i/pts*Math.PI*2; const r = 40 + Math.sin(i*2.7)*3 + Math.cos(i*1.3)*2.4; d += (i?'L':'M') + (50+Math.cos(a)*r).toFixed(1) + ' ' + (50+Math.sin(a)*r).toFixed(1); }
+    $('#sealpath').setAttribute('d', d + 'Z');
+  })();
+
+  /* ---------- register ---------- */
+  const people = [
+    {name:'Victor', role:'host'},
+    {name:'Ana Beatriz'},
+    {name:'Kaito'},
+    {name:'Maëlle', role:'bringing wood'},
+    {name:'Bruno', struck:true, role:'changed their mind'}
+  ];
+  let mine = null;
+  function renderRegister(){
+    $('#register').innerHTML = people.map((p,i) =>
+      `<li class="${p.struck?'struck':''}"><span class="sig${p.fresh?' writing':''}">${esc(p.name)}</span><span class="role">${p.role?esc(p.role):''}${p.mine?` · <button type="button" class="linkish" data-unsign="${i}">strike my name</button>`:''}</span></li>`
+    ).join('');
+    people.forEach(p => delete p.fresh);
+    renderCount();
+  }
+  function renderCount(){
+    const c = people.filter(p => !p.struck).length;
+    const past = book.dataset.life === 'past';
+    $('#count').innerHTML = past
+      ? `<b>${c}</b> came to the fire.`
+      : `<b>${c}</b> have signed, the host included. Victor can plan the wood.`;
+  }
+  const esc = s => s.replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  $('#signform').addEventListener('submit', e => {
+    e.preventDefault();
+    if (mine) { toast('You have already signed. Your name is on line ' + (people.indexOf(mine)+1) + '.'); return; }
+    const name = $('#signname').value.trim() || 'a friend';
+    mine = {name, mine:true, fresh:true};
+    people.push(mine);
+    $('#signname').value = '';
+    renderRegister();
+    toast('Signed. You\'ll get a note a day before, and the bell when it starts.');
+  });
+  $('#register').addEventListener('click', e => {
+    const b = e.target.closest('[data-unsign]'); if (!b) return;
+    people.splice(+b.dataset.unsign, 1); mine = null; renderRegister();
+    toast('Struck from the register. No hard feelings: it was a soft commitment.');
+  });
+
+  /* ---------- margin notes (comments) ---------- */
+  const notes = [
+    {t:'Last month we burned the old lease. Very cathartic.', who:'Maëlle'},
+    {t:'Could someone bring the guitar with all six strings?', who:'Kaito'},
+    {t:'Rain forecast; we\'ll move under the porch roof if needed.', who:'Victor'}
+  ];
+  function renderNotes(){
+    $('#notes').innerHTML = notes.map(n => `<p class="note${n.fresh?' fresh':''}" style="margin:0">${esc(n.t)}<cite>${esc(n.who)}</cite></p>`).join('');
+    notes.forEach(n => delete n.fresh);
+  }
+  $('#noteform').addEventListener('submit', e => {
+    e.preventDefault();
+    const t = $('#notetext').value.trim(); if (!t) return;
+    notes.push({t, who: mine ? mine.name : 'you', fresh:true});
+    $('#notetext').value = ''; renderNotes();
+  });
+
+  /* ---------- actions ---------- */
+  let tt;
+  function toast(msg){ const el = $('#toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('on'), 3200); }
+  $('#ics').addEventListener('click', () => toast('In the app, this downloads full-moon-fire.ics for your own calendar.'));
+  $('#embed').addEventListener('click', () => toast('In the app, this opens the shareable embed at /embed/events/<id>.'));
+  $('#bell').addEventListener('click', e => {
+    const b = e.currentTarget; const muted = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', String(muted));
+    b.textContent = muted ? 'Bell muted' : 'Ring the bell at start';
+    toast(muted ? 'The bell won\'t ring for this fire. Reminders by letter still come.' : 'The bell will ring when the fire is lit.');
+  });
+
+  /* ---------- demo controls ---------- */
+  $('#demo').addEventListener('change', e => {
+    if (e.target.name === 'life') setLife(e.target.value);
+    if (e.target.name === 'vis') setVis(e.target.value);
+  });
+
+  renderRegister(); renderNotes(); setVis('public');
+  $('#stamp-icon').innerHTML = ICONS.proposed; $('#stamp-text').textContent = LABEL.proposed;
+  requestAnimationFrame(() => setTimeout(() => setLife('auto'), 700));
+})();
+</script>
