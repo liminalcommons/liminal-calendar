@@ -432,3 +432,193 @@ export function computeAnalyticsSummary(
     viewers: breakdown(rows, windowStart, nowMs, (r) => r.viewer, '(unknown)', 4),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Per-event scoreboard (Phase C)
+// ---------------------------------------------------------------------------
+
+export const UPCOMING_DAYS = 14;
+export const PAST_DAYS = 30;
+/** Fixed traffic range for the scoreboard, independent of the 7/30/90 selector. */
+export const TRAFFIC_DAYS = PAST_DAYS + UPCOMING_DAYS;
+
+/** postgres `integer` ceiling — ids beyond it can't be event ids. */
+const MAX_EVENT_ID = 2147483647;
+
+/**
+ * `/events/<id>` → numeric id, else null. A trailing query or anchor is
+ * stripped first; sub-pages (`/events/5/edit`), non-numeric ids (`/events/new`)
+ * and lookalikes (`/events/5abc`) are ignored.
+ */
+export function parseEventId(path: string | null | undefined): number | null {
+  if (!path) return null;
+  const clean = path.split(/[?#]/, 1)[0].replace(/\/+$/, '');
+  const m = /^\/events\/(\d+)$/.exec(clean);
+  if (!m) return null;
+  const id = Number(m[1]);
+  return id >= 1 && id <= MAX_EVENT_ID ? id : null;
+}
+
+export interface EventTraffic {
+  views: number;
+  viewers: number;
+  topRef: string | null;
+}
+
+/**
+ * Views / distinct viewers / top ref tag per event id, from pageviews in
+ * [sinceMs, nowMs] (callers pass the fixed TRAFFIC_DAYS range). Internal traffic is excluded here too (same rule as the summary), so
+ * callers can pass the raw loaded rows.
+ */
+export function computeEventTraffic(
+  rows: AnalyticsRow[],
+  sinceMs: number,
+  nowMs: number,
+): Map<number, EventTraffic> {
+  const acc = new Map<number, { views: number; viewers: Set<string>; refs: Map<string, Set<string>> }>();
+  let anonSeq = 0;
+  for (const r of rows) {
+    if (r.type !== 'pageview' || isInternalRow(r)) continue;
+    const id = parseEventId(r.path);
+    if (id === null) continue;
+    const t = Date.parse(r.createdAt);
+    if (isNaN(t) || t < sinceMs || t > nowMs) continue;
+    let a = acc.get(id);
+    if (!a) {
+      a = { views: 0, viewers: new Set(), refs: new Map() };
+      acc.set(id, a);
+    }
+    a.views += 1;
+    // Rows with no id at all each count as one viewer, as in computeRefs.
+    const key = personKey(r) ?? `anon:${anonSeq++}`;
+    a.viewers.add(key);
+    if (r.ref) {
+      if (!a.refs.has(r.ref)) a.refs.set(r.ref, new Set());
+      a.refs.get(r.ref)!.add(key);
+    }
+  }
+  const out = new Map<number, EventTraffic>();
+  for (const [id, a] of acc) {
+    const top = Array.from(a.refs.entries())
+      .map(([label, s]) => ({ label, count: s.size }))
+      .sort((x, y) => y.count - x.count || x.label.localeCompare(y.label))[0];
+    out.set(id, { views: a.views, viewers: a.viewers.size, topRef: top?.label ?? null });
+  }
+  return out;
+}
+
+/** An event row as read from the events table. */
+export interface ScoreboardEvent {
+  id: number;
+  title: string;
+  startsAt: string; // ISO 8601
+  /** IANA zone the event was created in; used to render its date. */
+  timezone?: string;
+}
+
+/** RSVP counts for one event, all-time (not windowed). */
+export interface EventRsvpCounts {
+  yes: number;
+  interested: number;
+  /** member_id null and status != 'no'. */
+  guest: number;
+}
+
+export interface EventScoreboardRow {
+  id: number;
+  title: string;
+  startsAt: string;
+  timezone: string;
+  views: number;
+  viewers: number;
+  yes: number;
+  interested: number;
+  guestRsvps: number;
+  topRef: string | null;
+}
+
+export interface EventScoreboard {
+  upcoming: EventScoreboardRow[];
+  past: EventScoreboardRow[];
+  /**
+   * True distinct viewers across each list's events (same TRAFFIC_DAYS range),
+   * NOT the sum of per-event viewers: one person viewing three events counts
+   * once here. null when the raw rows weren't supplied, so the UI leaves the
+   * cell blank rather than show a misleading sum.
+   */
+  upcomingViewers: number | null;
+  pastViewers: number | null;
+}
+
+/** Distinct viewers over pageviews of the given event ids (keyless rows count one each). */
+export function countDistinctEventViewers(
+  rows: AnalyticsRow[],
+  eventIds: Set<number>,
+  sinceMs: number,
+  nowMs: number,
+): number {
+  if (eventIds.size === 0) return 0;
+  const keys = new Set<string>();
+  let anonSeq = 0;
+  for (const r of rows) {
+    if (r.type !== 'pageview' || isInternalRow(r)) continue;
+    const id = parseEventId(r.path);
+    if (id === null || !eventIds.has(id)) continue;
+    const t = Date.parse(r.createdAt);
+    if (isNaN(t) || t < sinceMs || t > nowMs) continue;
+    keys.add(personKey(r) ?? `anon:${anonSeq++}`);
+  }
+  return keys.size;
+}
+
+/**
+ * Join events to traffic + RSVPs and split by start time: upcoming = starts in
+ * (now, now+14d], past = started in [now-30d, now]. Events with no views still
+ * list (their RSVPs are the signal). Upcoming soonest-first, past newest-first.
+ * `trafficRows` (the rows `traffic` came from) enables the distinct-viewer totals.
+ */
+export function buildEventScoreboard(
+  events: ScoreboardEvent[],
+  traffic: Map<number, EventTraffic>,
+  rsvpCounts: Map<number, EventRsvpCounts>,
+  nowMs: number,
+  trafficRows?: AnalyticsRow[],
+): EventScoreboard {
+  const upcomingEnd = nowMs + UPCOMING_DAYS * DAY_MS;
+  const pastStart = nowMs - PAST_DAYS * DAY_MS;
+  const upcoming: EventScoreboardRow[] = [];
+  const past: EventScoreboardRow[] = [];
+
+  for (const e of events) {
+    const start = Date.parse(e.startsAt);
+    if (isNaN(start)) continue;
+    const isUpcoming = start > nowMs && start <= upcomingEnd;
+    const isPast = start <= nowMs && start >= pastStart;
+    if (!isUpcoming && !isPast) continue;
+    const t = traffic.get(e.id);
+    const rs = rsvpCounts.get(e.id);
+    const row: EventScoreboardRow = {
+      id: e.id,
+      title: e.title,
+      startsAt: e.startsAt,
+      timezone: e.timezone || 'UTC',
+      views: t?.views ?? 0,
+      viewers: t?.viewers ?? 0,
+      yes: rs?.yes ?? 0,
+      interested: rs?.interested ?? 0,
+      guestRsvps: rs?.guest ?? 0,
+      topRef: t?.topRef ?? null,
+    };
+    (isUpcoming ? upcoming : past).push(row);
+  }
+
+  const byStart = (a: EventScoreboardRow, b: EventScoreboardRow) =>
+    Date.parse(a.startsAt) - Date.parse(b.startsAt) || a.id - b.id;
+  upcoming.sort(byStart);
+  past.sort((a, b) => byStart(b, a));
+  const distinct = (list: EventScoreboardRow[]) =>
+    trafficRows
+      ? countDistinctEventViewers(trafficRows, new Set(list.map((r) => r.id)), nowMs - TRAFFIC_DAYS * DAY_MS, nowMs)
+      : null;
+  return { upcoming, past, upcomingViewers: distinct(upcoming), pastViewers: distinct(past) };
+}

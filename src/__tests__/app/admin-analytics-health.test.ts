@@ -12,6 +12,8 @@ jest.mock('@/lib/analytics/repo', () => ({
   fetchLastEventAt: jest.fn(),
   fetchFirstSeenByVisitor: jest.fn().mockResolvedValue(new Map()),
   fetchFunnelDbCounts: jest.fn().mockResolvedValue({ guestRsvps: 0, newMembers: 0 }),
+  fetchEventPageviewRows: jest.fn().mockResolvedValue([]),
+  fetchScoreboardEvents: jest.fn().mockResolvedValue({ events: [], rsvpCounts: new Map() }),
   // Use the REAL predicate. Stubbing it here previously hid the actual bug:
   // the route classified fine against a hand-made `{code:'42P01'}`, while
   // production errors arrive wrapped by Drizzle with the code on `.cause`.

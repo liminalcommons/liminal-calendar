@@ -4,17 +4,50 @@
  */
 
 import {
-  and, count, desc, gte, isNotNull, isNull, lte, min, ne, notLike, or,
+  and, count, desc, eq, gte, inArray, isNotNull, isNull, like, lte, min, ne, notLike, or, sql,
 } from 'drizzle-orm';
-import { analyticsEvents, members, rsvps } from '@/lib/db/schema';
+import { analyticsEvents, events, members, rsvps } from '@/lib/db/schema';
 import {
-  INTERNAL_CLICK_TARGET, INTERNAL_PATH_PREFIX, type AnalyticsRow, type FunnelDbCounts,
+  INTERNAL_CLICK_TARGET, INTERNAL_PATH_PREFIX, PAST_DAYS, TRAFFIC_DAYS, UPCOMING_DAYS,
+  type AnalyticsRow, type EventRsvpCounts, type FunnelDbCounts, type ScoreboardEvent,
 } from './aggregate';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+const ROW_COLUMNS = {
+  type: analyticsEvents.type,
+  path: analyticsEvents.path,
+  target: analyticsEvents.target,
+  visitorId: analyticsEvents.visitorId,
+  isGuest: analyticsEvents.isGuest,
+  createdAt: analyticsEvents.createdAt,
+  referrerHost: analyticsEvents.referrerHost,
+  device: analyticsEvents.device,
+  country: analyticsEvents.country,
+  visitId: analyticsEvents.visitId,
+  viewer: analyticsEvents.viewer,
+  ref: analyticsEvents.ref,
+};
+
+function toAnalyticsRow(r: Record<string, unknown>): AnalyticsRow {
+  return {
+    type: r.type as string,
+    path: (r.path as string | null) ?? null,
+    target: (r.target as string | null) ?? null,
+    visitorId: (r.visitorId as string | null) ?? null,
+    isGuest: Boolean(r.isGuest),
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    referrerHost: (r.referrerHost as string | null) ?? null,
+    device: (r.device as string | null) ?? null,
+    country: (r.country as string | null) ?? null,
+    visitId: (r.visitId as string | null) ?? null,
+    viewer: (r.viewer as string | null) ?? null,
+    ref: (r.ref as string | null) ?? null,
+  };
+}
 
 /**
  * Load the trailing window used to build the dashboard summary (default 30
@@ -30,39 +63,40 @@ export async function fetchRecentAnalyticsRows(
 ): Promise<AnalyticsRow[]> {
   const since = new Date(nowMs - windowDays * DAY_MS);
   const rows = await db
-    .select({
-      type: analyticsEvents.type,
-      path: analyticsEvents.path,
-      target: analyticsEvents.target,
-      visitorId: analyticsEvents.visitorId,
-      isGuest: analyticsEvents.isGuest,
-      createdAt: analyticsEvents.createdAt,
-      referrerHost: analyticsEvents.referrerHost,
-      device: analyticsEvents.device,
-      country: analyticsEvents.country,
-      visitId: analyticsEvents.visitId,
-      viewer: analyticsEvents.viewer,
-      ref: analyticsEvents.ref,
-    })
+    .select(ROW_COLUMNS)
     .from(analyticsEvents)
     .where(gte(analyticsEvents.createdAt, since))
     .orderBy(desc(analyticsEvents.createdAt))
     .limit(limit);
 
-  return rows.map((r: Record<string, unknown>) => ({
-    type: r.type as string,
-    path: (r.path as string | null) ?? null,
-    target: (r.target as string | null) ?? null,
-    visitorId: (r.visitorId as string | null) ?? null,
-    isGuest: Boolean(r.isGuest),
-    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
-    referrerHost: (r.referrerHost as string | null) ?? null,
-    device: (r.device as string | null) ?? null,
-    country: (r.country as string | null) ?? null,
-    visitId: (r.visitId as string | null) ?? null,
-    viewer: (r.viewer as string | null) ?? null,
-    ref: (r.ref as string | null) ?? null,
-  }));
+  return rows.map(toAnalyticsRow);
+}
+
+/**
+ * Event-page pageviews over the FIXED scoreboard range (TRAFFIC_DAYS), fetched
+ * independently of the 7/30/90 selector so an event's views never shrink with
+ * it. Internal traffic (admin self-test target) is filtered in SQL; `/events/%`
+ * already excludes `/admin…` paths, and parseEventId does the exact match
+ * downstream. Same hard row cap / newest-wins as the main load.
+ */
+export async function fetchEventPageviewRows(db: Db, nowMs: number, limit = 50000): Promise<AnalyticsRow[]> {
+  const since = new Date(nowMs - TRAFFIC_DAYS * DAY_MS);
+  const rows = await db
+    .select(ROW_COLUMNS)
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.type, 'pageview'),
+        gte(analyticsEvents.createdAt, since),
+        lte(analyticsEvents.createdAt, new Date(nowMs)),
+        like(analyticsEvents.path, '/events/%'),
+        or(isNull(analyticsEvents.target), ne(analyticsEvents.target, INTERNAL_CLICK_TARGET)),
+      ),
+    )
+    .orderBy(desc(analyticsEvents.createdAt))
+    .limit(limit);
+
+  return rows.map(toAnalyticsRow);
 }
 
 /**
@@ -113,6 +147,52 @@ export async function fetchFirstSeenByVisitor(db: Db): Promise<Map<string, numbe
     if (!isNaN(t)) out.set(r.visitorId, t);
   }
   return out;
+}
+
+/**
+ * Events eligible for the scoreboard (started in the last PAST_DAYS or start in
+ * the next UPCOMING_DAYS; cancelled events and booking-created events — the
+ * rows with source_event_type_id set, which are always private — skipped; public,
+ * members and private member-created events all stay) plus their all-time RSVP
+ * counts. The upcoming/past split itself happens in buildEventScoreboard.
+ */
+export async function fetchScoreboardEvents(
+  db: Db,
+  nowMs: number,
+): Promise<{ events: ScoreboardEvent[]; rsvpCounts: Map<number, EventRsvpCounts> }> {
+  const from = new Date(nowMs - PAST_DAYS * DAY_MS);
+  const to = new Date(nowMs + UPCOMING_DAYS * DAY_MS);
+  const eventRows: Array<{ id: number; title: string; startsAt: Date | string; timezone: string | null }> = await db
+    .select({ id: events.id, title: events.title, startsAt: events.startsAt, timezone: events.timezone })
+    .from(events)
+    .where(and(gte(events.startsAt, from), lte(events.startsAt, to), isNull(events.cancelledAt), isNull(events.sourceEventTypeId)));
+
+  const rsvpCounts = new Map<number, EventRsvpCounts>();
+  if (eventRows.length > 0) {
+    const rows: Array<{ eventId: number; yes: number | string; interested: number | string; guest: number | string }> = await db
+      .select({
+        eventId: rsvps.eventId,
+        yes: sql<number>`count(*) filter (where ${rsvps.status} = 'yes')`,
+        interested: sql<number>`count(*) filter (where ${rsvps.status} = 'interested')`,
+        guest: sql<number>`count(*) filter (where ${rsvps.memberId} is null and ${rsvps.status} <> 'no')`,
+      })
+      .from(rsvps)
+      .where(inArray(rsvps.eventId, eventRows.map((e) => e.id)))
+      .groupBy(rsvps.eventId);
+    for (const r of rows) {
+      rsvpCounts.set(r.eventId, { yes: Number(r.yes), interested: Number(r.interested), guest: Number(r.guest) });
+    }
+  }
+
+  return {
+    events: eventRows.map((e) => ({
+      id: e.id,
+      title: e.title,
+      startsAt: e.startsAt instanceof Date ? e.startsAt.toISOString() : String(e.startsAt),
+      timezone: e.timezone ?? 'UTC',
+    })),
+    rsvpCounts,
+  };
 }
 
 // Re-exported so existing analytics callers keep a single import site.

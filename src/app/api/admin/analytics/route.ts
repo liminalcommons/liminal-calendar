@@ -2,20 +2,29 @@ import { NextResponse } from 'next/server';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import {
+  buildEventScoreboard,
   computeAnalyticsSummary,
+  computeEventTraffic,
   DEFAULT_WINDOW_DAYS,
+  TRAFFIC_DAYS,
   WINDOW_DAYS,
+  type EventScoreboard,
   type FunnelDbCounts,
   type WindowDays,
 } from '@/lib/analytics/aggregate';
 import {
   fetchAllTimeTotals,
   fetchFirstSeenByVisitor,
+  fetchEventPageviewRows,
   fetchFunnelDbCounts,
   fetchLastEventAt,
   fetchRecentAnalyticsRows,
+  fetchScoreboardEvents,
   isMissingTableError,
 } from '@/lib/analytics/repo';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const EMPTY_SCOREBOARD: EventScoreboard = { upcoming: [], past: [], upcomingViewers: 0, pastViewers: 0 };
 
 async function requireAdmin() {
   const user = await getAuthedUser();
@@ -43,6 +52,7 @@ function emptySummary(windowDays: WindowDays) {
     },
     refs: [],
     refTotal: 0,
+    eventScoreboard: EMPTY_SCOREBOARD,
   };
 }
 
@@ -71,6 +81,18 @@ export async function GET(request: Request) {
     } catch (err) {
       console.error('[GET /api/admin/analytics] funnel db counts failed:', err);
     }
+    // Isolated like the funnel: events/rsvps belong to other features.
+    let eventScoreboard: EventScoreboard | undefined;
+    try {
+      const { events, rsvpCounts } = await fetchScoreboardEvents(db, nowMs);
+      // Traffic comes from its own fixed TRAFFIC_DAYS query, NOT the
+      // window-filtered `rows`, so the scoreboard ignores the 7/30/90 selector.
+      const trafficRows = await fetchEventPageviewRows(db, nowMs);
+      const traffic = computeEventTraffic(trafficRows, nowMs - TRAFFIC_DAYS * DAY_MS, nowMs);
+      eventScoreboard = buildEventScoreboard(events, traffic, rsvpCounts, nowMs, trafficRows);
+    } catch (err) {
+      console.error('[GET /api/admin/analytics] event scoreboard failed:', err);
+    }
     const summary = computeAnalyticsSummary(rows, nowMs, { windowDays, firstSeen, funnelDb });
     const rawTotals = await fetchAllTimeTotals(db);
     const lastEventAt = await fetchLastEventAt(db);
@@ -91,6 +113,8 @@ export async function GET(request: Request) {
         totalEvents: rawTotals.pageviews + rawTotals.guestEntries + rawTotals.clicks,
       },
       funnelDbAvailable: funnelDb !== undefined,
+      eventScoreboard: eventScoreboard ?? EMPTY_SCOREBOARD,
+      eventScoreboardAvailable: eventScoreboard !== undefined,
       ...summary,
     });
   } catch (err) {

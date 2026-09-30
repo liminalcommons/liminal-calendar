@@ -55,6 +55,44 @@ interface AnalyticsData {
   refTotal?: number;
   /** False when the rsvps/members counts failed server-side. */
   funnelDbAvailable?: boolean;
+  eventScoreboard?: EventScoreboard;
+  /** False when the events/rsvps queries failed server-side. */
+  eventScoreboardAvailable?: boolean;
+}
+
+interface EventScoreboardRow {
+  id: number;
+  title: string;
+  startsAt: string;
+  timezone: string;
+  views: number;
+  viewers: number;
+  yes: number;
+  interested: number;
+  guestRsvps: number;
+  topRef: string | null;
+}
+
+interface EventScoreboard {
+  upcoming: EventScoreboardRow[];
+  past: EventScoreboardRow[];
+  /** True distinct viewers across the list; null = not computed (cell left blank). */
+  upcomingViewers: number | null;
+  pastViewers: number | null;
+}
+
+/** Event date in the event's own timezone (UTC if the zone is missing/invalid). */
+function formatEventDate(iso: string, timezone: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso.slice(0, 10);
+  const fmt = (timeZone: string) =>
+    // en-CA renders YYYY-MM-DD
+    new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+  try {
+    return fmt(timezone || 'UTC');
+  } catch {
+    return fmt('UTC');
+  }
 }
 
 interface GuestFunnel {
@@ -131,6 +169,76 @@ function FunnelStrip({
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+/** One scoreboard table; rows link to the event page. Plain counts, totals row. */
+function EventTable({
+  title,
+  rows,
+  viewersTotal,
+  emptyLabel,
+}: {
+  title: string;
+  rows: EventScoreboardRow[];
+  viewersTotal: number | null;
+  emptyLabel: string;
+}) {
+  const sum = (pick: (r: EventScoreboardRow) => number) => rows.reduce((a, r) => a + pick(r), 0);
+  return (
+    <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
+      <h3 className="text-sm font-medium text-grove-text mb-3">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-grove-text-muted italic">{emptyLabel}</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-grove-text-muted border-b border-grove-border">
+                <th className="font-medium py-1.5 pr-3">Event</th>
+                <th className="font-medium py-1.5 pr-3 whitespace-nowrap">Date</th>
+                <th className="font-medium py-1.5 pr-3 text-right whitespace-nowrap">Views (last 44 days)</th>
+                <th className="font-medium py-1.5 pr-3 text-right whitespace-nowrap">Viewers (last 44 days)</th>
+                <th className="font-medium py-1.5 pr-3 text-right whitespace-nowrap">Yes (all-time)</th>
+                <th className="font-medium py-1.5 pr-3 text-right whitespace-nowrap">Interested (all-time)</th>
+                <th className="font-medium py-1.5 pr-3 text-right whitespace-nowrap">Guest RSVPs (all-time)</th>
+                <th className="font-medium py-1.5">Top source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-grove-border/40 text-grove-text">
+                  <td className="py-1.5 pr-3 max-w-[14rem] truncate">
+                    <a href={`/events/${r.id}`} className="hover:underline text-grove-accent" title={r.title}>
+                      {r.title}
+                    </a>
+                  </td>
+                  <td className="py-1.5 pr-3 whitespace-nowrap text-grove-text-muted">{formatEventDate(r.startsAt, r.timezone)}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{r.views.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{r.viewers.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{r.yes.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{r.interested.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{r.guestRsvps.toLocaleString()}</td>
+                  <td className="py-1.5 text-grove-text-muted">{r.topRef ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="font-medium text-grove-text">
+                <td className="pt-2 pr-3">Total</td>
+                <td className="pt-2 pr-3" />
+                <td className="pt-2 pr-3 text-right tabular-nums">{sum((r) => r.views).toLocaleString()}</td>
+                <td className="pt-2 pr-3 text-right tabular-nums" title="Distinct people across these events, not a sum of the rows above">{viewersTotal === null ? '' : viewersTotal.toLocaleString()}</td>
+                <td className="pt-2 pr-3 text-right tabular-nums">{sum((r) => r.yes).toLocaleString()}</td>
+                <td className="pt-2 pr-3 text-right tabular-nums">{sum((r) => r.interested).toLocaleString()}</td>
+                <td className="pt-2 pr-3 text-right tabular-nums">{sum((r) => r.guestRsvps).toLocaleString()}</td>
+                <td className="pt-2" />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -486,6 +594,34 @@ export function AnalyticsPanel() {
           note="Rows can sum above the header when a visitor carries two tags."
         />
       </div>
+
+      {/* Per-event scoreboard. Views use a fixed 44-day range (not the window selector); RSVPs are all-time. */}
+      {data.eventScoreboardAvailable === false ? (
+        <p className="text-xs text-grove-text-muted italic">Event scoreboard unavailable — the events/RSVP query failed.</p>
+      ) : (
+        <div className="space-y-4">
+          <EventTable
+            title="Upcoming (next 14 days)"
+            rows={data.eventScoreboard?.upcoming ?? []}
+            viewersTotal={data.eventScoreboard?.upcomingViewers ?? null}
+            emptyLabel="No events in the next 14 days."
+          />
+          <EventTable
+            title="Past 30 days"
+            rows={data.eventScoreboard?.past ?? []}
+            viewersTotal={data.eventScoreboard?.pastViewers ?? null}
+            emptyLabel="No events in the last 30 days."
+          />
+          <p className="text-[11px] text-grove-text-dim">
+            Booking-created private events and cancelled events are not listed; every other event is, whatever its visibility. Views and
+            viewers always cover the last 44 days (30 past + 14 upcoming), whatever window is selected;
+            the Total viewers cell is distinct people across the listed events. Yes / Interested / Guest
+            RSVPs are all-time; guest RSVPs are yes/interested replies with no member account. Top source
+            is the ?ref= tag on the entry link — “—” means no tag, not necessarily direct. Embedded
+            calendar views are not counted.
+          </p>
+        </div>
+      )}
       </>
       )}
 
