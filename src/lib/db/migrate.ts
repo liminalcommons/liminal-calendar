@@ -440,6 +440,8 @@ async function runMigrationsInner(sql: any): Promise<MigrationResult> {
   await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS country TEXT`;
   await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS visit_id TEXT`;
   await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS viewer TEXT`;
+  // Attribution tag from a `?ref=` link parameter. Null = direct/unknown.
+  await step`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ref TEXT`;
   await step`CREATE INDEX IF NOT EXISTS analytics_events_visit_idx ON analytics_events(visit_id)`;
   await step`CREATE INDEX IF NOT EXISTS analytics_events_type_created_idx ON analytics_events(type, created_at)`;
   await step`CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)`;

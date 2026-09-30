@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GUEST_COOKIE } from '@/lib/guest';
 import { db } from '@/lib/db';
-import { recordAnalyticsEvent } from '@/lib/analytics/events';
+import { parseRef, recordAnalyticsEvent } from '@/lib/analytics/events';
 import { countryFromHeaders } from '@/lib/analytics/context';
 
 /**
@@ -27,7 +27,13 @@ export async function GET(request: Request) {
     await recordAnalyticsEvent(
       db,
       { type: 'guest_enter', path: '/guest' },
-      { isGuest: true, viewer: 'guest', country: countryFromHeaders(request.headers) },
+      {
+        isGuest: true,
+        viewer: 'guest',
+        country: countryFromHeaders(request.headers),
+        // The redirect to / drops ?ref=, so capture it from this request.
+        ref: parseRef(new URL(request.url).searchParams.get('ref')),
+      },
     );
   } catch (err) {
     console.error('[GET /guest] analytics record failed:', err);

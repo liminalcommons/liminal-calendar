@@ -245,3 +245,88 @@ describe('computeAnalyticsSummary — breakdowns', () => {
     expect(computeAnalyticsSummary(rows, NOW).topReferrers[0].count).toBe(1);
   });
 });
+
+describe('computeAnalyticsSummary — guest funnel', () => {
+  const NOW = Date.parse('2026-08-08T12:00:00.000Z');
+  const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
+  const pv = (over: Partial<AnalyticsRow> = {}): AnalyticsRow => ({
+    type: 'pageview', path: '/', target: null, visitorId: 'v1', isGuest: true, createdAt: ago(10), ...over,
+  });
+  const enter = (over: Partial<AnalyticsRow> = {}): AnalyticsRow => ({
+    type: 'guest_enter', path: '/guest', target: null, visitorId: null, isGuest: true, createdAt: ago(10), ...over,
+  });
+
+  it('counts guest entries and distinct guest event viewers in the window', () => {
+    const rows = [
+      enter(), enter(), enter({ createdAt: ago(60 * 24 * 40) }), // out of 30d window
+      pv({ visitorId: 'g1', path: '/events/3' }),
+      pv({ visitorId: 'g1', path: '/events/4' }), // same guest → once
+      pv({ visitorId: 'g2', path: '/events/3' }),
+      pv({ visitorId: 'g3', path: '/week' }), // not an event page
+      pv({ visitorId: 'm1', path: '/events/3', isGuest: false }), // not a guest
+    ];
+    const { funnel } = computeAnalyticsSummary(rows, NOW);
+    expect(funnel.guestEntries).toBe(2);
+    expect(funnel.guestEventViewers).toBe(2);
+  });
+
+  it('passes DB counts through and labels new members as window-new, not linked', () => {
+    const { funnel } = computeAnalyticsSummary([], NOW, { funnelDb: { guestRsvps: 4, newMembers: 7 } });
+    expect(funnel.guestRsvps).toBe(4);
+    expect(funnel.newMembers).toBe(7);
+    expect(funnel.newMembersBasis).toBe('window-new');
+  });
+
+  it('defaults DB-derived steps to 0 and excludes admin traffic', () => {
+    const rows = [pv({ visitorId: 'a', path: '/admin/events/3' }), enter({ path: '/admin' })];
+    const { funnel } = computeAnalyticsSummary(rows, NOW);
+    expect(funnel).toMatchObject({ guestEntries: 0, guestEventViewers: 0, guestRsvps: 0, newMembers: 0 });
+  });
+
+  it('follows the selected window', () => {
+    const rows = [pv({ visitorId: 'g1', path: '/events/3', createdAt: ago(60 * 24 * 20) })];
+    expect(computeAnalyticsSummary(rows, NOW, { windowDays: 7 }).funnel.guestEventViewers).toBe(0);
+    expect(computeAnalyticsSummary(rows, NOW, { windowDays: 30 }).funnel.guestEventViewers).toBe(1);
+  });
+});
+
+describe('computeAnalyticsSummary — brought-by refs', () => {
+  const NOW = Date.parse('2026-08-08T12:00:00.000Z');
+  const ago = (mins: number) => new Date(NOW - mins * 60_000).toISOString();
+  const pv = (over: Partial<AnalyticsRow> = {}): AnalyticsRow => ({
+    type: 'pageview', path: '/', target: null, visitorId: 'v1', isGuest: false, createdAt: ago(10), ...over,
+  });
+
+  it('credits each visitor once per ref and ranks by count', () => {
+    const rows = [
+      pv({ visitorId: 'a', ref: 'newsletter' }),
+      pv({ visitorId: 'a', ref: 'newsletter' }), // same visitor again
+      pv({ visitorId: 'b', ref: 'newsletter' }),
+      pv({ visitorId: 'c', ref: 'discord' }),
+      pv({ visitorId: 'd', ref: null }), // direct — not listed
+      pv({ visitorId: 'e' }), // pre-column row — not listed
+    ];
+    const s = computeAnalyticsSummary(rows, NOW);
+    expect(s.refs).toEqual([
+      { label: 'newsletter', count: 2 },
+      { label: 'discord', count: 1 },
+    ]);
+    expect(s.refTotal).toBe(3);
+  });
+
+  it('ignores clicks, out-of-window rows and admin paths', () => {
+    const rows = [
+      pv({ type: 'click', target: 'cta', ref: 'signal' }),
+      pv({ visitorId: 'old', ref: 'signal', createdAt: ago(60 * 24 * 45) }),
+      pv({ visitorId: 'adm', ref: 'signal', path: '/admin' }),
+    ];
+    const s = computeAnalyticsSummary(rows, NOW);
+    expect(s.refs).toEqual([]);
+    expect(s.refTotal).toBe(0);
+  });
+
+  it('counts a tagged row with no visitor id once rather than dropping it', () => {
+    const s = computeAnalyticsSummary([pv({ visitorId: null, visitId: null, ref: 'signal' })], NOW);
+    expect(s.refs).toEqual([{ label: 'signal', count: 1 }]);
+  });
+});

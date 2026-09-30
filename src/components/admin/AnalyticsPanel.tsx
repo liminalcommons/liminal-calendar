@@ -50,6 +50,19 @@ interface AnalyticsData {
   topCountries?: Breakdown[];
   devices?: Breakdown[];
   viewers?: Breakdown[];
+  funnel?: GuestFunnel;
+  refs?: Breakdown[];
+  refTotal?: number;
+  /** False when the rsvps/members counts failed server-side. */
+  funnelDbAvailable?: boolean;
+}
+
+interface GuestFunnel {
+  guestEntries: number;
+  guestEventViewers: number;
+  guestRsvps: number;
+  newMembers: number;
+  newMembersBasis: 'window-new';
 }
 
 /**
@@ -81,6 +94,43 @@ function StatTile({ label, value, sub }: { label: string; value: number; sub?: s
       <div className="text-2xl font-serif text-grove-text tabular-nums">{value.toLocaleString()}</div>
       <div className="text-xs text-grove-text-muted mt-0.5">{label}</div>
       {sub && <div className="text-[11px] text-grove-text-dim mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+/** Plain counts in journey order — deliberately no rates; volume is too low. */
+function FunnelStrip({
+  funnel,
+  windowDays,
+  dbAvailable,
+}: {
+  funnel: GuestFunnel;
+  windowDays: WindowDays;
+  dbAvailable: boolean;
+}) {
+  const steps = [
+    { label: 'Guest entries', value: funnel.guestEntries, sub: 'entries via /guest' },
+    { label: 'Guests viewing an event', value: funnel.guestEventViewers, sub: 'distinct guest visitors' },
+    { label: 'Guest RSVPs', value: dbAvailable ? funnel.guestRsvps : null, sub: 'yes/interested RSVPs with no member account' },
+    {
+      label: 'New members',
+      value: dbAvailable ? funnel.newMembers : null,
+      sub: 'all members who joined in the window — not linked to the guests above',
+    },
+  ];
+  return (
+    <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
+      <h3 className="text-sm font-medium text-grove-text mb-3">Guest journey (last {windowDays} days)</h3>
+      <ol className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {steps.map((s, i) => (
+          <li key={s.label} className="min-w-0">
+            <div className="text-[11px] text-grove-text-dim">Step {i + 1}</div>
+            <div className="text-2xl font-serif text-grove-text tabular-nums">{s.value === null ? '—' : s.value.toLocaleString()}</div>
+            <div className="text-xs text-grove-text-muted mt-0.5">{s.label}</div>
+            <div className="text-[11px] text-grove-text-dim mt-0.5">{s.sub}</div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
@@ -139,6 +189,7 @@ function RankedList({
   total,
   totalLabel = 'Total',
   emptyLabel,
+  note,
 }: {
   title: string;
   rows: { label: string; value: number }[];
@@ -147,6 +198,8 @@ function RankedList({
   /** Name the unit when "Total" could be misread (e.g. pageviews, not visitors). */
   totalLabel?: string;
   emptyLabel: string;
+  /** Optional caveat shown under the list. */
+  note?: string;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return (
@@ -175,6 +228,7 @@ function RankedList({
           </li>
         </ul>
       )}
+      {note && <p className="text-[11px] text-grove-text-dim mt-2">{note}</p>}
     </div>
   );
 }
@@ -369,6 +423,8 @@ export function AnalyticsPanel() {
         <StatTile label="Returning" value={stats.returningVisitors} />
       </div>
 
+      {data.funnel && <FunnelStrip funnel={data.funnel} windowDays={win} dbAvailable={data.funnelDbAvailable !== false} />}
+
       {/* Trend over the selected window */}
       <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
         <h3 className="text-sm font-medium text-grove-text mb-3">
@@ -421,6 +477,14 @@ export function AnalyticsPanel() {
           total={stats.pageviews}
           emptyLabel="No viewer data yet."
         />
+        <RankedList
+          title={`Brought by (${win}d)`}
+          rows={(data.refs ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          total={data.refTotal ?? 0}
+          totalLabel="Visitors arriving with a ref tag"
+          emptyLabel="No ?ref= links visited yet. Share links like /?ref=newsletter to see who brings people."
+          note="Rows can sum above the header when a visitor carries two tags."
+        />
       </div>
       </>
       )}
@@ -433,8 +497,9 @@ export function AnalyticsPanel() {
         {/* State plainly what is and isn't kept — this is the answer to "what
             are you collecting about me" without reading the source. */}
         <p>
-          Stored: page path, referring site’s host, country, device size bucket, and an
-          anonymous per-browser id. Not stored: IP addresses, user-agent strings, full
+          Stored: page path, referring site’s host, country, device size bucket, an
+          anonymous per-browser id, and the <code>?ref=</code> tag on a link if it had one
+          (a short label such as “newsletter”; no tag means direct or unknown). Not stored: IP addresses, user-agent strings, full
           referring URLs, or any tracking cookie.
         </p>
         <p>

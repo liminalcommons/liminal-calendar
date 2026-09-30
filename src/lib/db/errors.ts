@@ -32,3 +32,22 @@ export function isMissingTableError(err: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * True when the error is Postgres 42703 (undefined_column), optionally for one
+ * named column. Same cause-chain walk as above: drizzle wraps the driver error,
+ * so the code/message live on `.cause`. Used where a column added by a recent
+ * migration may not exist yet (boot migration races first traffic).
+ */
+export function isMissingColumnError(err: unknown, column?: string): boolean {
+  let current: unknown = err;
+  for (let depth = 0; current && depth < 5; depth++) {
+    const e = current as { code?: unknown; message?: unknown; cause?: unknown };
+    const msg = typeof e.message === 'string' ? e.message : '';
+    const named = !column || msg.includes(`"${column}"`);
+    if (e.code === '42703' && named) return true;
+    if (/column ".+" (of relation ".+" )?does not exist/.test(msg) && named) return true;
+    current = e.cause;
+  }
+  return false;
+}

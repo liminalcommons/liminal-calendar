@@ -406,6 +406,9 @@ export const analyticsEvents = pgTable(
     country: text('country'), // ISO-3166 alpha-2
     visitId: text('visit_id'),
     viewer: text('viewer'), // 'member' | 'guest' | 'anonymous'
+    // Attribution tag from a `?ref=` link parameter (e.g. newsletter, discord).
+    // Null = direct/unknown.
+    ref: text('ref'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -413,6 +416,26 @@ export const analyticsEvents = pgTable(
     index('analytics_events_created_idx').on(table.createdAt),
   ],
 );
+
+// Same physical table minus `ref`. Drizzle lists every column of the table
+// object in an INSERT, so omitting `ref` from the values isn't enough: the
+// collect path falls back to this shape when the ref column hasn't been
+// migrated yet, so an event is never lost to schema drift.
+export const analyticsEventsPreRef = pgTable('analytics_events', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(),
+  path: text('path'),
+  target: text('target'),
+  visitorId: text('visitor_id'),
+  isGuest: boolean('is_guest').notNull().default(false),
+  memberId: integer('member_id').references(() => members.id, { onDelete: 'set null' }),
+  referrerHost: text('referrer_host'),
+  device: text('device'),
+  country: text('country'),
+  visitId: text('visit_id'),
+  viewer: text('viewer'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
 export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;

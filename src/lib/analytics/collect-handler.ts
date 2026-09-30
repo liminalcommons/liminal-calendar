@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { analyticsEventInputSchema, recordAnalyticsEvent } from '@/lib/analytics/events';
+import { analyticsEventInputSchema, recordAnalyticsEvent, splitRef } from '@/lib/analytics/events';
 import { requestContext } from '@/lib/analytics/context';
 
 /**
@@ -54,7 +54,10 @@ export async function handleCollect(request: NextRequest) {
     // the country the platform edge already resolved. No DB lookup, no IP.
     const ctx = requestContext(request);
 
-    await recordAnalyticsEvent(db, parsed.data, ctx);
+    // `?ref=` rides on the beaconed path; lift it into its own column.
+    const { path, ref } = splitRef(parsed.data.path);
+
+    await recordAnalyticsEvent(db, { ...parsed.data, path }, { ...ctx, ref });
   } catch (err) {
     // Swallow — a missing table (pre-migration) or transient DB error must not
     // surface as a failed request in the visitor's console. The admin health

@@ -4,10 +4,12 @@
  */
 
 import {
-  and, count, desc, gte, isNotNull, isNull, min, ne, notLike, or,
+  and, count, desc, gte, isNotNull, isNull, lte, min, ne, notLike, or,
 } from 'drizzle-orm';
-import { analyticsEvents } from '@/lib/db/schema';
-import { INTERNAL_CLICK_TARGET, INTERNAL_PATH_PREFIX, type AnalyticsRow } from './aggregate';
+import { analyticsEvents, members, rsvps } from '@/lib/db/schema';
+import {
+  INTERNAL_CLICK_TARGET, INTERNAL_PATH_PREFIX, type AnalyticsRow, type FunnelDbCounts,
+} from './aggregate';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
@@ -40,6 +42,7 @@ export async function fetchRecentAnalyticsRows(
       country: analyticsEvents.country,
       visitId: analyticsEvents.visitId,
       viewer: analyticsEvents.viewer,
+      ref: analyticsEvents.ref,
     })
     .from(analyticsEvents)
     .where(gte(analyticsEvents.createdAt, since))
@@ -58,7 +61,31 @@ export async function fetchRecentAnalyticsRows(
     country: (r.country as string | null) ?? null,
     visitId: (r.visitId as string | null) ?? null,
     viewer: (r.viewer as string | null) ?? null,
+    ref: (r.ref as string | null) ?? null,
   }));
+}
+
+/**
+ * The funnel steps that live outside analytics_events: guest RSVPs (rsvps with
+ * no member_id, excluding declined `no` replies) and members created in the
+ * window. Two indexed-ish COUNTs, no row load.
+ */
+export async function fetchFunnelDbCounts(
+  db: Db,
+  nowMs: number,
+  windowDays: number,
+): Promise<FunnelDbCounts> {
+  const since = new Date(nowMs - windowDays * DAY_MS);
+  const until = new Date(nowMs);
+  const [rsvpRow] = await db
+    .select({ c: count() })
+    .from(rsvps)
+    .where(and(isNull(rsvps.memberId), ne(rsvps.status, 'no'), gte(rsvps.createdAt, since), lte(rsvps.createdAt, until)));
+  const [memberRow] = await db
+    .select({ c: count() })
+    .from(members)
+    .where(and(gte(members.createdAt, since), lte(members.createdAt, until)));
+  return { guestRsvps: Number(rsvpRow?.c ?? 0), newMembers: Number(memberRow?.c ?? 0) };
 }
 
 /**

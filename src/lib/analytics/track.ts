@@ -88,7 +88,15 @@ function send(payload: TrackPayload): void {
 }
 
 export function trackPageview(path: string): void {
-  send({ type: 'pageview', path });
+  // usePathname() drops the query string, so carry a `?ref=` attribution tag
+  // over explicitly; the collect handler lifts it into its own column.
+  let ref: string | null = null;
+  try {
+    ref = new URLSearchParams(window.location.search).get('ref');
+  } catch {
+    /* no window / unparsable — treat as direct */
+  }
+  send({ type: 'pageview', path: ref ? `${path}?ref=${encodeURIComponent(ref)}` : path });
 }
 
 export function trackClick(target: string, path?: string): void {
