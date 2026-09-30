@@ -20,7 +20,7 @@ interface WindowStats {
   guestPageviews: number;
   visits: number;
   pagesPerVisit: number;
-  bounceRate: number;
+  visitsToEvents: number;
   newVisitors: number;
   returningVisitors: number;
 }
@@ -40,11 +40,12 @@ interface AnalyticsHealth {
 interface AnalyticsData {
   generatedAt: string;
   health?: AnalyticsHealth;
-  allTime: { pageviews: number; uniqueVisitors: number; guestEntries: number; clicks: number };
-  windows: { day: WindowStats; week: WindowStats; month: WindowStats };
+  windowDays: WindowDays;
+  window: WindowStats;
+  trendBucket: 'day' | 'week';
   topPaths: { path: string; views: number }[];
   topClicks: { target: string; clicks: number }[];
-  dailyPageviews: { date: string; views: number; guestViews: number }[];
+  dailyPageviews: { date: string; endDate?: string; views: number; guestViews: number }[];
   topReferrers?: Breakdown[];
   topCountries?: Breakdown[];
   devices?: Breakdown[];
@@ -64,14 +65,10 @@ type SelfTest =
   | { kind: 'ok' }
   | { kind: 'error'; message: string };
 
-type WindowKey = 'day' | 'week' | 'month' | 'all';
+type WindowDays = 7 | 30 | 90;
 
-const WINDOW_LABELS: Record<WindowKey, string> = {
-  day: 'Last 24h',
-  week: 'Last 7 days',
-  month: 'Last 30 days',
-  all: 'All time',
-};
+const WINDOW_OPTIONS: WindowDays[] = [7, 30, 90];
+const DEFAULT_WINDOW: WindowDays = 30;
 
 type FetchState =
   | { kind: 'loading' }
@@ -88,21 +85,36 @@ function StatTile({ label, value, sub }: { label: string; value: number; sub?: s
   );
 }
 
-function TrendBars({ points }: { points: AnalyticsData['dailyPageviews'] }) {
-  const max = Math.max(1, ...points.map((p) => p.views));
+function TrendBars({
+  points,
+  bucket,
+  windowDays,
+}: {
+  points: AnalyticsData['dailyPageviews'];
+  bucket: 'day' | 'week';
+  windowDays: WindowDays;
+}) {
+  const maxViews = Math.max(0, ...points.map((p) => p.views));
+  const max = Math.max(1, maxViews);
+  const unit = bucket === 'week' ? 'Weekly' : 'Daily';
   return (
     <div>
-      <div className="flex items-end gap-[3px] h-24" role="img" aria-label="Daily pageviews, last 30 days">
+      <div className="flex items-end gap-[3px] h-24" role="img" aria-label={`${unit} pageviews, last ${windowDays} days`}>
         {points.map((p) => {
           const h = Math.round((p.views / max) * 100);
           const guestH = p.views > 0 ? Math.round((p.guestViews / p.views) * h) : 0;
+          const range = p.endDate ? `${p.date} – ${p.endDate}` : p.date;
           return (
             <div
               key={p.date}
               className="flex-1 flex flex-col justify-end min-w-0"
-              title={`${p.date}: ${p.views} views (${p.guestViews} guest)`}
+              title={`${range}: ${p.views} views (${p.guestViews} guest)`}
             >
-              <div className="w-full bg-grove-accent/30 rounded-sm relative" style={{ height: `${Math.max(h, 2)}%` }}>
+              {/* Zero renders flat; any non-zero count keeps a visible sliver. */}
+              <div
+                className="w-full bg-grove-accent/30 rounded-sm relative"
+                style={{ height: p.views > 0 ? `${Math.max(h, 2)}%` : '0%' }}
+              >
                 <div
                   className="absolute bottom-0 left-0 right-0 bg-grove-accent rounded-sm"
                   style={{ height: `${guestH}%` }}
@@ -115,6 +127,7 @@ function TrendBars({ points }: { points: AnalyticsData['dailyPageviews'] }) {
       <div className="flex items-center gap-4 mt-2 text-[11px] text-grove-text-muted">
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-grove-accent/30" /> pageviews</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-sm bg-grove-accent" /> guest views</span>
+        <span className="ml-auto tabular-nums">max {maxViews.toLocaleString()} per {bucket}</span>
       </div>
     </div>
   );
@@ -123,10 +136,16 @@ function TrendBars({ points }: { points: AnalyticsData['dailyPageviews'] }) {
 function RankedList({
   title,
   rows,
+  total,
+  totalLabel = 'Total',
   emptyLabel,
 }: {
   title: string;
   rows: { label: string; value: number }[];
+  /** Window total for this list — rows are a capped top-N, so it can exceed their sum. */
+  total: number;
+  /** Name the unit when "Total" could be misread (e.g. pageviews, not visitors). */
+  totalLabel?: string;
   emptyLabel: string;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
@@ -150,6 +169,10 @@ function RankedList({
               </div>
             </li>
           ))}
+          <li className="flex items-center justify-between gap-2 pt-2 border-t border-grove-border">
+            <span className="text-xs font-medium text-grove-text">{totalLabel}</span>
+            <span className="text-xs font-medium text-grove-text tabular-nums">{total.toLocaleString()}</span>
+          </li>
         </ul>
       )}
     </div>
@@ -158,14 +181,14 @@ function RankedList({
 
 export function AnalyticsPanel() {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
-  const [win, setWin] = useState<WindowKey>('week');
+  const [win, setWin] = useState<WindowDays>(DEFAULT_WINDOW);
   const [selfTest, setSelfTest] = useState<SelfTest>({ kind: 'idle' });
 
   const load = useCallback(async (): Promise<AnalyticsData | null> => {
-    const r = await apiFetch('/api/admin/analytics', { method: 'GET' });
+    const r = await apiFetch(`/api/admin/analytics?window=${win}`, { method: 'GET' });
     if (!r.ok) return null;
     return (await r.json()) as AnalyticsData;
-  }, []);
+  }, [win]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,18 +251,9 @@ export function AnalyticsPanel() {
   }
 
   const { data } = state;
-  // All-time totals come from cheap COUNTs, which can't produce visit-shaped
-  // metrics — those tiles are hidden for this window rather than shown as 0.
-  const stats: WindowStats =
-    win === 'all'
-      ? {
-          ...data.allTime,
-          guestPageviews: 0,
-          visits: 0, pagesPerVisit: 0, bounceRate: 0,
-          newVisitors: 0, returningVisitors: 0,
-        }
-      : data.windows[win];
-  const guestSub = win === 'all' ? undefined : `${stats.guestPageviews.toLocaleString()} guest views`;
+  const stale = data.windowDays !== win;
+  const stats = data.window;
+  const guestSub = `${stats.guestPageviews.toLocaleString()} guest views`;
   const health = data.health;
 
   return (
@@ -311,21 +325,29 @@ export function AnalyticsPanel() {
 
       {/* Window selector */}
       <div className="flex flex-wrap gap-1.5">
-        {(Object.keys(WINDOW_LABELS) as WindowKey[]).map((k) => (
+        {WINDOW_OPTIONS.map((k) => (
           <button
             key={k}
             onClick={() => setWin(k)}
+            aria-pressed={win === k}
             className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
               win === k
                 ? 'border-grove-accent bg-grove-accent/15 text-grove-text'
                 : 'border-grove-border text-grove-text-muted hover:text-grove-text'
             }`}
           >
-            {WINDOW_LABELS[k]}
+            Last {k} days
           </button>
         ))}
       </div>
 
+      {/* The fetch for a newly selected window hasn't landed: what's in state
+          belongs to the previous window, so show nothing rather than numbers
+          labelled as the wrong period. */}
+      {stale ? (
+        <p role="status" className="text-sm text-grove-text-muted italic py-8 text-center">Loading…</p>
+      ) : (
+      <>
       {/* Stat tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatTile label="Pageviews" value={stats.pageviews} sub={guestSub} />
@@ -335,66 +357,73 @@ export function AnalyticsPanel() {
       </div>
 
       {/* Visit-shaped metrics — "how many people and how deep did they go",
-          which raw hit counts can't answer. Hidden for the all-time window,
-          where only cheap COUNTs are available. */}
-      {win !== 'all' && 'visits' in stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatTile
-            label="Visits"
-            value={stats.visits}
-            sub={stats.visits > 0 ? `${stats.pagesPerVisit} pages each` : undefined}
-          />
-          <StatTile label="Bounce rate" value={stats.bounceRate} sub="% seeing one page" />
-          <StatTile label="New visitors" value={stats.newVisitors} />
-          <StatTile label="Returning" value={stats.returningVisitors} />
-        </div>
-      )}
+          which raw hit counts can't answer. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatTile
+          label="Visits"
+          value={stats.visits}
+          sub={stats.visits > 0 ? `${stats.pagesPerVisit} pages each` : undefined}
+        />
+        <StatTile label="Visits reaching an event page" value={stats.visitsToEvents} />
+        <StatTile label="New visitors" value={stats.newVisitors} />
+        <StatTile label="Returning" value={stats.returningVisitors} />
+      </div>
 
-      {/* 30-day trend */}
+      {/* Trend over the selected window */}
       <div className="bg-grove-surface border border-grove-border rounded-xl p-4">
-        <h3 className="text-sm font-medium text-grove-text mb-3">Pageviews — last 30 days</h3>
-        <TrendBars points={data.dailyPageviews} />
+        <h3 className="text-sm font-medium text-grove-text mb-3">
+          Pageviews — last {win} days{data.trendBucket === 'week' ? ' (by week)' : ''}
+        </h3>
+        <TrendBars points={data.dailyPageviews} bucket={data.trendBucket} windowDays={win} />
       </div>
 
       {/* Top paths + clicks */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <RankedList
-          title="Top pages (30d)"
+          title={`Top pages (${win}d)`}
           rows={data.topPaths.map((p) => ({ label: p.path, value: p.views }))}
+          total={stats.pageviews}
           emptyLabel="No pageviews recorded yet."
         />
         <RankedList
-          title="Top clicked CTAs (30d)"
+          title={`Top clicked CTAs (${win}d)`}
           rows={data.topClicks.map((c) => ({ label: c.target, value: c.clicks }))}
+          total={stats.clicks}
           emptyLabel="No CTA clicks recorded yet."
         />
       </div>
 
       {/* Who and where from — the question that prompted analytics in the
-          first place. All four are 30-day windows regardless of the selector,
-          since these need volume to be meaningful. */}
+          first place. All four follow the selected window. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <RankedList
-          title="Where visitors came from (30d)"
+          title={`Where visitors came from (${win}d)`}
           rows={(data.topReferrers ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          total={stats.pageviews}
+          totalLabel="Total pageviews"
           emptyLabel="No referrer data yet."
         />
         <RankedList
-          title="Countries (30d)"
+          title={`Countries (${win}d)`}
           rows={(data.topCountries ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          total={stats.pageviews}
           emptyLabel="No country data yet."
         />
         <RankedList
-          title="Devices (30d)"
+          title={`Devices (${win}d)`}
           rows={(data.devices ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          total={stats.pageviews}
           emptyLabel="No device data yet."
         />
         <RankedList
-          title="Member vs guest vs anonymous (30d)"
+          title={`Member vs guest vs anonymous (${win}d)`}
           rows={(data.viewers ?? []).map((r) => ({ label: r.label, value: r.count }))}
+          total={stats.pageviews}
           emptyLabel="No viewer data yet."
         />
       </div>
+      </>
+      )}
 
       <div className="text-[11px] text-grove-text-dim text-center space-y-1">
         <p>
@@ -407,6 +436,10 @@ export function AnalyticsPanel() {
           Stored: page path, referring site’s host, country, device size bucket, and an
           anonymous per-browser id. Not stored: IP addresses, user-agent strings, full
           referring URLs, or any tracking cookie.
+        </p>
+        <p>
+          Admin pages and the pipeline test click are collected but excluded from every
+          number above.
         </p>
       </div>
     </div>

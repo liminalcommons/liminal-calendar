@@ -3,9 +3,11 @@
  * aggregation (aggregate.ts) so the number-crunching stays unit-testable.
  */
 
-import { and, count, countDistinct, desc, eq, gte } from 'drizzle-orm';
+import {
+  and, count, desc, gte, isNotNull, isNull, min, ne, notLike, or,
+} from 'drizzle-orm';
 import { analyticsEvents } from '@/lib/db/schema';
-import type { AnalyticsRow } from './aggregate';
+import { INTERNAL_CLICK_TARGET, INTERNAL_PATH_PREFIX, type AnalyticsRow } from './aggregate';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = any;
@@ -13,7 +15,8 @@ type Db = any;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Load the trailing-30-day window used to build the dashboard summary.
+ * Load the trailing window used to build the dashboard summary (default 30
+ * days; the route passes the selected window).
  * Bounded by a hard row cap so a traffic spike can't blow up the query — if
  * the cap is hit the newest rows win (order by created_at desc).
  */
@@ -21,8 +24,9 @@ export async function fetchRecentAnalyticsRows(
   db: Db,
   nowMs: number,
   limit = 50000,
+  windowDays = 30,
 ): Promise<AnalyticsRow[]> {
-  const since = new Date(nowMs - 30 * DAY_MS);
+  const since = new Date(nowMs - windowDays * DAY_MS);
   const rows = await db
     .select({
       type: analyticsEvents.type,
@@ -57,6 +61,33 @@ export async function fetchRecentAnalyticsRows(
   }));
 }
 
+/**
+ * Earliest event time (epoch ms) per visitor across FULL history — the basis
+ * for new vs returning. Internal (admin) rows are excluded so an admin poking
+ * around first doesn't make a later real visit look like a return.
+ */
+export async function fetchFirstSeenByVisitor(db: Db): Promise<Map<string, number>> {
+  const rows: Array<{ visitorId: string | null; first: Date | string | null }> = await db
+    .select({ visitorId: analyticsEvents.visitorId, first: min(analyticsEvents.createdAt) })
+    .from(analyticsEvents)
+    .where(
+      and(
+        isNotNull(analyticsEvents.visitorId),
+        or(isNull(analyticsEvents.path), notLike(analyticsEvents.path, `${INTERNAL_PATH_PREFIX}%`)),
+        or(isNull(analyticsEvents.target), ne(analyticsEvents.target, INTERNAL_CLICK_TARGET)),
+      ),
+    )
+    .groupBy(analyticsEvents.visitorId);
+
+  const out = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.visitorId || !r.first) continue;
+    const t = new Date(r.first).getTime();
+    if (!isNaN(t)) out.set(r.visitorId, t);
+  }
+  return out;
+}
+
 // Re-exported so existing analytics callers keep a single import site.
 export { isMissingTableError } from '@/lib/db/errors';
 
@@ -73,7 +104,6 @@ export async function fetchLastEventAt(db: Db): Promise<string | null> {
 
 export interface AllTimeTotals {
   pageviews: number;
-  uniqueVisitors: number;
   guestEntries: number;
   clicks: number;
 }
@@ -87,14 +117,8 @@ export async function fetchAllTimeTotals(db: Db): Promise<AllTimeTotals> {
 
   const totalFor = (t: string) => Number(byType.find((r) => r.type === t)?.c ?? 0);
 
-  const [uv] = await db
-    .select({ n: countDistinct(analyticsEvents.visitorId) })
-    .from(analyticsEvents)
-    .where(and(eq(analyticsEvents.type, 'pageview')));
-
   return {
     pageviews: totalFor('pageview'),
-    uniqueVisitors: Number(uv?.n ?? 0),
     guestEntries: totalFor('guest_enter'),
     clicks: totalFor('click'),
   };

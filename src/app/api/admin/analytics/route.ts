@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
-import { computeAnalyticsSummary } from '@/lib/analytics/aggregate';
+import {
+  computeAnalyticsSummary,
+  DEFAULT_WINDOW_DAYS,
+  WINDOW_DAYS,
+  type WindowDays,
+} from '@/lib/analytics/aggregate';
 import {
   fetchAllTimeTotals,
+  fetchFirstSeenByVisitor,
   fetchLastEventAt,
   fetchRecentAnalyticsRows,
   isMissingTableError,
@@ -17,27 +23,39 @@ async function requireAdmin() {
 }
 
 /** Zeroed payload so the panel can still render structure around a health note. */
-function emptySummary() {
-  const day = { pageviews: 0, uniqueVisitors: 0, guestEntries: 0, clicks: 0, guestPageviews: 0 };
+function emptySummary(windowDays: WindowDays) {
+  const day = {
+    pageviews: 0, uniqueVisitors: 0, guestEntries: 0, clicks: 0, guestPageviews: 0,
+    visits: 0, pagesPerVisit: 0, visitsToEvents: 0, newVisitors: 0, returningVisitors: 0,
+  };
   return {
-    allTime: { pageviews: 0, uniqueVisitors: 0, guestEntries: 0, clicks: 0 },
-    windows: { day: { ...day }, week: { ...day }, month: { ...day } },
+    windowDays,
+    window: { ...day },
+    trendBucket: 'day' as const,
     topPaths: [],
     topClicks: [],
     dailyPageviews: [],
   };
 }
 
-export async function GET() {
+/** `?window=7|30|90`; anything else falls back to 30. */
+function parseWindow(request: Request): WindowDays {
+  const raw = Number(new URL(request.url).searchParams.get('window'));
+  return (WINDOW_DAYS as readonly number[]).includes(raw) ? (raw as WindowDays) : DEFAULT_WINDOW_DAYS;
+}
+
+export async function GET(request: Request) {
   const gate = await requireAdmin();
   if (gate.error) return gate.error;
 
   const nowMs = Date.now();
+  const windowDays = parseWindow(request);
 
   try {
-    const rows = await fetchRecentAnalyticsRows(db, nowMs);
-    const summary = computeAnalyticsSummary(rows, nowMs);
-    const allTime = await fetchAllTimeTotals(db);
+    const rows = await fetchRecentAnalyticsRows(db, nowMs, undefined, windowDays);
+    const firstSeen = await fetchFirstSeenByVisitor(db);
+    const summary = computeAnalyticsSummary(rows, nowMs, { windowDays, firstSeen });
+    const rawTotals = await fetchAllTimeTotals(db);
     const lastEventAt = await fetchLastEventAt(db);
 
     return NextResponse.json({
@@ -49,9 +67,12 @@ export async function GET() {
         status: 'ok' as const,
         tableExists: true,
         lastEventAt,
-        totalEvents: allTime.pageviews + allTime.guestEntries + allTime.clicks,
+        // Raw, unfiltered, all-time count — deliberately NOT the window/admin-
+        // filtered numbers. The pipeline self-test sends an `admin:self-test`
+        // click (excluded from every displayed figure) and checks that this
+        // total went up, so filtering or windowing it would break the test.
+        totalEvents: rawTotals.pageviews + rawTotals.guestEntries + rawTotals.clicks,
       },
-      allTime,
       ...summary,
     });
   } catch (err) {
@@ -67,7 +88,7 @@ export async function GET() {
           lastEventAt: null,
           totalEvents: 0,
         },
-        ...emptySummary(),
+        ...emptySummary(windowDays),
       });
     }
 

@@ -10,6 +10,7 @@ jest.mock('@/lib/analytics/repo', () => ({
   fetchRecentAnalyticsRows: jest.fn(),
   fetchAllTimeTotals: jest.fn(),
   fetchLastEventAt: jest.fn(),
+  fetchFirstSeenByVisitor: jest.fn().mockResolvedValue(new Map()),
   // Use the REAL predicate. Stubbing it here previously hid the actual bug:
   // the route classified fine against a hand-made `{code:'42P01'}`, while
   // production errors arrive wrapped by Drizzle with the code on `.cause`.
@@ -44,7 +45,7 @@ afterEach(() => {
 describe('GET /api/admin/analytics — health reporting', () => {
   it('rejects non-admins', async () => {
     mockGetAuthedUser.mockResolvedValue({ ...adminUser, role: 'member' });
-    const res = await GET();
+    const res = await GET(new Request('http://x/api/admin/analytics'));
     expect(res.status).toBe(403);
   });
 
@@ -53,7 +54,7 @@ describe('GET /api/admin/analytics — health reporting', () => {
     mockTotals.mockResolvedValue({ pageviews: 10, uniqueVisitors: 4, guestEntries: 2, clicks: 3 });
     mockLastAt.mockResolvedValue('2026-08-01T10:00:00.000Z');
 
-    const res = await GET();
+    const res = await GET(new Request('http://x/api/admin/analytics'));
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -69,7 +70,7 @@ describe('GET /api/admin/analytics — health reporting', () => {
     mockTotals.mockResolvedValue({ pageviews: 0, uniqueVisitors: 0, guestEntries: 0, clicks: 0 });
     mockLastAt.mockResolvedValue(null);
 
-    const body = await (await GET()).json();
+    const body = await (await GET(new Request('http://x/api/admin/analytics'))).json();
     expect(body.health.status).toBe('ok');
     expect(body.health.totalEvents).toBe(0);
     expect(body.health.lastEventAt).toBeNull();
@@ -88,22 +89,61 @@ describe('GET /api/admin/analytics — health reporting', () => {
     );
     mockRows.mockRejectedValue(undefinedTable);
 
-    const res = await GET();
+    const res = await GET(new Request('http://x/api/admin/analytics'));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body.health.status).toBe('table_missing');
     expect(body.health.tableExists).toBe(false);
     // Zeroed structure so the panel still renders around the health notice.
-    expect(body.allTime.pageviews).toBe(0);
-    expect(body.windows.week.pageviews).toBe(0);
+    expect(body.window.pageviews).toBe(0);
+    expect(body.allTime).toBeUndefined();
+    expect(body.windows).toBeUndefined();
     expect(body.topPaths).toEqual([]);
   });
 
   it('still 500s on an unrelated database error', async () => {
     mockRows.mockRejectedValue(Object.assign(new Error('connection refused'), { code: 'ECONNREFUSED' }));
-    const res = await GET();
+    const res = await GET(new Request('http://x/api/admin/analytics'));
     expect(res.status).toBe(500);
     expect((await res.json()).error).toBe('Failed to load analytics');
+  });
+});
+
+describe('GET /api/admin/analytics — window param', () => {
+  beforeEach(() => {
+    mockRows.mockResolvedValue([]);
+    mockTotals.mockResolvedValue({ pageviews: 0, uniqueVisitors: 0, guestEntries: 0, clicks: 0 });
+    mockLastAt.mockResolvedValue(null);
+  });
+
+  it('defaults to 30 days', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/analytics'))).json();
+    expect(body.windowDays).toBe(30);
+    expect(mockRows).toHaveBeenCalledWith(expect.anything(), expect.any(Number), undefined, 30);
+  });
+
+  it('loads and reports the requested window', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/analytics?window=90'))).json();
+    expect(body.windowDays).toBe(90);
+    expect(body.trendBucket).toBe('week');
+    expect(mockRows).toHaveBeenCalledWith(expect.anything(), expect.any(Number), undefined, 90);
+  });
+
+  it('loads only the requested 7 days of rows', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/analytics?window=7'))).json();
+    expect(body.windowDays).toBe(7);
+    expect(mockRows).toHaveBeenCalledWith(expect.anything(), expect.any(Number), undefined, 7);
+  });
+
+  it('no longer sends allTime or day/week/month summaries', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/analytics'))).json();
+    expect(body.allTime).toBeUndefined();
+    expect(body.windows).toBeUndefined();
+  });
+
+  it('ignores unsupported windows', async () => {
+    const body = await (await GET(new Request('http://x/api/admin/analytics?window=365'))).json();
+    expect(body.windowDays).toBe(30);
   });
 });

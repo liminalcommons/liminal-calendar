@@ -21,28 +21,24 @@ describe('computeAnalyticsSummary', () => {
       { type: 'click', path: '/', target: 'join-meeting', visitorId: 'v1', isGuest: false, createdAt: hoursAgo(1) },
     ];
 
-    const s = computeAnalyticsSummary(rows, NOW);
+    // 7d window: 4 pageviews (h1,h2,h3,d3), 3 unique visitors (v1,v2,v3), 1 guest pv.
+    const w7 = computeAnalyticsSummary(rows, NOW, { windowDays: 7 }).window;
+    expect(w7.pageviews).toBe(4);
+    expect(w7.uniqueVisitors).toBe(3);
+    expect(w7.guestPageviews).toBe(1);
+    expect(w7.guestEntries).toBe(1);
+    expect(w7.clicks).toBe(1);
 
-    // Day window: 3 pageviews (h1,h2,h3), 2 unique visitors (v1,v2), 1 guest pv.
-    expect(s.windows.day.pageviews).toBe(3);
-    expect(s.windows.day.uniqueVisitors).toBe(2);
-    expect(s.windows.day.guestPageviews).toBe(1);
-    expect(s.windows.day.guestEntries).toBe(1);
-    expect(s.windows.day.clicks).toBe(1);
-
-    // Week window adds the 3-days-ago view → 4 pageviews, 3 unique.
-    expect(s.windows.week.pageviews).toBe(4);
-    expect(s.windows.week.uniqueVisitors).toBe(3);
-
-    // Month window adds the 20-days-ago view → 5 pageviews.
-    expect(s.windows.month.pageviews).toBe(5);
-    expect(s.windows.month.uniqueVisitors).toBe(4);
+    // 30d window adds the 20-days-ago view → 5 pageviews, 4 unique.
+    const w30 = computeAnalyticsSummary(rows, NOW, { windowDays: 30 }).window;
+    expect(w30.pageviews).toBe(5);
+    expect(w30.uniqueVisitors).toBe(4);
   });
 
   it('excludes events older than 30 days', () => {
     const rows: AnalyticsRow[] = [pageview(daysAgo(45), 'old')];
     const s = computeAnalyticsSummary(rows, NOW);
-    expect(s.windows.month.pageviews).toBe(0);
+    expect(s.window.pageviews).toBe(0);
     expect(s.dailyPageviews.every((p) => p.views === 0)).toBe(true);
   });
 
@@ -60,13 +56,68 @@ describe('computeAnalyticsSummary', () => {
     expect(s.topClicks[0]).toEqual({ target: 'landing:sign-up', clicks: 2 });
   });
 
-  it('produces 30 daily buckets, newest last', () => {
+  it('buckets the default 30-day window by week, newest last', () => {
     const s = computeAnalyticsSummary([pageview(hoursAgo(1), 'v1', true)], NOW);
-    expect(s.dailyPageviews).toHaveLength(30);
+    expect(s.trendBucket).toBe('week');
+    expect(s.dailyPageviews).toHaveLength(5); // 30d = 4 full weeks + a 2-day remainder
     const last = s.dailyPageviews[s.dailyPageviews.length - 1];
-    expect(last.date).toBe('2026-07-17');
+    expect(last.endDate).toBe('2026-07-17');
     expect(last.views).toBe(1);
     expect(last.guestViews).toBe(1);
+  });
+});
+
+describe('computeAnalyticsSummary — selected window', () => {
+  it('uses daily buckets at 7d, with zero days at exactly 0', () => {
+    const s = computeAnalyticsSummary([pageview(hoursAgo(1), 'v1')], NOW, { windowDays: 7 });
+    expect(s.trendBucket).toBe('day');
+    expect(s.dailyPageviews).toHaveLength(7);
+    expect(s.dailyPageviews.map((p) => p.views)).toEqual([0, 0, 0, 0, 0, 0, 1]);
+  });
+
+  it('uses weekly buckets at 90d and keeps totals consistent with the tiles', () => {
+    const rows = [pageview(daysAgo(1), 'v1'), pageview(daysAgo(40), 'v2'), pageview(daysAgo(85), 'v3')];
+    const s = computeAnalyticsSummary(rows, NOW, { windowDays: 90 });
+    expect(s.trendBucket).toBe('week');
+    expect(s.dailyPageviews).toHaveLength(13);
+    expect(s.dailyPageviews.reduce((a, p) => a + p.views, 0)).toBe(3);
+    expect(s.window.pageviews).toBe(3);
+  });
+
+  it('drives tiles and ranked lists from the selected window', () => {
+    const rows = [
+      pageview(daysAgo(2), 'v1', false, '/new'),
+      pageview(daysAgo(60), 'v2', false, '/old'),
+    ];
+    const w7 = computeAnalyticsSummary(rows, NOW, { windowDays: 7 });
+    const w90 = computeAnalyticsSummary(rows, NOW, { windowDays: 90 });
+    expect(w7.window.pageviews).toBe(1);
+    expect(w7.topPaths.map((p) => p.path)).toEqual(['/new']);
+    expect(w90.window.pageviews).toBe(2);
+    expect(w90.topPaths).toHaveLength(2);
+  });
+});
+
+describe('computeAnalyticsSummary — internal traffic exclusion', () => {
+  it('drops /admin paths and the admin:self-test click from every count', () => {
+    const rows: AnalyticsRow[] = [
+      pageview(hoursAgo(1), 'real', false, '/events/12'),
+      { ...pageview(hoursAgo(1), 'admin', false, '/admin'), visitId: 'adm', referrerHost: 'x.com' },
+      pageview(hoursAgo(1), 'admin', false, '/admin/analytics'),
+      { type: 'click', path: '/admin', target: 'admin:self-test', visitorId: 'admin', isGuest: false, createdAt: hoursAgo(1) },
+      { type: 'click', path: '/', target: 'admin:self-test', visitorId: 'admin', isGuest: false, createdAt: hoursAgo(1) },
+      { type: 'click', path: '/', target: 'join-meeting', visitorId: 'real', isGuest: false, createdAt: hoursAgo(1) },
+      { type: 'guest_enter', path: '/admin', target: null, visitorId: null, isGuest: true, createdAt: hoursAgo(1) },
+    ];
+    const s = computeAnalyticsSummary(rows, NOW);
+    expect(s.window.pageviews).toBe(1);
+    expect(s.window.uniqueVisitors).toBe(1);
+    expect(s.window.clicks).toBe(1);
+    expect(s.window.guestEntries).toBe(0);
+    expect(s.topPaths).toEqual([{ path: '/events/12', views: 1 }]);
+    expect(s.topClicks).toEqual([{ target: 'join-meeting', clicks: 1 }]);
+    expect(s.topReferrers.some((r) => r.label === 'x.com')).toBe(false);
+    expect(s.dailyPageviews.reduce((a, p) => a + p.views, 0)).toBe(1);
   });
 });
 
@@ -91,20 +142,22 @@ describe('computeAnalyticsSummary — visit-shaped metrics', () => {
       pv({ visitId: 'a' }), pv({ visitId: 'a' }), pv({ visitId: 'a' }),
       pv({ visitId: 'b' }),
     ];
-    const { windows } = computeAnalyticsSummary(rows, NOW);
-    expect(windows.day.pageviews).toBe(4);
-    expect(windows.day.visits).toBe(2);
-    expect(windows.day.pagesPerVisit).toBe(2);
+    const { window: w } = computeAnalyticsSummary(rows, NOW);
+    expect(w.pageviews).toBe(4);
+    expect(w.visits).toBe(2);
+    expect(w.pagesPerVisit).toBe(2);
   });
 
-  it('treats single-page visits as bounces', () => {
+  it('counts visits reaching an event page once each, only for /events/ paths', () => {
     const rows = [
-      pv({ visitId: 'a' }), pv({ visitId: 'a' }), // engaged
-      pv({ visitId: 'b' }),                        // bounce
-      pv({ visitId: 'c' }),                        // bounce
+      pv({ visitId: 'a', path: '/' }), pv({ visitId: 'a', path: '/events/3' }), pv({ visitId: 'a', path: '/events/4' }),
+      pv({ visitId: 'b', path: '/events/3' }),
+      pv({ visitId: 'c', path: '/week' }),
+      pv({ visitId: 'd', path: '/eventsfoo' }),
     ];
-    const { windows } = computeAnalyticsSummary(rows, NOW);
-    expect(windows.day.bounceRate).toBe(67); // 2 of 3
+    const { window: w } = computeAnalyticsSummary(rows, NOW);
+    expect(w.visits).toBe(4);
+    expect(w.visitsToEvents).toBe(2);
   });
 
   it('splits new from returning by first-ever appearance', () => {
@@ -115,16 +168,39 @@ describe('computeAnalyticsSummary — visit-shaped metrics', () => {
       // First appearance is inside the day window → new.
       pv({ visitorId: 'fresh', visitId: 'z' }),
     ];
-    const { windows } = computeAnalyticsSummary(rows, NOW);
-    expect(windows.day.newVisitors).toBe(1);
-    expect(windows.day.returningVisitors).toBe(1);
+    const { window: w } = computeAnalyticsSummary(rows, NOW, { windowDays: 7 });
+    expect(w.newVisitors).toBe(1);
+    expect(w.returningVisitors).toBe(1);
+  });
+
+  it('uses full-history first-seen so a visitor first seen before the loaded window is returning', () => {
+    const rows = [
+      pv({ visitorId: 'old', visitId: 'y' }),
+      pv({ visitorId: 'fresh', visitId: 'z' }),
+    ];
+    // Loaded rows alone would call both new; full history says 'old' was here 50 days ago.
+    const firstSeen = new Map([
+      ['old', NOW - 50 * 24 * 60 * 60_000],
+      ['fresh', NOW - 10 * 60_000],
+    ]);
+    const { window } = computeAnalyticsSummary(rows, NOW, { firstSeen });
+    expect(window.newVisitors).toBe(1);
+    expect(window.returningVisitors).toBe(1);
+  });
+
+  it('treats a visitor missing from first-seen as returning, not new', () => {
+    const { window } = computeAnalyticsSummary([pv({ visitorId: 'ghost', visitId: 'g' })], NOW, {
+      firstSeen: new Map(),
+    });
+    expect(window.newVisitors).toBe(0);
+    expect(window.returningVisitors).toBe(1);
   });
 
   it('reports zeroed visit metrics rather than dividing by zero', () => {
-    const { windows } = computeAnalyticsSummary([], NOW);
-    expect(windows.day.visits).toBe(0);
-    expect(windows.day.pagesPerVisit).toBe(0);
-    expect(windows.day.bounceRate).toBe(0);
+    const { window: w } = computeAnalyticsSummary([], NOW);
+    expect(w.visits).toBe(0);
+    expect(w.pagesPerVisit).toBe(0);
+    expect(w.visitsToEvents).toBe(0);
   });
 });
 
