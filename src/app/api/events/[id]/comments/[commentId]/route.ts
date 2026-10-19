@@ -38,7 +38,7 @@ export async function DELETE(
   // identity-provider migrations. event_comments.memberId is set on
   // every create (see comments POST → createComment), so it's the reliable key.
   const isAuthor = comment.memberId != null && comment.memberId === member.id;
-  const isAdmin = member.role === 'admin' || member.role === 'owner';
+  const isAdmin = member.role === 'admin' || member.role === 'governor';
   if (!isAuthor && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

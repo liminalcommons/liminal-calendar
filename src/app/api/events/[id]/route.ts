@@ -201,7 +201,7 @@ export async function PATCH(
     );
   }
 
-  if (wantsInvitationEdit && !isCreator && role !== 'admin' && role !== 'owner') {
+  if (wantsInvitationEdit && !isCreator && role !== 'admin' && role !== 'governor') {
     return NextResponse.json(
       { error: 'Forbidden: only the event creator or an admin can edit invitations' },
       { status: 403 },
@@ -211,7 +211,7 @@ export async function PATCH(
   if (!hasFieldUpdates && !wantsInvitationEdit) {
     // Empty body with no recognized fields — fall through to no-op update.
     // Auth: if user is neither a field editor nor an invitation editor, reject.
-    if (!canEditEvent(role, isCreator) && !isCreator && role !== 'admin' && role !== 'owner') {
+    if (!canEditEvent(role, isCreator) && !isCreator && role !== 'admin' && role !== 'governor') {
       return NextResponse.json(
         { error: 'Forbidden: insufficient permissions to edit this event' },
         { status: 403 },
@@ -250,7 +250,7 @@ export async function PATCH(
   // on the permanent calendar = clearing conference_id) is admin/owner-only.
   // The creator's own flags (continueBeyond, category) follow normal field rules.
   if (Object.prototype.hasOwnProperty.call(bodyRaw, 'conferenceId') && bodyRaw.conferenceId !== undefined) {
-    if (role !== 'admin' && role !== 'owner') {
+    if (role !== 'admin' && role !== 'governor') {
       return NextResponse.json(
         { error: 'Forbidden: only admins can move events between calendars' },
         { status: 403 },

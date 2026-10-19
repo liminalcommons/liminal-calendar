@@ -8,7 +8,7 @@ export async function GET(_request: NextRequest) {
   if (!member) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (member.role !== 'admin' && member.role !== 'owner') {
+  if (member.role !== 'admin' && member.role !== 'governor') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

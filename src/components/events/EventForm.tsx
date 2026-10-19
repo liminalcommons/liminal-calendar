@@ -312,7 +312,7 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
       ?? 'member',
     [session, clerkAwareRole],
   );
-  const canCreatePublic = userRole === 'host' || userRole === 'admin' || userRole === 'owner';
+  const canCreatePublic = userRole === 'host' || userRole === 'admin' || userRole === 'governor';
   const conferenceActive = !!conference && conference.status === 'active';
   const inviteeCap = userRole === 'member' ? INVITEE_CAP_MEMBER : undefined;
 
@@ -519,7 +519,7 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         // member may create while an active conference is in scope (Limicon).
         // Edit mode relies on the PATCH API's own 403s (creator-or-admin).
         if (mode === 'create') {
-          if (profile.role !== 'host' && profile.role !== 'admin' && profile.role !== 'owner' && !conferenceActive) {
+          if (profile.role !== 'host' && profile.role !== 'admin' && profile.role !== 'governor' && !conferenceActive) {
             router.replace('/');
           }
         }

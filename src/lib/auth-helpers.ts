@@ -1,12 +1,12 @@
 // Pure helpers — no `auth` import, so this module stays client-safe.
 // Server-only auth() callers should import directly from `@/auth`.
 
-export type UserRole = 'member' | 'host' | 'admin' | 'owner';
+export type UserRole = 'member' | 'host' | 'admin' | 'governor';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getUserRole(session: any): UserRole {
   const role = session?.user?.role;
-  if (role === 'owner') return 'owner';
+  if (role === 'governor') return 'governor';
   if (role === 'admin') return 'admin';
   if (role === 'host') return 'host';
   return 'member';
@@ -21,35 +21,35 @@ export function canCreateEvents(role: UserRole): boolean {
   // members with >10 invitees, called inside POST /api/events before the
   // INSERT). Members may also edit + delete their own events (canEditEvent /
   // canDeleteEvent gate on creator ownership).
-  return role === 'member' || role === 'host' || role === 'admin' || role === 'owner';
+  return role === 'member' || role === 'host' || role === 'admin' || role === 'governor';
 }
 
 export function canCreatePublicEvent(role: UserRole): boolean {
-  return role === 'host' || role === 'admin' || role === 'owner';
+  return role === 'host' || role === 'admin' || role === 'governor';
 }
 
 export function canPromoteMembers(role: UserRole): boolean {
-  return role === 'admin' || role === 'owner';
+  return role === 'admin' || role === 'governor';
 }
 
-/** Admins and owners — every admin API gate and admin UI affordance. */
+/** Admins and governors — every admin API gate and admin UI affordance. */
 export function isAdminLike(role: UserRole): boolean {
-  return role === 'admin' || role === 'owner';
+  return role === 'admin' || role === 'governor';
 }
 
 /** Hosts and above — everyone allowed to publish public events. */
 export function isHostOrAbove(role: UserRole): boolean {
-  return role === 'host' || role === 'admin' || role === 'owner';
+  return role === 'host' || role === 'admin' || role === 'governor';
 }
 
 /**
  * Who may assign which role via POST /api/admin/members/[id]/role.
- * Only owners can create admins (or owners). Admins keep everything else —
+ * Only governors can create admins (or governors). Admins keep everything else —
  * they can still grant/revoke member/host — minus the ability to mint admins.
  */
 export function canAssignRole(callerRole: UserRole, targetRole: string): boolean {
-  if (callerRole === 'owner') {
-    return targetRole === 'member' || targetRole === 'host' || targetRole === 'admin' || targetRole === 'owner';
+  if (callerRole === 'governor') {
+    return targetRole === 'member' || targetRole === 'host' || targetRole === 'admin' || targetRole === 'governor';
   }
   if (callerRole === 'admin') {
     return targetRole === 'member' || targetRole === 'host';
@@ -75,19 +75,19 @@ export function canEditEvent(role: UserRole, isCreator: boolean): boolean {
   // Admins may also edit events they didn't create — mirrors canDeleteEvent so
   // admins aren't limited to delete-only when a member-run event needs a fix.
   // (Product 2026-07-29: restore admin edit-any-event, previously delete-only.)
-  // Owners inherit every admin power.
-  return role === 'admin' || role === 'owner' || isCreator;
+  // Governors inherit every admin power.
+  return role === 'admin' || role === 'governor' || isCreator;
 }
 
 export function canDeleteEvent(role: UserRole, isCreator: boolean): boolean {
   // Admins may delete any event; any creator may delete their own (members
   // included). (Product 2026-05-30: members can delete their own events.)
-  // Owners inherit every admin power.
-  return role === 'admin' || role === 'owner' || isCreator;
+  // Governors inherit every admin power.
+  return role === 'admin' || role === 'governor' || isCreator;
 }
 
 export function canEditAllEvents(role: UserRole): boolean {
-  return role === 'admin' || role === 'owner';
+  return role === 'admin' || role === 'governor';
 }
 
 export function isAuthenticated(session: any): boolean {

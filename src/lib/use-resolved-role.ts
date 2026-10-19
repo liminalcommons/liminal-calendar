@@ -34,8 +34,8 @@ async function fetchProfile(): Promise<ResolvedProfile | null> {
       if (!res.ok) { cached = null; return null; }
       const p = await res.json();
       const role: UserRole =
-        p.role === 'owner'
-          ? 'owner'
+        p.role === 'governor'
+          ? 'governor'
           : p.role === 'admin'
             ? 'admin'
             : p.role === 'host'

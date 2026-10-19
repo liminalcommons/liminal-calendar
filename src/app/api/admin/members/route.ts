@@ -47,12 +47,12 @@ export async function PATCH(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (!role || !['member', 'host', 'admin', 'owner'].includes(role as string)) {
-    return NextResponse.json({ error: 'role must be member, host, admin, or owner' }, { status: 400 });
+  if (!role || !['member', 'host', 'admin', 'governor'].includes(role as string)) {
+    return NextResponse.json({ error: 'role must be member, host, admin, or governor' }, { status: 400 });
   }
-  // Only owners can mint admins (or owners) — same rule as the role route.
+  // Only governors can mint admins (or governors) — same rule as the role route.
   if (!canAssignRole(gate.user.role, role as string)) {
-    return NextResponse.json({ error: 'Forbidden: only owners can create admins' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden: only governors can create admins' }, { status: 403 });
   }
 
   try {
@@ -104,12 +104,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
   const requestedRole = typeof role === 'string' ? role : 'host';
-  const assignRole = (['member', 'host', 'admin', 'owner'].includes(requestedRole))
+  const assignRole = (['member', 'host', 'admin', 'governor'].includes(requestedRole))
     ? requestedRole
     : 'host';
-  // Only owners may mint admin/owner rows through this route.
+  // Only governors may mint admin/governor rows through this route.
   if (!canAssignRole(gate.user.role, assignRole)) {
-    return NextResponse.json({ error: 'Forbidden: only owners can create admins' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden: only governors can create admins' }, { status: 403 });
   }
   const imageValue = typeof image === 'string' ? image : null;
 

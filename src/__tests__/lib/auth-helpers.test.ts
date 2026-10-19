@@ -84,20 +84,20 @@ describe('canCreatePublicEvent', () => {
   it('rejects members', () => { expect(canCreatePublicEvent('member')).toBe(false); });
   it('allows hosts', () => { expect(canCreatePublicEvent('host')).toBe(true); });
   it('allows admins', () => { expect(canCreatePublicEvent('admin')).toBe(true); });
-  it('allows owners', () => { expect(canCreatePublicEvent('owner')).toBe(true); });
+  it('allows governors', () => { expect(canCreatePublicEvent('governor')).toBe(true); });
 });
 
-describe('canAssignRole — only owners mint admins', () => {
-  it('owner may assign any role', () => {
-    for (const target of ['member', 'host', 'admin', 'owner']) {
-      expect(canAssignRole('owner', target)).toBe(true);
+describe('canAssignRole — only governors mint admins', () => {
+  it('governor may assign any role', () => {
+    for (const target of ['member', 'host', 'admin', 'governor']) {
+      expect(canAssignRole('governor', target)).toBe(true);
     }
   });
-  it('admin may assign member/host but not admin/owner', () => {
+  it('admin may assign member/host but not admin/governor', () => {
     expect(canAssignRole('admin', 'member')).toBe(true);
     expect(canAssignRole('admin', 'host')).toBe(true);
     expect(canAssignRole('admin', 'admin')).toBe(false);
-    expect(canAssignRole('admin', 'owner')).toBe(false);
+    expect(canAssignRole('admin', 'governor')).toBe(false);
   });
   it('members and hosts may assign nothing', () => {
     expect(canAssignRole('member', 'member')).toBe(false);
@@ -110,7 +110,7 @@ describe('canPublishToConference — time-boxed member hosting', () => {
     expect(canPublishToConference('member', 'active')).toBe(true);
     expect(canPublishToConference('host', 'active')).toBe(true);
     expect(canPublishToConference('admin', 'active')).toBe(true);
-    expect(canPublishToConference('owner', 'active')).toBe(true);
+    expect(canPublishToConference('governor', 'active')).toBe(true);
   });
   it('nothing may publish into upcoming/ended conferences', () => {
     expect(canPublishToConference('member', 'upcoming')).toBe(false);
@@ -121,16 +121,16 @@ describe('canPublishToConference — time-boxed member hosting', () => {
 });
 
 describe('isAdminLike / isHostOrAbove', () => {
-  it('admins and owners are admin-like', () => {
+  it('admins and governors are admin-like', () => {
     expect(isAdminLike('admin')).toBe(true);
-    expect(isAdminLike('owner')).toBe(true);
+    expect(isAdminLike('governor')).toBe(true);
     expect(isAdminLike('host')).toBe(false);
     expect(isAdminLike('member')).toBe(false);
   });
   it('hosts and above clear the host bar', () => {
     expect(isHostOrAbove('host')).toBe(true);
     expect(isHostOrAbove('admin')).toBe(true);
-    expect(isHostOrAbove('owner')).toBe(true);
+    expect(isHostOrAbove('governor')).toBe(true);
     expect(isHostOrAbove('member')).toBe(false);
   });
 });

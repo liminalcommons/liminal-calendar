@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
-const ALLOWED = new Set(['member', 'host', 'admin', 'owner']);
+const ALLOWED = new Set(['member', 'host', 'admin', 'governor']);
 
 export async function POST(
   request: NextRequest,
@@ -26,7 +26,7 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
 
-  // Only owners can create admins (or owners). Admins may still grant/revoke
+  // Only governors can create admins (or governors). Admins may still grant/revoke
   // member/host — everything else they had, minus minting admins.
   if (!canAssignRole(caller.role, body.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

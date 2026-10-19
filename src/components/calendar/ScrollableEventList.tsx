@@ -186,7 +186,7 @@ export function ScrollableEventList({
   }, [hasMore, loading, loadMore])
 
   const canCreate =
-    userRole === 'admin' || userRole === 'host' || userRole === 'owner' || conferenceActive
+    userRole === 'admin' || userRole === 'host' || userRole === 'governor' || conferenceActive
 
   const dateGroups = groupEventsByDateLabel(events)
   const nextEvent = events[0] || null

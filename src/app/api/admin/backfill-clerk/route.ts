@@ -1,7 +1,7 @@
 /**
  * POST /api/admin/backfill-clerk
  *
- * Owner-triggered backfill that walks Clerk's user list and provisions
+ * Admin-triggered backfill that walks Clerk's user list and provisions
  * a `members` row for every Clerk identity that does not yet have one.
  * Companion to the cycle-3 defensive sync in getCurrentMember — that
  * heals on first read AFTER the user signs in again; this route heals
@@ -45,7 +45,7 @@ export async function POST() {
   if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (authed.role !== 'admin' && authed.role !== 'owner') {
+  if (authed.role !== 'admin' && authed.role !== 'governor') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

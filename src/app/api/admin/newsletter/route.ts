@@ -32,7 +32,7 @@ const MAX_RECIPIENTS_PER_SEND = 2000;
 async function requireAdmin() {
   const user = await getAuthedUser();
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (user.role !== 'admin' && user.role !== 'owner') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  if (user.role !== 'admin' && user.role !== 'governor') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   return { user };
 }
 

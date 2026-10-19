@@ -28,10 +28,10 @@ interface Member {
   updatedAt: string;
 }
 
-const ROLES = ['member', 'host', 'admin', 'owner'] as const;
+const ROLES = ['member', 'host', 'admin', 'governor'] as const;
 
 const ROLE_COLORS: Record<string, string> = {
-  owner: 'bg-purple-900/30 text-purple-300 border-purple-700/50 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/50',
+  governor: 'bg-purple-900/30 text-purple-300 border-purple-700/50 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/50',
   admin: 'bg-red-900/30 text-red-300 border-red-700/50 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/50',
   host: 'bg-amber-900/30 text-amber-300 border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
   member: 'bg-grove-border/30 text-grove-text-muted border-grove-border',
@@ -140,17 +140,17 @@ function AdminPageInner() {
 
   const userRole = resolvedRole;
 
-  // Only owners can mint admins (or owners) — admins get a reduced list so the
+  // Only governors can mint admins (or governors) — admins get a reduced list so the
   // UI can't offer what the API would 403. The server is the real gate.
   const assignableRoles: readonly string[] =
-    userRole === 'owner' ? ROLES : ['member', 'host'];
+    userRole === 'governor' ? ROLES : ['member', 'host'];
 
   useEffect(() => {
     if (status === 'loading' || !roleResolved) return;
     // Don't bounce on a failed role lookup — that would hide the fault behind
     // a redirect. The error is rendered instead.
     if (roleError) return;
-    if (userRole !== 'admin' && userRole !== 'owner') {
+    if (userRole !== 'admin' && userRole !== 'governor') {
       router.replace('/');
       return;
     }
@@ -173,7 +173,7 @@ function AdminPageInner() {
           return;
         }
         setMembers(data.sort((a: Member, b: Member) => {
-          const order = { owner: -1, admin: 0, host: 1, member: 2 };
+          const order = { governor: -1, admin: 0, host: 1, member: 2 };
           return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
         }));
         setMembersError(null);
@@ -204,7 +204,7 @@ function AdminPageInner() {
         setMembers(prev =>
           prev.map(m => m.id === member.id ? { ...m, role: updated.role } : m)
             .sort((a, b) => {
-              const order = { owner: -1, admin: 0, host: 1, member: 2 };
+              const order = { governor: -1, admin: 0, host: 1, member: 2 };
               return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
             })
         );
@@ -241,7 +241,7 @@ function AdminPageInner() {
     );
   }
 
-  if (status === 'loading' || !roleResolved || (userRole !== 'admin' && userRole !== 'owner')) {
+  if (status === 'loading' || !roleResolved || (userRole !== 'admin' && userRole !== 'governor')) {
     return (
       <div className="min-h-screen bg-grove-bg">
         <NavBar />
@@ -376,7 +376,7 @@ function AdminPageInner() {
         {/* Role legend */}
         <div className="flex gap-4 mb-6 text-xs flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-purple-400" /> owner — everything; only owners mint admins
+            <span className="w-2 h-2 rounded-full bg-purple-400" /> governor — everything; only governors mint admins
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-400" /> admin — full control, cannot mint admins

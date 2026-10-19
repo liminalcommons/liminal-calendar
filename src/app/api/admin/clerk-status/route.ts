@@ -28,7 +28,7 @@ export async function GET() {
   if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (authed.role !== 'admin' && authed.role !== 'owner') {
+  if (authed.role !== 'admin' && authed.role !== 'governor') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

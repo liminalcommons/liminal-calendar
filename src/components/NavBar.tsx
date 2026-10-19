@@ -120,7 +120,7 @@ export function NavBar() {
         {isAuthed && user ? (
           <>
             {/* Create event — hosts + admins (+ owners) */}
-            {(user.role === 'admin' || user.role === 'host' || user.role === 'owner') && (
+            {(user.role === 'admin' || user.role === 'host' || user.role === 'governor') && (
               <Link
                 href="/events/new"
                 className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-accent hover:text-grove-accent-deep hover:bg-grove-accent/10 transition-colors"
@@ -143,7 +143,7 @@ export function NavBar() {
 
             {/* Gear menu: Sound, Subscribe, Admin, Sign out */}
             <NavGearMenu
-              isAdmin={user.role === 'admin' || user.role === 'owner'}
+              isAdmin={user.role === 'admin' || user.role === 'governor'}
               onSignOut={handleSignOut}
             />
           </>

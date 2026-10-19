@@ -31,13 +31,13 @@ const memberUser = {
   image: null,
   logtoUserId: 'logto-member',
 };
-const ownerUser = {
+const governorUser = {
   memberId: 9,
-  id: 'logto-owner',
-  role: 'owner' as const,
-  name: 'Owner',
+  id: 'logto-governor',
+  role: 'governor' as const,
+  name: 'Governor',
   image: null,
-  logtoUserId: 'logto-owner',
+  logtoUserId: 'logto-governor',
 };
 
 interface UpdateCapture {
@@ -169,8 +169,8 @@ describe('PATCH /api/admin/members', () => {
     expect(updateCapture.set?.role).toBe('host');
   });
 
-  it('owner minting an admin → 200 (only owners can create admins)', async () => {
-    mockGetAuthedUser.mockResolvedValue(ownerUser);
+  it('governor minting an admin → 200 (only governors can create admins)', async () => {
+    mockGetAuthedUser.mockResolvedValue(governorUser);
     const updateCapture: UpdateCapture = {};
     const updated = { id: 9, logtoId: null, clerkId: 'clerk_y', role: 'admin' };
     setupDbMocks({ updateReturn: [updated], updateCapture });
@@ -180,7 +180,7 @@ describe('PATCH /api/admin/members', () => {
     expect(updateCapture.set?.role).toBe('admin');
   });
 
-  it('admin minting an admin → 403 (only owners can create admins)', async () => {
+  it('admin minting an admin → 403 (only governors can create admins)', async () => {
     mockGetAuthedUser.mockResolvedValue(adminUser);
     setupDbMocks({});
 

@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   const user = await getAuthedUser();
-  if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'governor')) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 });
   }
 

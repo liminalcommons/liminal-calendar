@@ -19,7 +19,7 @@ branch preview: `<preview-url>/c/limicon1`. No subdomain, no second deploy.
   tick-box; flags transfer candidates for the admin list.
 - `events.category` text nullable: `speaker | practice | audience | other`;
   `events.category_other` text nullable (free text when `other`).
-- No role migration: `members.role` is free text; `owner` is just a new value.
+- No role migration: `members.role` is free text; `governor` is just a new value.
 
 ## Visibility — new `members` tier
 
@@ -37,7 +37,7 @@ window, so current public events in that window "absorb" automatically.
 
 ## Permissions
 
-- Roles become `member | host | admin | owner`.
+- Roles become `member | host | admin | governor`.
 - Members can already create/edit/delete their own events; the publish gate is
   `canCreatePublicEvent`. New helper `canPublishToConference(role, conference)`:
   any authenticated role may publish `visibility='members'` **with
@@ -47,9 +47,9 @@ window, so current public events in that window "absorb" automatically.
 - EventForm role guard opens for conference creation (member + active conference);
   the plain `/events/new` path stays host/admin-only.
 - `POST /api/admin/members/[id]/role` → `canAssignRole(caller, target)`:
-  owner may assign any role (incl. admin/owner); admin may assign member/host
+  governor may assign any role (incl. admin/governor); admin may assign member/host
   only; everyone else nothing. Admin keeps edit-any-event, all else unchanged.
-- Owner seeding (Erik + Danielle Johnson) is a data write, done explicitly after
+- Governor seeding (Erik + Danielle Johnson) is a data write, done explicitly after
   looking up their member rows — not in a migration.
 
 ## Event form changes
@@ -83,5 +83,5 @@ window, so current public events in that window "absorb" automatically.
 ## Phases
 
 1. Schema + migration. 2. Permissions/visibility. 3. Events + admin API.
-4. EventForm. 5. Views. 6. Owner seeding. 7. Verify (typecheck, jest, local
+4. EventForm. 5. Views. 6. Governor seeding. 7. Verify (typecheck, jest, local
    query test, push, preview URL, HTTP e2e).

@@ -31,8 +31,8 @@ export type AuthedUser = {
 };
 
 function normalizeRole(role: unknown): UserRole {
-  return role === 'owner'
-    ? 'owner'
+  return role === 'governor'
+    ? 'governor'
     : role === 'admin'
       ? 'admin'
       : role === 'host'
