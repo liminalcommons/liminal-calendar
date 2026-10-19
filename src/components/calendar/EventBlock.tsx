@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { useUserTimezone } from '@/lib/timezone-utils';
+import { categoryMeta } from '@/lib/events/categories';
 
 interface EventBlockProps {
   event: DisplayEvent;
@@ -131,6 +132,9 @@ const EventBlock = React.memo(function EventBlock({
   const widthPct = (1 / colTotal) * 100;
 
   const bgGradient = EVENT_GRADIENTS[hashId(event.id)];
+  // Limicon category marker: a coloured left edge so a crowded week stays
+  // scannable by category. Uncategorized events keep the legacy gradient.
+  const catMeta = categoryMeta(event.category);
   // A URL alone isn't a picture. If the asset 404s (moved bucket, expired
   // link), the <img> renders nothing — and because the gradient was skipped
   // for image-bearing events, the tile came out genuinely transparent. Track
@@ -172,6 +176,7 @@ const EventBlock = React.memo(function EventBlock({
         left: `calc(${leftPct}% + 1px)`,
         width: `calc(${widthPct}% - 2px)`,
         background: showImage ? undefined : bgGradient,
+        borderLeft: catMeta ? `3px solid ${catMeta.dot}` : undefined,
         transition: transitionStyle,
         opacity: isDragging ? 0.30 : isMuted ? 0.45 : undefined,
         filter: isMuted ? 'grayscale(0.6)' : undefined,

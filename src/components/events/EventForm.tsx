@@ -11,6 +11,8 @@ import { ImageUpload } from '@/components/ImageUpload';
 import { InviteePicker, type Invitee } from './InviteePicker';
 import { apiFetch } from '@/lib/api-fetch';
 import { INVITEE_CAP_MEMBER } from '@/lib/events/invitations-types';
+import { EVENT_CATEGORIES, type CategoryMeta } from '@/lib/events/categories';
+import type { EventCategory } from '@/lib/events/create-event-input';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -174,6 +176,8 @@ function TalkZonePicker({ selectedZoneId, onChange, autoSelect }: {
 interface EventFormProps {
   mode: 'create' | 'edit';
   eventId?: string;
+  /** Limicon mode: tag the created event to this conference. */
+  conference?: { id: number; slug: string; name: string; status: string } | null;
   externalValues?: Partial<{
     title: string
     description: string
@@ -198,7 +202,7 @@ interface EventFormProps {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuccess }: EventFormProps) {
+export function EventForm({ mode, eventId, conference, externalValues, onValuesChange, onSuccess }: EventFormProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
@@ -240,9 +244,17 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
   // Image
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-  // Visibility + invitees
-  const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  // Visibility + invitees. Conference creations default to members-visible
+  // (every Limicon member sees it, nobody outside does).
+  const [visibility, setVisibility] = useState<'public' | 'private' | 'members'>(
+    conference ? 'members' : 'private',
+  );
   const [invitees, setInvitees] = useState<Invitee[]>([]);
+
+  // Limicon fields: category + "continues beyond" retention flag.
+  const [category, setCategory] = useState<'' | EventCategory>('');
+  const [categoryOther, setCategoryOther] = useState('');
+  const [continueBeyond, setContinueBeyond] = useState(false);
 
   // UI state
   const [timezone, setTimezone] = useState('UTC');
@@ -300,7 +312,8 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
       ?? 'member',
     [session, clerkAwareRole],
   );
-  const canCreatePublic = userRole === 'host' || userRole === 'admin';
+  const canCreatePublic = userRole === 'host' || userRole === 'admin' || userRole === 'owner';
+  const conferenceActive = !!conference && conference.status === 'active';
   const inviteeCap = userRole === 'member' ? INVITEE_CAP_MEMBER : undefined;
 
   const weekDays = useMemo(() => getWeekDays(currentWeekStart), [currentWeekStart]);
@@ -464,6 +477,15 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         if (event.recurrenceRule && event.recurrenceRule !== 'none') {
           setRecurrence(event.recurrenceRule as RecurrenceValue);
         }
+        // Limicon fields (present on conference + retained events).
+        if (event.visibility === 'members' || event.visibility === 'public' || event.visibility === 'private') {
+          setVisibility(event.visibility);
+        }
+        if (event.category === 'speaker' || event.category === 'practice' || event.category === 'audience' || event.category === 'other') {
+          setCategory(event.category);
+        }
+        if (typeof event.categoryOther === 'string') setCategoryOther(event.categoryOther);
+        setContinueBeyond(event.continueBeyond === true);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load event');
       } finally {
@@ -493,8 +515,13 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           return;
         }
         const profile = await res.json();
-        if (profile.role !== 'host' && profile.role !== 'admin') {
-          router.replace('/');
+        // Create mode: hosts/admins/owners always allowed; any signed-in
+        // member may create while an active conference is in scope (Limicon).
+        // Edit mode relies on the PATCH API's own 403s (creator-or-admin).
+        if (mode === 'create') {
+          if (profile.role !== 'host' && profile.role !== 'admin' && profile.role !== 'owner' && !conferenceActive) {
+            router.replace('/');
+          }
         }
       } catch {
         if (!cancelled) router.replace('/');
@@ -587,6 +614,15 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         imageUrl: imageUrl || undefined,
         visibility,
         invitees: invitees.map(({ userId, name, image }) => ({ userId, name, image })),
+        // Limicon scope: tag the conference, flag retention, categorise.
+        // JSON.stringify drops undefined, so permanent-calendar creations
+        // and edits send none of these keys.
+        conferenceId: conference?.id ?? undefined,
+        // Edit mode always sends the flags (a retained/conference event's
+        // creator can toggle them); create mode only for conference events.
+        continueBeyond: mode === 'edit' || conference ? continueBeyond : undefined,
+        category: category || undefined,
+        categoryOther: category === 'other' ? categoryOther.trim() || undefined : undefined,
       };
 
       if (mode === 'create') {
@@ -639,7 +675,7 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Page heading */}
       <h1 className="text-xl font-semibold text-grove-text">
-        {mode === 'create' ? 'Create Event' : 'Edit Event'}
+        {mode === 'create' ? (conference ? `Create ${conference.name} event` : 'Create Event') : 'Edit Event'}
       </h1>
 
       {/* Error */}
@@ -878,7 +914,17 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
         <label className="block text-sm font-medium text-grove-text mb-1">
           Visibility
         </label>
-        {canCreatePublic ? (
+        {conference ? (
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as 'public' | 'private' | 'members')}
+            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+          >
+            <option value="members">Limicon members (all members see it, not public)</option>
+            <option value="private">Private</option>
+            {canCreatePublic && <option value="public">Public</option>}
+          </select>
+        ) : canCreatePublic ? (
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
@@ -893,6 +939,52 @@ export function EventForm({ mode, eventId, externalValues, onValuesChange, onSuc
           </p>
         )}
       </div>
+
+      {/* Category (Limicon) */}
+      <div>
+        <label className="block text-sm font-medium text-grove-text mb-1">
+          Category
+        </label>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as '' | EventCategory)}
+          className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+        >
+          <option value="">No category</option>
+          {EVENT_CATEGORIES.map((c: CategoryMeta) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+        </select>
+        {category === 'other' && (
+          <input
+            type="text"
+            value={categoryOther}
+            onChange={(e) => setCategoryOther(e.target.value)}
+            placeholder="Please specify…"
+            maxLength={200}
+            className="mt-2 w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+          />
+        )}
+      </div>
+
+      {/* Continues beyond Limicon */}
+      {conference && (
+        <div className="flex items-start gap-2">
+          <input
+            id="continue-beyond"
+            type="checkbox"
+            checked={continueBeyond}
+            onChange={(e) => setContinueBeyond(e.target.checked)}
+            className="mt-1"
+          />
+          <label htmlFor="continue-beyond" className="text-sm text-grove-text">
+            This event continues beyond {conference.name}
+            <span className="block text-xs text-grove-text-muted">
+              Flags it for the admin as a candidate to keep on the permanent calendar.
+            </span>
+          </label>
+        </div>
+      )}
 
       {/* Invite members */}
       <div>

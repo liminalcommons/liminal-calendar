@@ -31,6 +31,14 @@ const memberUser = {
   image: null,
   logtoUserId: 'logto-member',
 };
+const ownerUser = {
+  memberId: 9,
+  id: 'logto-owner',
+  role: 'owner' as const,
+  name: 'Owner',
+  image: null,
+  logtoUserId: 'logto-owner',
+};
 
 interface UpdateCapture {
   set?: Record<string, unknown>;
@@ -149,16 +157,35 @@ describe('PATCH /api/admin/members', () => {
   it('updates role for a Clerk-only member (new behavior)', async () => {
     mockGetAuthedUser.mockResolvedValue(adminUser);
     const updateCapture: UpdateCapture = {};
+    const updated = { id: 9, logtoId: null, clerkId: 'clerk_y', role: 'host' };
+    setupDbMocks({ updateReturn: [updated], updateCapture });
+
+    const res = await PATCH(patchReq({ clerkId: 'clerk_y', role: 'host' }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.role).toBe('host');
+    expect(body.clerkId).toBe('clerk_y');
+    expect(body.logtoId).toBeNull();
+    expect(updateCapture.set?.role).toBe('host');
+  });
+
+  it('owner minting an admin → 200 (only owners can create admins)', async () => {
+    mockGetAuthedUser.mockResolvedValue(ownerUser);
+    const updateCapture: UpdateCapture = {};
     const updated = { id: 9, logtoId: null, clerkId: 'clerk_y', role: 'admin' };
     setupDbMocks({ updateReturn: [updated], updateCapture });
 
     const res = await PATCH(patchReq({ clerkId: 'clerk_y', role: 'admin' }));
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.role).toBe('admin');
-    expect(body.clerkId).toBe('clerk_y');
-    expect(body.logtoId).toBeNull();
     expect(updateCapture.set?.role).toBe('admin');
+  });
+
+  it('admin minting an admin → 403 (only owners can create admins)', async () => {
+    mockGetAuthedUser.mockResolvedValue(adminUser);
+    setupDbMocks({});
+
+    const res = await PATCH(patchReq({ clerkId: 'clerk_y', role: 'admin' }));
+    expect(res.status).toBe(403);
   });
 
   it('returns 400 when neither logtoId nor clerkId is provided', async () => {

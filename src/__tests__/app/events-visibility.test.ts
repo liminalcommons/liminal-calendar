@@ -15,6 +15,7 @@ jest.mock('@/lib/auth-helpers', () => ({
   getUserRole: jest.fn(() => 'member'),
   canCreateEvents: jest.fn(() => true),
   canCreatePublicEvent: jest.fn((role: string) => role === 'host' || role === 'admin'),
+  canPublishToConference: jest.fn(() => true),
 }));
 jest.mock('@/lib/db', () => ({
   db: { __mock: true },
@@ -33,19 +34,30 @@ jest.mock('@/lib/events/invitations-repo', () => ({
 jest.mock('@/lib/events/visibility', () => ({
   visibleEventsForMemberCondition: jest.fn((memberId: number) => ({ __visibilityCond: 'member', memberId })),
   publicOnlyEventsCondition: jest.fn(() => ({ __visibilityCond: 'public' })),
+  activeConferenceCondition: jest.fn(() => ({ __activeConferenceCond: true })),
+  conferenceScopeCondition: jest.fn((conferenceId: number) => ({ __conferenceScope: conferenceId })),
+}));
+jest.mock('@/lib/events/conferences', () => ({
+  getConferenceBySlug: jest.fn(),
+  getConferenceById: jest.fn(),
 }));
 
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
-import { getUserRole, canCreatePublicEvent } from '@/lib/auth-helpers';
-import { visibleEventsForMemberCondition, publicOnlyEventsCondition } from '@/lib/events/visibility';
+import { getUserRole, canCreatePublicEvent, canPublishToConference } from '@/lib/auth-helpers';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition, conferenceScopeCondition } from '@/lib/events/visibility';
+import { getConferenceBySlug, getConferenceById } from '@/lib/events/conferences';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
 import { GET, POST } from '@/app/api/events/route';
 
 const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 const mockGetUserRole = getUserRole as unknown as jest.Mock;
 const mockCanCreatePublicEvent = canCreatePublicEvent as unknown as jest.Mock;
+const mockCanPublishToConference = canPublishToConference as unknown as jest.Mock;
 const mockVisibleForMember = visibleEventsForMemberCondition as unknown as jest.Mock;
 const mockPublicOnly = publicOnlyEventsCondition as unknown as jest.Mock;
+const mockConferenceScope = conferenceScopeCondition as unknown as jest.Mock;
+const mockGetConferenceBySlug = getConferenceBySlug as unknown as jest.Mock;
+const mockGetConferenceById = getConferenceById as unknown as jest.Mock;
 const mockValidateInput = validateCreateEventInput as unknown as jest.Mock;
 
 // ─── DB helpers ──────────────────────────────────────────────────────────────
@@ -348,5 +360,157 @@ describe('validateCreateEventInput — visibility field', () => {
     const result = realValidate({ ...baseInput, visibility: 'secret' });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.visibility).toBe('private');
+  });
+
+  it('accepts "members" explicitly (Limicon tier)', () => {
+    const result = realValidate({ ...baseInput, visibility: 'members' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.visibility).toBe('members');
+  });
+
+  it('parses conference scope + category + retention flag', () => {
+    const result = realValidate({
+      ...baseInput,
+      visibility: 'members',
+      conferenceId: 9,
+      continueBeyond: true,
+      category: 'practice',
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.conferenceId).toBe(9);
+      expect(result.value.continueBeyond).toBe(true);
+      expect(result.value.category).toBe('practice');
+      expect(result.value.categoryOther).toBeNull();
+    }
+  });
+
+  it('keeps free text only for "other" categories', () => {
+    const other = realValidate({ ...baseInput, category: 'other', categoryOther: '  drum circle  ' });
+    expect(other.ok).toBe(true);
+    if (other.ok) {
+      expect(other.value.category).toBe('other');
+      expect(other.value.categoryOther).toBe('drum circle');
+    }
+    const speaker = realValidate({ ...baseInput, category: 'speaker', categoryOther: 'ignored' });
+    expect(speaker.ok).toBe(true);
+    if (speaker.ok) expect(speaker.value.categoryOther).toBeNull();
+  });
+});
+
+// ─── GET /api/events — conference scope ─────────────────────────────────────
+
+describe('GET /api/events — conference scope', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 7, id: 'h-7', name: 'M', image: null, role: 'member',
+    });
+  });
+
+  it('unknown conference slug → 404', async () => {
+    mockGetConferenceBySlug.mockResolvedValue(null);
+    setupSelectMock([]);
+
+    const res = await GET(makeGetReq({ conference: 'nope' }));
+
+    expect(res.status).toBe(404);
+    expect(mockGetConferenceBySlug).toHaveBeenCalledWith('nope');
+  });
+
+  it('known conference applies the scope condition', async () => {
+    mockGetConferenceBySlug.mockResolvedValue({ id: 9, slug: 'limicon1', status: 'active' });
+    setupSelectMock([]);
+
+    const res = await GET(makeGetReq({ conference: 'limicon1' }));
+
+    expect(res.status).toBe(200);
+    expect(mockConferenceScope).toHaveBeenCalledWith(9);
+  });
+});
+
+// ─── POST /api/events — Limicon publishing ──────────────────────────────────
+
+describe('POST /api/events — Limicon conference publishing', () => {
+  const baseValidatedValue = {
+    title: 'Limicon Event',
+    description: null,
+    startDate: new Date('2026-10-05T18:00:00Z'),
+    endDate: new Date('2026-10-05T19:00:00Z'),
+    timezone: 'UTC',
+    location: null,
+    imageUrl: null,
+    recurrenceRule: null,
+    conferenceId: null as number | null,
+    continueBeyond: false,
+    category: null as string | null,
+    categoryOther: null as string | null,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAuthedUser.mockResolvedValue({
+      memberId: 1, id: 'h-1', name: 'Alice', image: null, role: 'member',
+    });
+  });
+
+  it('members-tier without a conference → 400', async () => {
+    mockValidateInput.mockReturnValue({
+      ok: true,
+      value: { ...baseValidatedValue, visibility: 'members', conferenceId: null },
+    });
+
+    const res = await POST(makePostReq({ title: 'x', visibility: 'members' }));
+
+    expect(res.status).toBe(400);
+  });
+
+  it('member publishing into an active conference → 201 with scope columns', async () => {
+    mockGetConferenceById.mockResolvedValue({ id: 9, slug: 'limicon1', status: 'active' });
+    mockCanPublishToConference.mockReturnValue(true);
+    mockValidateInput.mockReturnValue({
+      ok: true,
+      value: {
+        ...baseValidatedValue,
+        visibility: 'members',
+        conferenceId: 9,
+        continueBeyond: true,
+        category: 'practice',
+      },
+    });
+    const { getValues } = setupInsertMock({ id: 20, title: 'Limicon Event', startsAt: new Date() });
+
+    const res = await POST(makePostReq({ title: 'x', visibility: 'members', conferenceId: 9 }));
+
+    expect(res.status).toBe(201);
+    const vals = getValues() as Record<string, unknown>;
+    expect(vals.conferenceId).toBe(9);
+    expect(vals.continueBeyond).toBe(true);
+    expect(vals.category).toBe('practice');
+  });
+
+  it('publishing into a non-accepting conference → 403', async () => {
+    mockGetConferenceById.mockResolvedValue({ id: 9, slug: 'limicon1', status: 'ended' });
+    mockCanPublishToConference.mockReturnValue(false);
+    mockValidateInput.mockReturnValue({
+      ok: true,
+      value: { ...baseValidatedValue, visibility: 'members', conferenceId: 9 },
+    });
+
+    const res = await POST(makePostReq({ title: 'x', visibility: 'members', conferenceId: 9 }));
+
+    expect(res.status).toBe(403);
+  });
+
+  it('unknown conference id → 400', async () => {
+    mockGetConferenceById.mockResolvedValue(null);
+    mockValidateInput.mockReturnValue({
+      ok: true,
+      value: { ...baseValidatedValue, visibility: 'members', conferenceId: 999 },
+    });
+
+    const res = await POST(makePostReq({ title: 'x', visibility: 'members', conferenceId: 999 }));
+
+    expect(res.status).toBe(400);
   });
 });

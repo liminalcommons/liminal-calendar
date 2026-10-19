@@ -34,7 +34,13 @@ async function fetchProfile(): Promise<ResolvedProfile | null> {
       if (!res.ok) { cached = null; return null; }
       const p = await res.json();
       const role: UserRole =
-        p.role === 'admin' ? 'admin' : p.role === 'host' ? 'host' : 'member';
+        p.role === 'owner'
+          ? 'owner'
+          : p.role === 'admin'
+            ? 'admin'
+            : p.role === 'host'
+              ? 'host'
+              : 'member';
       // Identity precedence mirrors getAuthedUser: logtoId first, then
       // clerkId. This must match what POST /api/events stored in
       // events.creator_id at creation time.

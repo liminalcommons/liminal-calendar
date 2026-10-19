@@ -4,7 +4,11 @@
  * shape the route uses to emit NextResponse.json(..., { status }).
  */
 
-export type EventVisibility = 'public' | 'private';
+export type EventVisibility = 'public' | 'private' | 'members';
+
+export type EventCategory = 'speaker' | 'practice' | 'audience' | 'other';
+
+const CATEGORIES: ReadonlySet<string> = new Set(['speaker', 'practice', 'audience', 'other']);
 
 export interface ValidatedCreateEventInput {
   title: string;
@@ -16,6 +20,14 @@ export interface ValidatedCreateEventInput {
   imageUrl: string | null;
   recurrenceRule: string | null;
   visibility: EventVisibility;
+  /** Limicon scope. Null/undefined = permanent-calendar event. */
+  conferenceId: number | null;
+  /** "Continues beyond Limicon" tick-box — transfer candidate flag. */
+  continueBeyond: boolean;
+  /** Limicon category. Null = uncategorised (keeps legacy hash colours). */
+  category: EventCategory | null;
+  /** Free text when category is 'other'. */
+  categoryOther: string | null;
 }
 
 export interface CreateEventInputError {
@@ -62,9 +74,23 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
 
   const rawVisibility = str(b.visibility);
   const visibility: EventVisibility =
-    rawVisibility === 'public' || rawVisibility === 'private'
+    rawVisibility === 'public' || rawVisibility === 'private' || rawVisibility === 'members'
       ? rawVisibility
       : 'private';
+
+  const rawConferenceId = b.conferenceId;
+  const conferenceId =
+    typeof rawConferenceId === 'number' && Number.isInteger(rawConferenceId) && rawConferenceId > 0
+      ? rawConferenceId
+      : null;
+
+  const rawCategory = str(b.category)?.trim().toLowerCase() ?? null;
+  const category: EventCategory | null =
+    rawCategory && CATEGORIES.has(rawCategory) ? (rawCategory as EventCategory) : null;
+
+  const rawCategoryOther = str(b.categoryOther)?.trim() ?? null;
+  const categoryOther =
+    rawCategoryOther && rawCategoryOther.length > 0 ? rawCategoryOther.slice(0, 200) : null;
 
   return {
     ok: true,
@@ -78,6 +104,10 @@ export function validateCreateEventInput(raw: unknown): CreateEventValidation {
       imageUrl: str(b.imageUrl),
       recurrenceRule: str(b.recurrenceRule),
       visibility,
+      conferenceId,
+      continueBeyond: b.continueBeyond === true,
+      category,
+      categoryOther: category === 'other' ? categoryOther : null,
     },
   };
 }

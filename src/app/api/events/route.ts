@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { canCreateEvents, canCreatePublicEvent } from '@/lib/auth-helpers';
+import { canCreateEvents, canCreatePublicEvent, canPublishToConference } from '@/lib/auth-helpers';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
 import { db } from '@/lib/db';
 import { events, rsvps } from '@/lib/db/schema';
@@ -8,9 +8,10 @@ import { dbEventToDisplayEvent } from '@/lib/db/to-display-event';
 import { redactEventUrlForNonMembers } from '@/lib/display-event';
 import { asc, inArray, lte, and } from 'drizzle-orm';
 import { validateCreateEventInput } from '@/lib/events/create-event-input';
-import { visibleEventsForMemberCondition, publicOnlyEventsCondition, eventsStartingOnOrAfter } from '@/lib/events/visibility';
+import { visibleEventsForMemberCondition, publicOnlyEventsCondition, eventsStartingOnOrAfter, activeConferenceCondition, conferenceScopeCondition } from '@/lib/events/visibility';
 import { validateInviteeCap, setEventInvitations, type Invitee } from '@/lib/events/invitations-repo';
 import { fanoutInvitationReceived } from '@/lib/notifications/fanout';
+import { getConferenceById, getConferenceBySlug } from '@/lib/events/conferences';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +20,17 @@ export async function GET(request: NextRequest) {
     const to = url.searchParams.get('to');
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10) || 50, 1), 200);
     const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10) || 0, 0);
+    // Limicon scope: ?conference=limicon1 returns the conference's own events
+    // plus permanent-calendar public events in the window (absorption).
+    const conferenceSlug = url.searchParams.get('conference');
+    let conferenceId: number | null = null;
+    if (conferenceSlug) {
+      const conference = await getConferenceBySlug(conferenceSlug);
+      if (!conference) {
+        return NextResponse.json({ error: 'Unknown conference' }, { status: 404 });
+      }
+      conferenceId = conference.id;
+    }
 
     // Resolve identity once — used for both visibility filtering and myResponse.
     // getAuthedUser handles Logto + Clerk and reads role/identifiers from
@@ -45,6 +57,12 @@ export async function GET(request: NextRequest) {
       ? visibleEventsForMemberCondition(authed.memberId)
       : publicOnlyEventsCondition();
     conditions.push(visibilityCond);
+    // Expired conferences vanish: events still linked to an ended conference
+    // are excluded from every list, signed-in or not.
+    conditions.push(activeConferenceCondition());
+    if (conferenceId !== null) {
+      conditions.push(conferenceScopeCondition(conferenceId));
+    }
 
     const query = db.select().from(events).orderBy(asc(events.startsAt)).limit(limit).offset(offset);
     const allEvents = await query.where(and(...conditions));
@@ -112,6 +130,30 @@ export async function POST(request: NextRequest) {
   }
   const v = validation.value;
 
+  // Conference scoping (Limicon). A members-tier event must belong to a
+  // conference, and publishing into one requires it to be active — any
+  // authenticated role qualifies, so members host freely during Limicon.
+  let conferenceStatus: string | null = null;
+  if (v.conferenceId != null) {
+    const conference = await getConferenceById(v.conferenceId);
+    if (!conference) {
+      return NextResponse.json({ error: 'Unknown conference' }, { status: 400 });
+    }
+    conferenceStatus = conference.status;
+    if (!canPublishToConference(role, conferenceStatus)) {
+      return NextResponse.json(
+        { error: 'Forbidden: this conference is not accepting events' },
+        { status: 403 },
+      );
+    }
+  }
+  if (v.visibility === 'members' && v.conferenceId == null) {
+    return NextResponse.json(
+      { error: 'Members-only visibility requires a conference' },
+      { status: 400 },
+    );
+  }
+
   // Tier check: only hosts and admins may publish public events.
   if (v.visibility === 'public' && !canCreatePublicEvent(role)) {
     return NextResponse.json(
@@ -154,6 +196,10 @@ export async function POST(request: NextRequest) {
         imageUrl: v.imageUrl,
         recurrenceRule: v.recurrenceRule,
         visibility: v.visibility,
+        conferenceId: v.conferenceId,
+        continueBeyond: v.continueBeyond,
+        category: v.category,
+        categoryOther: v.categoryOther,
         creatorId: user.clerkId ?? user.id ?? 'unknown',
         memberId: authed.memberId,
         creatorName: user.name ?? 'Unknown',

@@ -66,5 +66,10 @@ export function dbEventToDisplayEvent(
     cancelledAt: event.cancelledAt ? event.cancelledAt.toISOString() : null,
     cancellationReason: event.cancellationReason ?? null,
     noteFromBooker: viewerIsHost ? event.noteFromBooker ?? null : null,
+    conferenceId: event.conferenceId ?? null,
+    continueBeyond: event.continueBeyond ?? false,
+    category: event.category ?? null,
+    categoryOther: event.categoryOther ?? null,
+    visibility: event.visibility ?? 'private',
   };
 }

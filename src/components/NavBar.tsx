@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useUser, useClerk } from '@clerk/nextjs';
 import { Sun, Moon, Plus } from 'lucide-react';
@@ -50,6 +51,17 @@ export function NavBar() {
   // Guest mode: cookie-flagged unauthenticated browsing (see lib/guest.ts).
   const isGuest = useIsGuest() && !isAuthed;
 
+  // Live conferences (e.g. Limicon) — public directory, so this runs signed-out too.
+  const [liveConferences, setLiveConferences] = useState<{ slug: string; name: string; status: string }[]>([]);
+  useEffect(() => {
+    fetch('/api/conferences')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => {
+        if (Array.isArray(d)) setLiveConferences(d.filter((c) => c.status === 'active'));
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <>
     <nav className="flex items-center justify-between px-4 h-14 bg-grove-surface border-b border-grove-border">
@@ -65,6 +77,15 @@ export function NavBar() {
         >
           About
         </Link>
+        {liveConferences.map((c) => (
+          <Link
+            key={c.slug}
+            href={`/c/${c.slug}`}
+            className="ml-1 text-xs italic text-grove-accent-deep hover:text-grove-accent underline decoration-grove-accent/60 underline-offset-4"
+          >
+            {c.name}
+          </Link>
+        ))}
       </div>
 
       {/* Right: controls */}
@@ -98,8 +119,8 @@ export function NavBar() {
 
         {isAuthed && user ? (
           <>
-            {/* Create event — hosts + admins */}
-            {(user.role === 'admin' || user.role === 'host') && (
+            {/* Create event — hosts + admins (+ owners) */}
+            {(user.role === 'admin' || user.role === 'host' || user.role === 'owner') && (
               <Link
                 href="/events/new"
                 className="flex flex-col items-center gap-0.5 px-1.5 py-1 rounded-md text-grove-accent hover:text-grove-accent-deep hover:bg-grove-accent/10 transition-colors"
@@ -122,7 +143,7 @@ export function NavBar() {
 
             {/* Gear menu: Sound, Subscribe, Admin, Sign out */}
             <NavGearMenu
-              isAdmin={user.role === 'admin'}
+              isAdmin={user.role === 'admin' || user.role === 'owner'}
               onSignOut={handleSignOut}
             />
           </>

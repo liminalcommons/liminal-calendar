@@ -545,6 +545,32 @@ async function runMigrationsInner(sql: any): Promise<MigrationResult> {
     )
   `;
 
+  // Limicon1: time-boxed conference scope. See
+  // src/lib/db/migrations/limicon1-conference.sql for the canonical
+  // statement; this is the runtime mirror so boot/cron/admin repair apply it.
+  await step`
+    CREATE TABLE IF NOT EXISTS conferences (
+      id SERIAL PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      starts_at TIMESTAMPTZ,
+      ends_at TIMESTAMPTZ,
+      status TEXT NOT NULL DEFAULT 'upcoming',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS conference_id INTEGER REFERENCES conferences(id) ON DELETE SET NULL`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS continue_beyond BOOLEAN NOT NULL DEFAULT FALSE`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT`;
+  await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS category_other TEXT`;
+  await step`CREATE INDEX IF NOT EXISTS events_conference_idx ON events(conference_id)`;
+  // Seed row. Dates NULL until confirmed; the admin conference panel sets them.
+  await step`
+    INSERT INTO conferences (slug, name, status)
+      VALUES ('limicon1', 'Limicon', 'upcoming')
+      ON CONFLICT (slug) DO NOTHING
+  `;
+
   // The legacy single-identity CHECK constraint is dropped because rows may
   // now legitimately carry only an email (no clerk/logto id) — e.g. members
   // pending re-signup. IF EXISTS keeps this idempotent.

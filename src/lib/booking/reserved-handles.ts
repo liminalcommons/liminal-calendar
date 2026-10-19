@@ -16,6 +16,7 @@ export const RESERVED_HANDLES = new Set<string>([
   'api',
   'book',
   'booking',
+  'c',
   'embed',
   'events',
   'guest',
@@ -30,6 +31,7 @@ export const RESERVED_HANDLES = new Set<string>([
   'sign-in',
   'sign-up',
   'topics',
+  'upcoming',
   'week',
   'welcome',
 ]);

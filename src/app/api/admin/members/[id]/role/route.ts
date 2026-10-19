@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
-import { canPromoteMembers } from '@/lib/auth-helpers';
+import { canAssignRole } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
-const ALLOWED = new Set(['member', 'host', 'admin']);
+const ALLOWED = new Set(['member', 'host', 'admin', 'owner']);
 
 export async function POST(
   request: NextRequest,
@@ -14,9 +14,6 @@ export async function POST(
 ) {
   const caller = await getAuthedUser();
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!canPromoteMembers(caller.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
 
   let body: { role?: string };
   try {
@@ -27,6 +24,12 @@ export async function POST(
 
   if (!body.role || !ALLOWED.has(body.role)) {
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
+  }
+
+  // Only owners can create admins (or owners). Admins may still grant/revoke
+  // member/host — everything else they had, minus minting admins.
+  if (!canAssignRole(caller.role, body.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const { id } = await params;

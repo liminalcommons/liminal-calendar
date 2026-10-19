@@ -191,7 +191,7 @@ export async function PATCH(
   // For invitation edits: creator (any role) or admin may edit invitations.
   // For field edits: existing canEditEvent gate applies (creator who is host/admin).
   const hasFieldUpdates = Object.keys(bodyRaw).some((k) =>
-    ['title', 'details', 'startTime', 'endTime', 'timezone', 'location', 'imageUrl', 'recurrenceRule', 'scope'].includes(k),
+    ['title', 'details', 'startTime', 'endTime', 'timezone', 'location', 'imageUrl', 'recurrenceRule', 'scope', 'continueBeyond', 'category', 'categoryOther', 'conferenceId'].includes(k),
   );
 
   if (hasFieldUpdates && !canEditEvent(role, isCreator)) {
@@ -201,7 +201,7 @@ export async function PATCH(
     );
   }
 
-  if (wantsInvitationEdit && !isCreator && role !== 'admin') {
+  if (wantsInvitationEdit && !isCreator && role !== 'admin' && role !== 'owner') {
     return NextResponse.json(
       { error: 'Forbidden: only the event creator or an admin can edit invitations' },
       { status: 403 },
@@ -211,7 +211,7 @@ export async function PATCH(
   if (!hasFieldUpdates && !wantsInvitationEdit) {
     // Empty body with no recognized fields — fall through to no-op update.
     // Auth: if user is neither a field editor nor an invitation editor, reject.
-    if (!canEditEvent(role, isCreator) && !isCreator && role !== 'admin') {
+    if (!canEditEvent(role, isCreator) && !isCreator && role !== 'admin' && role !== 'owner') {
       return NextResponse.json(
         { error: 'Forbidden: insufficient permissions to edit this event' },
         { status: 403 },
@@ -246,6 +246,18 @@ export async function PATCH(
 
   const setValues: Record<string, unknown> = { updatedAt: new Date() };
 
+  // Limicon transfer: linking/unlinking an event to a conference (retaining it
+  // on the permanent calendar = clearing conference_id) is admin/owner-only.
+  // The creator's own flags (continueBeyond, category) follow normal field rules.
+  if (Object.prototype.hasOwnProperty.call(bodyRaw, 'conferenceId') && bodyRaw.conferenceId !== undefined) {
+    if (role !== 'admin' && role !== 'owner') {
+      return NextResponse.json(
+        { error: 'Forbidden: only admins can move events between calendars' },
+        { status: 403 },
+      );
+    }
+  }
+
   if (typeof updates.title === 'string') setValues.title = updates.title;
   if (typeof updates.details === 'string') setValues.description = updates.details;
   if (typeof updates.startTime === 'string') setValues.startsAt = new Date(updates.startTime);
@@ -254,6 +266,23 @@ export async function PATCH(
   if (typeof updates.location === 'string') setValues.location = updates.location;
   if (typeof updates.imageUrl === 'string') setValues.imageUrl = updates.imageUrl;
   if (typeof updates.recurrenceRule === 'string') setValues.recurrenceRule = updates.recurrenceRule;
+  if (typeof updates.continueBeyond === 'boolean') setValues.continueBeyond = updates.continueBeyond;
+  if (updates.category === null || updates.category === undefined) {
+    if (updates.category === null) setValues.category = null;
+  } else if (typeof updates.category === 'string' && ['speaker', 'practice', 'audience', 'other'].includes(updates.category)) {
+    setValues.category = updates.category;
+  } else {
+    return NextResponse.json({ error: 'Invalid category' }, { status: 400 });
+  }
+  if (typeof updates.categoryOther === 'string') setValues.categoryOther = updates.categoryOther.trim().slice(0, 200) || null;
+  else if (updates.categoryOther === null) setValues.categoryOther = null;
+  if (Object.prototype.hasOwnProperty.call(updates, 'conferenceId') && updates.conferenceId !== undefined) {
+    const cid = updates.conferenceId;
+    if (cid !== null && !(typeof cid === 'number' && Number.isInteger(cid) && cid > 0)) {
+      return NextResponse.json({ error: 'Invalid conferenceId' }, { status: 400 });
+    }
+    setValues.conferenceId = cid;
+  }
 
   // Invitees cap validation (pure, before any DB write)
   let dedupedInvitees: Invitee[] | null = null;

@@ -29,6 +29,16 @@ export interface DisplayEvent {
    * (guest/anonymous), so `event_url` was stripped server-side. Lets the UI
    * render a "sign up to join" affordance without exposing the URL. */
   event_url_redacted?: boolean;
+  /** Limicon scope. Null = permanent-calendar event; set = conference event. */
+  conferenceId?: number | null;
+  /** "Continues beyond Limicon" flag — transfer candidate for the admin. */
+  continueBeyond?: boolean;
+  /** Limicon category: 'speaker' | 'practice' | 'audience' | 'other' | null. */
+  category?: string | null;
+  /** Free text when category is 'other'. */
+  categoryOther?: string | null;
+  /** Raw visibility tier: 'public' | 'private' | 'members'. */
+  visibility?: string;
 }
 
 /** Server-side fence: strip the meeting link for non-member viewers while

@@ -39,6 +39,24 @@ export const members = pgTable('members', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
+// Limicon-style time-boxed conferences. A conference is a record plus a scope
+// on events (events.conference_id), never a fork: the same app and database
+// serve both the permanent calendar and the conference. Transferring an event
+// to the permanent calendar = clearing its conference_id; ending a conference
+// = excluding still-linked rows from every query. No deletion anywhere.
+export const conferences = pgTable('conferences', {
+  id: serial('id').primaryKey(),
+  slug: text('slug').notNull().unique(), // e.g. 'limicon1' — also the /c/[slug] path
+  name: text('name').notNull(),
+  startsAt: timestamp('starts_at', { withTimezone: true }),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  status: text('status').notNull().default('upcoming'), // 'upcoming' | 'active' | 'ended'
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+export type Conference = typeof conferences.$inferSelect;
+export type NewConference = typeof conferences.$inferInsert;
+
 export const events = pgTable('events', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),
@@ -49,6 +67,15 @@ export const events = pgTable('events', {
   location: text('location'),
   imageUrl: text('image_url'),
   recurrenceRule: text('recurrence_rule'), // 'daily' | 'weekly' | 'fortnightly' | 'monthly' | null
+  // Limicon scope. NULL = permanent-calendar event. Set = conference event;
+  // still linked when the conference ends means expired (excluded everywhere).
+  conferenceId: integer('conference_id').references(() => conferences.id, { onDelete: 'set null' }),
+  // "Continues beyond Limicon" tick-box: flags transfer candidates for admin.
+  continueBeyond: boolean('continue_beyond').notNull().default(false),
+  // Limicon event category: 'speaker' | 'practice' | 'audience' | 'other' | null.
+  category: text('category'),
+  // Free text when category = 'other' ("please specify").
+  categoryOther: text('category_other'),
   // Legacy provider-string id (a logtoId or clerkId). Phase 4 will drop this.
   creatorId: text('creator_id').notNull(),
   // Canonical creator FK (Phase 1 backfilled, Phase 2 dual-writes,

@@ -6,6 +6,7 @@ import { Video, ExternalLink } from 'lucide-react'
 import { RuneAccent } from '@/components/RuneAccent'
 import { formatTimeInTimezone, getUserTimezone } from '@/lib/timezone-utils'
 import { formatDuration } from '@/lib/calendar-utils'
+import { categoryMeta } from '@/lib/events/categories'
 import type { DisplayEvent } from '@/lib/display-event'
 
 function getRelativeTime(startsAt: string): string {
@@ -64,6 +65,19 @@ export function EventCard({ event }: EventCardProps) {
                 recurring
               </span>
             )}
+            {(() => {
+              const meta = categoryMeta(event.category)
+              if (!meta) return null
+              return (
+                <span
+                  className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 border"
+                  style={{ borderColor: meta.dot, color: meta.dot }}
+                  title={event.category === 'other' && event.categoryOther ? event.categoryOther : meta.label}
+                >
+                  {event.category === 'other' && event.categoryOther ? event.categoryOther : meta.shortLabel}
+                </span>
+              )
+            })()}
           </div>
 
           {/* Time + host */}

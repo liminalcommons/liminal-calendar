@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { formatInTimeZone } from 'date-fns-tz';
 import type { DisplayEvent } from '@/lib/display-event';
 import { toDateKey } from '@/lib/calendar-utils';
+import { categoryMeta } from '@/lib/events/categories';
 import { calendarSFX } from '@/lib/sound-manager';
 import { useUserTimezone } from '@/lib/timezone-utils';
 
@@ -40,6 +41,20 @@ function hashEventId(id: string): number {
     h = (h * 31 + baseId.charCodeAt(i)) >>> 0;
   }
   return h % 6;
+}
+
+/** Chip classes: Limicon category colour wins; uncategorised keeps the legacy hash colour. */
+function chipFor(event: DisplayEvent): string {
+  const meta = categoryMeta(event.category);
+  if (meta) return `${meta.chip} border-l-2`;
+  const c = EVENT_COLORS[hashEventId(event.id)];
+  return `${c.bg} ${c.text} border-l-2 ${c.border}`;
+}
+
+function chipTitle(event: DisplayEvent, userTz: string): string {
+  const meta = categoryMeta(event.category);
+  const cat = meta ? ` [${meta.shortLabel}]` : '';
+  return `${event.title} — ${formatShortTime(event.starts_at, userTz)}${cat}`;
 }
 
 interface MonthlyGridProps {
@@ -184,15 +199,14 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                   {/* Events (max 3 shown, colored) */}
                   <div className="flex-1 space-y-0.5 overflow-hidden">
                     {dayEvents.slice(0, 3).map(event => {
-                      const color = EVENT_COLORS[hashEventId(event.id)];
+                      const chip = chipFor(event);
                       return (
                         <Link
                           key={event.id}
                           href={`/events/${event.id}`}
                           className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
-                                     ${color.bg} ${color.text} hover:opacity-80 transition-opacity
-                                     border-l-2 ${color.border}`}
-                          title={`${event.title} — ${formatShortTime(event.starts_at, userTz)}`}
+                                     ${chip} hover:opacity-80 transition-opacity`}
+                          title={chipTitle(event, userTz)}
                         >
                           <span className="opacity-70">{formatShortTime(event.starts_at, userTz)}</span>{' '}
                           {event.title}
@@ -214,15 +228,14 @@ export function MonthlyGrid({ events }: MonthlyGridProps) {
                     {dayEvents.length > 3 && (
                       <div id={`more-${key}`} className="hidden space-y-0.5">
                         {dayEvents.slice(3).map(event => {
-                          const color = EVENT_COLORS[hashEventId(event.id)];
+                          const chip = chipFor(event);
                           return (
                             <Link
                               key={event.id}
                               href={`/events/${event.id}`}
                               className={`block text-[10px] leading-tight truncate rounded px-1 py-0.5
-                                         ${color.bg} ${color.text} hover:opacity-80 transition-opacity
-                                         border-l-2 ${color.border}`}
-                              title={`${event.title} — ${formatShortTime(event.starts_at, userTz)}`}
+                                         ${chip} hover:opacity-80 transition-opacity`}
+                              title={chipTitle(event, userTz)}
                             >
                               <span className="opacity-70">{formatShortTime(event.starts_at, userTz)}</span>{' '}
                               {event.title}

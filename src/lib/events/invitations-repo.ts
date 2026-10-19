@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { eventInvitations } from '@/lib/db/schema';
 import { resolveMemberId } from '@/lib/auth/resolve-member-id';
 import { INVITEE_CAP_MEMBER, type Invitee } from './invitations-types';
+import type { UserRole } from '@/lib/auth-helpers';
 
 export { INVITEE_CAP_MEMBER, type Invitee };
 
@@ -15,7 +16,7 @@ export function validateInviteeCap({
   organizerRole,
   invitees,
 }: {
-  organizerRole: 'member' | 'host' | 'admin';
+  organizerRole: UserRole;
   invitees: Invitee[];
 }): Invitee[] {
   const seen = new Map<string, Invitee>();
@@ -37,7 +38,7 @@ export async function setEventInvitations({
   invitees,
 }: {
   eventId: number;
-  organizerRole: 'member' | 'host' | 'admin';
+  organizerRole: UserRole;
   invitees: Invitee[];
 }): Promise<void> {
   // Dedupe by userId (last-wins)

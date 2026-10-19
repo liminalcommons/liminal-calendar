@@ -12,6 +12,7 @@ import { ReportsPanel } from '@/components/admin/ReportsPanel';
 import { TopicSubmissionsPanel } from '@/components/admin/TopicSubmissionsPanel';
 import { AnalyticsPanel } from '@/components/admin/AnalyticsPanel';
 import { NewsletterPanel } from '@/components/admin/NewsletterPanel';
+import { ConferencePanel } from '@/components/admin/ConferencePanel';
 
 interface Member {
   id: number;
@@ -27,9 +28,10 @@ interface Member {
   updatedAt: string;
 }
 
-const ROLES = ['member', 'host', 'admin'] as const;
+const ROLES = ['member', 'host', 'admin', 'owner'] as const;
 
 const ROLE_COLORS: Record<string, string> = {
+  owner: 'bg-purple-900/30 text-purple-300 border-purple-700/50 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700/50',
   admin: 'bg-red-900/30 text-red-300 border-red-700/50 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700/50',
   host: 'bg-amber-900/30 text-amber-300 border-amber-700/50 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700/50',
   member: 'bg-grove-border/30 text-grove-text-muted border-grove-border',
@@ -88,7 +90,7 @@ function AdminPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const tab: 'members' | 'reports' | 'topics' | 'analytics' | 'newsletter' =
+  const tab: 'members' | 'reports' | 'topics' | 'analytics' | 'newsletter' | 'conference' =
     tabParam === 'reports'
       ? 'reports'
       : tabParam === 'topics'
@@ -97,7 +99,9 @@ function AdminPageInner() {
           ? 'analytics'
           : tabParam === 'newsletter'
             ? 'newsletter'
-            : 'members';
+            : tabParam === 'conference'
+              ? 'conference'
+              : 'members';
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   // Distinguishes "the request failed" from "there are no members". Without
@@ -136,12 +140,17 @@ function AdminPageInner() {
 
   const userRole = resolvedRole;
 
+  // Only owners can mint admins (or owners) — admins get a reduced list so the
+  // UI can't offer what the API would 403. The server is the real gate.
+  const assignableRoles: readonly string[] =
+    userRole === 'owner' ? ROLES : ['member', 'host'];
+
   useEffect(() => {
     if (status === 'loading' || !roleResolved) return;
     // Don't bounce on a failed role lookup — that would hide the fault behind
     // a redirect. The error is rendered instead.
     if (roleError) return;
-    if (userRole !== 'admin') {
+    if (userRole !== 'admin' && userRole !== 'owner') {
       router.replace('/');
       return;
     }
@@ -164,7 +173,7 @@ function AdminPageInner() {
           return;
         }
         setMembers(data.sort((a: Member, b: Member) => {
-          const order = { admin: 0, host: 1, member: 2 };
+          const order = { owner: -1, admin: 0, host: 1, member: 2 };
           return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
         }));
         setMembersError(null);
@@ -195,7 +204,7 @@ function AdminPageInner() {
         setMembers(prev =>
           prev.map(m => m.id === member.id ? { ...m, role: updated.role } : m)
             .sort((a, b) => {
-              const order = { admin: 0, host: 1, member: 2 };
+              const order = { owner: -1, admin: 0, host: 1, member: 2 };
               return (order[a.role as keyof typeof order] ?? 3) - (order[b.role as keyof typeof order] ?? 3);
             })
         );
@@ -232,7 +241,7 @@ function AdminPageInner() {
     );
   }
 
-  if (status === 'loading' || !roleResolved || userRole !== 'admin') {
+  if (status === 'loading' || !roleResolved || (userRole !== 'admin' && userRole !== 'owner')) {
     return (
       <div className="min-h-screen bg-grove-bg">
         <NavBar />
@@ -322,6 +331,18 @@ function AdminPageInner() {
           >
             Mailing List
           </Link>
+          <Link
+            href="/admin?tab=conference"
+            role="tab"
+            aria-selected={tab === 'conference'}
+            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === 'conference'
+                ? 'border-grove-accent text-grove-text'
+                : 'border-transparent text-grove-text-muted hover:text-grove-text'
+            }`}
+          >
+            Conference
+          </Link>
         </nav>
 
         {tab === 'reports' ? (
@@ -340,6 +361,10 @@ function AdminPageInner() {
           <section role="tabpanel" aria-label="Mailing list">
             <NewsletterPanel />
           </section>
+        ) : tab === 'conference' ? (
+          <section role="tabpanel" aria-label="Conference retention">
+            <ConferencePanel />
+          </section>
         ) : (
           <section role="tabpanel" aria-label="Member directory" className="mb-2">
             <div className="mb-4">
@@ -349,15 +374,18 @@ function AdminPageInner() {
             </div>
 
         {/* Role legend */}
-        <div className="flex gap-4 mb-6 text-xs">
+        <div className="flex gap-4 mb-6 text-xs flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-400" /> admin — full control
+            <span className="w-2 h-2 rounded-full bg-purple-400" /> owner — everything; only owners mint admins
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-red-400" /> admin — full control, cannot mint admins
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-400" /> host — create + edit own events
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-grove-border" /> member — view + RSVP only
+            <span className="w-2 h-2 rounded-full bg-grove-border" /> member — private events + RSVP
           </span>
         </div>
 
@@ -426,7 +454,7 @@ function AdminPageInner() {
                               disabled:opacity-50 disabled:cursor-wait
                               focus:outline-none focus:ring-1 focus:ring-grove-accent`}
                           >
-                            {ROLES.map(r => (
+                            {Array.from(new Set([...assignableRoles, member.role])).map(r => (
                               <option key={r} value={r} className="bg-grove-surface text-grove-text">{r}</option>
                             ))}
                           </select>

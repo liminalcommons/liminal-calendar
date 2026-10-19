@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthedUser } from '@/lib/auth/get-authed-user';
+import { canAssignRole, isAdminLike } from '@/lib/auth-helpers';
 import { db } from '@/lib/db';
 import { members } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -7,7 +8,7 @@ import { eq } from 'drizzle-orm';
 async function requireAdmin() {
   const user = await getAuthedUser();
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  if (user.role !== 'admin') return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  if (!isAdminLike(user.role)) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   return { user };
 }
 
@@ -46,8 +47,12 @@ export async function PATCH(request: NextRequest) {
       { status: 400 },
     );
   }
-  if (!role || !['member', 'host', 'admin'].includes(role as string)) {
-    return NextResponse.json({ error: 'role must be member, host, or admin' }, { status: 400 });
+  if (!role || !['member', 'host', 'admin', 'owner'].includes(role as string)) {
+    return NextResponse.json({ error: 'role must be member, host, admin, or owner' }, { status: 400 });
+  }
+  // Only owners can mint admins (or owners) — same rule as the role route.
+  if (!canAssignRole(gate.user.role, role as string)) {
+    return NextResponse.json({ error: 'Forbidden: only owners can create admins' }, { status: 403 });
   }
 
   try {
@@ -98,9 +103,14 @@ export async function POST(request: NextRequest) {
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: 'name is required' }, { status: 400 });
   }
-  const assignRole = (typeof role === 'string' && ['member', 'host', 'admin'].includes(role))
-    ? role
+  const requestedRole = typeof role === 'string' ? role : 'host';
+  const assignRole = (['member', 'host', 'admin', 'owner'].includes(requestedRole))
+    ? requestedRole
     : 'host';
+  // Only owners may mint admin/owner rows through this route.
+  if (!canAssignRole(gate.user.role, assignRole)) {
+    return NextResponse.json({ error: 'Forbidden: only owners can create admins' }, { status: 403 });
+  }
   const imageValue = typeof image === 'string' ? image : null;
 
   try {
