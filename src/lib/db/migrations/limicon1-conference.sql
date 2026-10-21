@@ -16,7 +16,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS continue_beyond BOOLEAN NOT NULL DEF
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_other TEXT;
 CREATE INDEX IF NOT EXISTS events_conference_idx ON events(conference_id);
--- Seed row. Dates NULL until Erik confirms the month; admin panel sets them.
+-- Seed row. Dates NULL until Erik confirms the month; the admin conference panel sets them.
 INSERT INTO conferences (slug, name, status)
-  VALUES ('limicon1', 'Limicon', 'upcoming')
+  VALUES ('limicon1', 'Limicon 2027', 'upcoming')
   ON CONFLICT (slug) DO NOTHING;

@@ -35,7 +35,7 @@ export default async function ConferenceLayout({
         <div className="max-w-5xl mx-auto px-4 pt-5 pb-3">
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-serif text-2xl text-grove-text font-light italic">
-              {conference.name}
+              {conference.name} Calendar
             </span>
             <span
               className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${
