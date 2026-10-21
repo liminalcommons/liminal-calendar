@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { NavBar } from '@/components/NavBar';
 import { EventForm } from '@/components/events/EventForm';
 import type { EventFormValues } from '@/lib/chat-tools';
 
@@ -75,7 +74,6 @@ function ConferenceNewEventInner() {
   if (!loaded) {
     return (
       <div className="min-h-screen bg-grove-bg">
-        <NavBar />
         <div className="flex items-center justify-center py-20">
           <p className="text-grove-text-muted">Loading...</p>
         </div>
@@ -86,7 +84,6 @@ function ConferenceNewEventInner() {
   if (!conference || conference.status !== 'active') {
     return (
       <div className="min-h-screen bg-grove-bg">
-        <NavBar />
         <main className="max-w-2xl mx-auto px-4 py-12 text-center">
           <p className="text-grove-text-muted italic">
             Event creation is closed right now.
@@ -104,7 +101,6 @@ function ConferenceNewEventInner() {
 
   return (
     <div className="min-h-screen bg-grove-bg">
-      <NavBar />
       <main className="max-w-2xl mx-auto px-4 py-6">
         <button
           onClick={() => router.back()}
