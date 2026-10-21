@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useUser } from '@clerk/nextjs';
 import { useResolvedRole } from '@/lib/use-resolved-role';
@@ -261,6 +262,10 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(mode === 'edit');
   const [error, setError] = useState<string | null>(null);
+  // Logged-out preview: conference creation shows the form with publishing
+  // disabled so visitors can see what's on offer; the API still 401s any
+  // submit. Permanent-calendar creation keeps bouncing to the landing page.
+  const [previewOnly, setPreviewOnly] = useState(false);
 
   // Sync external values from chat panel.
   // CRITICAL: deps must NOT include local form state (durationMinutes,
@@ -502,7 +507,10 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
     if (session === undefined || !clerkLoaded) return; // still resolving
     const sessionSignedIn = !!session?.user;
     if (!sessionSignedIn && !clerkSignedIn) {
-      router.replace('/');
+      // Logged out: conference creation renders a publish-disabled preview
+      // so visitors can see the screen; everywhere else bounces home.
+      if (mode === 'create' && conference) setPreviewOnly(true);
+      else router.replace('/');
       return;
     }
     let cancelled = false;
@@ -573,6 +581,12 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Logged-out preview: look, don't publish (the API would 401 anyway).
+    if (previewOnly) {
+      setError('Sign in to publish this event.');
+      return;
+    }
 
     if (!selectedStartDate) {
       setError('Please select a day and time.');
@@ -1007,10 +1021,15 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />
 
       {/* Actions */}
+      {previewOnly && (
+        <p className="text-sm text-grove-accent-deep bg-grove-accent/10 border border-grove-accent/30 rounded-lg px-3 py-2">
+          You&apos;re previewing the form — <Link href="/welcome" className="underline underline-offset-2">sign in</Link> to publish.
+        </p>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 pt-2">
         <button
           type="submit"
-          disabled={isSubmitting || !selectedDay}
+          disabled={isSubmitting || !selectedDay || previewOnly}
           className="py-2 px-6 bg-grove-accent-deep hover:opacity-90 disabled:opacity-50 text-grove-surface font-medium rounded-lg transition-opacity text-sm flex-1"
         >
           {isSubmitting
