@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getConferenceBySlug } from '@/lib/events/conferences';
+import { TestLoginForm } from '@/components/conference/TestLoginForm';
 
 /**
  * Conference landing: a simple welcome banner, not the calendar.
@@ -57,6 +58,7 @@ export default async function ConferenceIndex({
         </Link>{' '}
         to join and host.
       </p>
+      {process.env.NEXT_PUBLIC_TEST_LOGIN === '1' && <TestLoginForm />}
     </main>
   );
 }

@@ -13,20 +13,35 @@ const VIEWS = [
   { label: 'Book', path: '/book', pref: 'book' },
 ] as const;
 
-export function ViewToggle() {
-  const pathname = usePathname();
+const CONFERENCE_VIEWS = [
+  { label: '24h', path: 'upcoming', pref: 'conf-upcoming' },
+  { label: 'List', path: 'list', pref: 'conf-list' },
+  { label: 'Week', path: 'week', pref: 'conf-week' },
+  { label: 'Month', path: 'month', pref: 'conf-month' },
+] as const;
 
+/**
+ * View switcher. Without `base` it drives the permanent calendar; with a
+ * conference base (e.g. `/c/limicon1`) it stays inside the conference and
+ * gains the 24h view instead of Book.
+ */
+export function ViewToggle({ base = '' }: { base?: string }) {
+  const pathname = usePathname();
+  const views = base ? CONFERENCE_VIEWS : VIEWS;
+
+  const hrefFor = (path: string) => (base ? `${base}/${path}` : path);
   const isActive = (path: string) => {
-    if (path === '/') return pathname === '/';
-    return pathname.startsWith(path);
+    const href = hrefFor(path);
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   return (
     <div className="flex items-center rounded-full border border-grove-border bg-grove-bg overflow-hidden">
-      {VIEWS.map(({ label, path, pref }) => (
+      {views.map(({ label, path, pref }) => (
         <Link
           key={path}
-          href={path}
+          href={hrefFor(path)}
           onClick={() => {
             if (!isActive(path)) calendarSFX.play('scroll');
             // Persist explicit choice so MobileRedirect respects it on next load

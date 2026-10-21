@@ -8,7 +8,7 @@ declare module 'next-auth' {
       email?: string | null;
       image?: string | null;
       logtoUserId?: string;
-      role?: 'member' | 'host' | 'admin';
+      role?: 'member' | 'host' | 'admin' | 'governor';
     };
   }
 }
@@ -16,6 +16,6 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
   interface JWT {
     logtoUserId?: string;
-    role?: 'member' | 'host' | 'admin';
+    role?: 'member' | 'host' | 'admin' | 'governor';
   }
 }

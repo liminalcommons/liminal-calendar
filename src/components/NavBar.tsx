@@ -27,10 +27,13 @@ export function NavBar({
   hideAbout = false,
   hideBrandText = false,
   hideIntro = false,
+  viewBase = '',
 }: {
   hideAbout?: boolean;
   hideBrandText?: boolean;
   hideIntro?: boolean;
+  /** Conference view root (e.g. `/c/limicon1`) — keeps the view switcher inside it. */
+  viewBase?: string;
 } = {}) {
   const { data: session, status } = useSession();
   const { isSignedIn: clerkSignedIn, user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -117,7 +120,7 @@ export function NavBar({
             </Link>
           </span>
         )}
-        <ViewToggle />
+        <ViewToggle base={viewBase} />
 
         {/* Theme toggle */}
         <button
