@@ -17,9 +17,6 @@ export default async function ConferenceIndex({
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-12 text-center">
-      <p className="text-xs uppercase tracking-[3px] text-grove-text-muted mb-3">
-        Liminal Commons presents
-      </p>
       <h1 className="font-serif text-4xl text-grove-text font-light italic leading-tight">
         Welcome to {conference.name}
       </h1>

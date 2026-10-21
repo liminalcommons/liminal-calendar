@@ -29,9 +29,12 @@ import { AgendaSidebar } from './AgendaSidebar';
 
 interface WeeklyGridProps {
   events: DisplayEvent[];
+  /** Base path for the full create form (default /events/new). Conference
+   * week views pass /c/[slug]/events/new. */
+  createBase?: string;
 }
 
-export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
+export function WeeklyGrid({ events: serverEvents, createBase }: WeeklyGridProps) {
   const router = useRouter();
   const { data: session } = useSession();
   // useResolvedRole hits /api/profile to read role from the members row.
@@ -703,6 +706,7 @@ export function WeeklyGrid({ events: serverEvents }: WeeklyGridProps) {
           anchorRect={quickCreate.rect}
           onClose={() => setQuickCreate(null)}
           onCreated={handleEventCreated}
+          createBase={createBase}
         />
       )}
       <RecurrenceMoveModal

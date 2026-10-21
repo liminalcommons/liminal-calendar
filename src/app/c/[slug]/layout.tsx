@@ -30,7 +30,7 @@ export default async function ConferenceLayout({
 
   return (
     <div className="min-h-screen bg-grove-bg">
-      <NavBar />
+      <NavBar hideAbout hideBrandText hideIntro />
       <div className="border-b border-grove-border bg-grove-surface/60">
         <div className="max-w-5xl mx-auto px-4 pt-5 pb-3">
           <div className="flex items-center gap-3 flex-wrap">

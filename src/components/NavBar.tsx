@@ -23,7 +23,15 @@ function getInitials(name?: string | null, email?: string | null): string {
   return '?';
 }
 
-export function NavBar() {
+export function NavBar({
+  hideAbout = false,
+  hideBrandText = false,
+  hideIntro = false,
+}: {
+  hideAbout?: boolean;
+  hideBrandText?: boolean;
+  hideIntro?: boolean;
+} = {}) {
   const { data: session, status } = useSession();
   const { isSignedIn: clerkSignedIn, user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const { signOut: clerkSignOut } = useClerk();
@@ -68,15 +76,19 @@ export function NavBar() {
       {/* Left: rune glyph + title + About */}
       <div className="flex items-center gap-2">
         <RuneAccent size="md" seed={2} />
-        <span className="hidden sm:inline text-grove-text font-semibold text-sm tracking-wide">
-          Liminal Commons
-        </span>
-        <Link
-          href="/about"
-          className="ml-1 text-xs italic text-grove-text-muted hover:text-grove-text underline decoration-grove-accent/60 underline-offset-4"
-        >
-          About
-        </Link>
+        {!hideBrandText && (
+          <span className="hidden sm:inline text-grove-text font-semibold text-sm tracking-wide">
+            Liminal Commons
+          </span>
+        )}
+        {!hideAbout && (
+          <Link
+            href="/about"
+            className="ml-1 text-xs italic text-grove-text-muted hover:text-grove-text underline decoration-grove-accent/60 underline-offset-4"
+          >
+            About
+          </Link>
+        )}
         {liveConferences.map((c) => (
           <Link
             key={c.slug}
@@ -158,7 +170,7 @@ export function NavBar() {
       </div>
     </nav>
     {/* One-time intro for non-members who skipped the landing page */}
-    <IntroStrip show={isUnauthed} />
+    {!hideIntro && <IntroStrip show={isUnauthed} />}
     </>
   );
 }

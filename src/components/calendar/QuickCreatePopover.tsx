@@ -15,6 +15,9 @@ interface QuickCreatePopoverProps {
   hour: number;
   anchorRect: DOMRect;
   onClose: () => void;
+  /** Base path for the full form handoff (default /events/new). Conference
+   * week views pass /c/[slug]/events/new so member creations land in scope. */
+  createBase?: string;
   // Kept for the WeeklyGrid's existing prop contract; unused now that the
   // popover only collects the title and hands off to /events/new.
   onCreated?: (event: DisplayEvent) => void;
@@ -57,7 +60,7 @@ function formatDateTimeLabel(day: Date, halfHourSlot: number): string {
 
 const DEFAULT_DURATION_MIN = 60;
 
-export function QuickCreatePopover({ day, hour, anchorRect, onClose }: QuickCreatePopoverProps) {
+export function QuickCreatePopover({ day, hour, anchorRect, onClose, createBase = '/events/new' }: QuickCreatePopoverProps) {
   const { data: session } = useSession();
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -109,8 +112,8 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose }: QuickCrea
     };
     try { localStorage.setItem('calendar-quick-create-handoff', JSON.stringify(handoff)); } catch { /* ignore */ }
     onClose();
-    router.push(`/events/new?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
-  }, [title, day, hour, onClose, router]);
+    router.push(`${createBase}?day=${format(day, 'yyyy-MM-dd')}&slot=${hour}`);
+  }, [title, day, hour, onClose, router, createBase]);
 
   if (!canCreateEvents(role)) return null;
 
