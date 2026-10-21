@@ -132,7 +132,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               .where(eq(members.email, p.email))
               .limit(1);
             if (existing) {
-              if (existing.role) token.role = existing.role;
+              if (
+                existing.role === 'member' ||
+                existing.role === 'host' ||
+                existing.role === 'admin' ||
+                existing.role === 'governor'
+              ) {
+                token.role = existing.role;
+              }
               linkedName = existing.name ?? null;
               if (!existing.logtoId) {
                 await db
