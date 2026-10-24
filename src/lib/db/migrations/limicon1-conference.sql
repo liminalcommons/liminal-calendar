@@ -16,6 +16,10 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS continue_beyond BOOLEAN NOT NULL DEF
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS category_other TEXT;
 CREATE INDEX IF NOT EXISTS events_conference_idx ON events(conference_id);
+-- The old visibility CHECK (public/private only) predates the members tier.
+-- Widen it: members-tier events are members-visible, never anonymous.
+ALTER TABLE events DROP CONSTRAINT IF EXISTS events_visibility_check;
+ALTER TABLE events ADD CONSTRAINT events_visibility_check CHECK (visibility IN ('public', 'private', 'members'));
 -- Seed row. Dates NULL until Erik confirms the month; the admin conference panel sets them.
 INSERT INTO conferences (slug, name, status)
   VALUES ('limicon1', 'Limicon 2027', 'upcoming')

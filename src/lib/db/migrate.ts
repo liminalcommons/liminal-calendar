@@ -566,6 +566,10 @@ async function runMigrationsInner(sql: any): Promise<MigrationResult> {
   await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS category TEXT`;
   await step`ALTER TABLE events ADD COLUMN IF NOT EXISTS category_other TEXT`;
   await step`CREATE INDEX IF NOT EXISTS events_conference_idx ON events(conference_id)`;
+  // The old visibility CHECK (public/private only) predates the members tier.
+  // Widen it: members-tier events are members-visible, never anonymous.
+  await step`ALTER TABLE events DROP CONSTRAINT IF EXISTS events_visibility_check`;
+  await step`ALTER TABLE events ADD CONSTRAINT events_visibility_check CHECK (visibility IN ('public', 'private', 'members'))`;
   // Seed row. Dates NULL until Erik confirms the month; the admin conference
   // panel sets them.
   await step`
