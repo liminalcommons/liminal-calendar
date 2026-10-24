@@ -209,18 +209,22 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
   const { isSignedIn: clerkSignedIn, isLoaded: clerkLoaded } = useUser();
 
   // ── Form state ────────────────────────────────────────────────────────────
-  // Default to Custom mode with a Castalia URL pre-filled — a soft nudge
-  // toward castalia.one without forcing users off Zoom/Meet/etc. Users who
-  // want a native Castalia talk zone can flip the tab.
+  // Permanent calendar: default to Custom mode with a Castalia URL
+  // pre-filled — a soft nudge toward castalia.one without forcing users off
+  // Zoom/Meet/etc. Users who want a native Castalia talk zone can flip the
+  // tab. Conference (Limicon) creations start blank: Online tab, no prefill.
   const DEFAULT_CASTALIA_LINK = 'https://castalia.one';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [meetingLink, setMeetingLink] = useState(
-    mode === 'create' ? DEFAULT_CASTALIA_LINK : '',
+    mode === 'create' && !conference ? DEFAULT_CASTALIA_LINK : '',
   );
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [zoneDeepLink, setZoneDeepLink] = useState<string | null>(null);
   const [linkMode, setLinkMode] = useState<'zone' | 'custom'>('custom');
+  // Limicon place: online (URL) or in-person (venue text). Conference only.
+  const [placeMode, setPlaceMode] = useState<'online' | 'inperson'>('online');
+  const [placeDetail, setPlaceDetail] = useState('');
 
   // Week / day selection
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -279,7 +283,12 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
     if (!externalValues) return
     if (externalValues.title !== undefined) setTitle(externalValues.title)
     if (externalValues.description !== undefined) setDescription(externalValues.description)
-    if (externalValues.meetingLink !== undefined) setMeetingLink(externalValues.meetingLink)
+    if (externalValues.meetingLink !== undefined
+      // Conference week-view handoff carries the permanent form's Castalia
+      // default — never prefill that into a Limicon event.
+      && !(conference && externalValues.meetingLink === 'https://castalia.one')) {
+      setMeetingLink(externalValues.meetingLink)
+    }
     if (externalValues.imageUrl !== undefined) setImageUrl(externalValues.imageUrl)
     if (externalValues.startTime !== undefined) setStartTime(externalValues.startTime)
     if (externalValues.endTime !== undefined) setEndTime(externalValues.endTime)
@@ -443,7 +452,11 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         setTitle(event.title || '');
         setDescription(event.description || '');
         const loc = event.location || '';
-        if (loc.includes('castalia.one/')) {
+        if (conference && !/^https?:\/\//.test(loc)) {
+          // Limicon in-person venue (plain text, not a URL).
+          setPlaceMode('inperson');
+          setPlaceDetail(loc);
+        } else if (loc.includes('castalia.one/')) {
           // Extract zone ID from deep link: .../groupSlug/mapSlug/zoneId
           const parts = loc.split('/');
           const zoneId = parts[parts.length - 1];
@@ -620,7 +633,9 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         endTime: endDate.toISOString(),
         details: description.trim() || undefined,
         timezone,
-        location: (linkMode === 'zone' && zoneDeepLink) ? zoneDeepLink : (meetingLink.trim() || undefined),
+        location: conference
+          ? ((placeMode === 'online' ? meetingLink.trim() : placeDetail.trim()) || undefined)
+          : ((linkMode === 'zone' && zoneDeepLink) ? zoneDeepLink : (meetingLink.trim() || undefined)),
         recurrenceRule: recurrence !== 'none' ? recurrence : undefined,
         recurrenceEndType: recurrence !== 'none' ? recurrenceEndType : undefined,
         recurrenceEndDate: recurrence !== 'none' && recurrenceEndType === 'on_date' ? recurrenceEndDate : undefined,
@@ -873,7 +888,51 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         <RecurrenceSelector value={recurrence} onChange={handleRecurrenceChange} />
       </div>
 
-      {/* Meeting location — zone picker or custom link */}
+      {/* Meeting location — conference: Online URL or In-person venue.
+          Permanent calendar keeps the Castalia zone picker / custom link. */}
+      {conference ? (
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-sm font-medium text-grove-text">Where</span>
+            <div className="flex rounded-md border border-grove-border overflow-hidden text-xs">
+              <button
+                type="button"
+                onClick={() => setPlaceMode('online')}
+                className={`px-3 py-1 transition-colors ${placeMode === 'online' ? 'bg-grove-accent text-grove-surface' : 'bg-grove-surface text-grove-text-muted hover:bg-grove-border/30'}`}
+              >
+                Online
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlaceMode('inperson')}
+                className={`px-3 py-1 transition-colors ${placeMode === 'inperson' ? 'bg-grove-accent text-grove-surface' : 'bg-grove-surface text-grove-text-muted hover:bg-grove-border/30'}`}
+              >
+                In-person
+              </button>
+            </div>
+          </div>
+          {placeMode === 'online' ? (
+            <input
+              id="meeting-link"
+              type="url"
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
+              placeholder="Paste the meeting URL — Zoom, Meet, or similar"
+              className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+            />
+          ) : (
+            <input
+              id="venue"
+              type="text"
+              value={placeDetail}
+              onChange={(e) => setPlaceDetail(e.target.value)}
+              placeholder="Venue — e.g. The Glasshouse, main hall"
+              maxLength={200}
+              className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text placeholder-grove-text-muted focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
+            />
+          )}
+        </div>
+      ) : (
       <div>
         <div className="flex items-center gap-3 mb-2">
           <span className="text-sm font-medium text-grove-text">Meeting location</span>
@@ -922,23 +981,16 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
           </>
         )}
       </div>
+      )}
 
-      {/* Visibility */}
+      {/* Visibility — Limicon events are always members-visible, so the
+          choice only exists on the permanent calendar. */}
+      {!conference && (
       <div>
         <label className="block text-sm font-medium text-grove-text mb-1">
           Visibility
         </label>
-        {conference ? (
-          <select
-            value={visibility}
-            onChange={(e) => setVisibility(e.target.value as 'public' | 'private' | 'members')}
-            className="w-full px-3 py-2 border border-grove-border rounded-lg bg-grove-surface text-grove-text focus:outline-none focus:ring-2 focus:ring-grove-accent focus:border-transparent text-sm"
-          >
-            <option value="members">Limicon members (all members see it, not public)</option>
-            <option value="private">Private</option>
-            {canCreatePublic && <option value="public">Public</option>}
-          </select>
-        ) : canCreatePublic ? (
+        {canCreatePublic ? (
           <select
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
@@ -953,6 +1005,7 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
           </p>
         )}
       </div>
+      )}
 
       {/* Category (Limicon) */}
       <div>
@@ -1000,7 +1053,9 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         </div>
       )}
 
-      {/* Invite members */}
+      {/* Invite members — hidden on Limicon: every member already sees
+          every conference event, and open invites would spray notifications. */}
+      {!conference && (
       <div>
         <label className="block text-sm font-medium text-grove-text mb-1">
           Invite members
@@ -1016,6 +1071,7 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
           cap={inviteeCap}
         />
       </div>
+      )}
 
       {/* Image upload */}
       <ImageUpload onImageUrl={setImageUrl} currentUrl={imageUrl} />

@@ -108,7 +108,9 @@ export function QuickCreatePopover({ day, hour, anchorRect, onClose, createBase 
       date: format(day, 'yyyy-MM-dd'),
       startTime: format(startTime, 'HH:mm'),
       endTime: format(endTime, 'HH:mm'),
-      meetingLink: 'https://castalia.one',
+      // Conference creations pick their own place (Online/In-person) — never
+      // carry over the permanent form's Castalia default link.
+      ...(createBase.startsWith('/c/') ? {} : { meetingLink: 'https://castalia.one' }),
     };
     try { localStorage.setItem('calendar-quick-create-handoff', JSON.stringify(handoff)); } catch { /* ignore */ }
     onClose();
