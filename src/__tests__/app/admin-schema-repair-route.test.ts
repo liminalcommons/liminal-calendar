@@ -18,11 +18,14 @@ const mockGetAuthedUser = getAuthedUser as unknown as jest.Mock;
 const mockRunMigrations = runMigrations as unknown as jest.Mock;
 const mockExecute = (db as unknown as { execute: jest.Mock }).execute;
 
-/** Every table the app declares — the same derivation the route uses. */
-const ALL_TABLES = Object.values(schema)
-  .filter((v) => is(v, PgTable))
-  .map((t) => getTableName(t as PgTable))
-  .sort();
+/** Every physical table the app declares — the same derivation the route uses.
+// `analyticsEventsPreRef` maps to the same physical table as
+// `analyticsEvents`, so dedupe: keys of `body.tables` are physical names. */
+const ALL_TABLES = [...new Set(
+  Object.values(schema)
+    .filter((v) => is(v, PgTable))
+    .map((t) => getTableName(t as PgTable)),
+)].sort();
 
 const adminUser = { memberId: 1, id: 'logto-admin', role: 'admin', name: 'Admin' };
 

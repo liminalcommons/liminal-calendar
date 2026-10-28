@@ -33,7 +33,7 @@ export interface DisplayEvent {
   conferenceId?: number | null;
   /** "Continues beyond Limicon" flag — transfer candidate for the admin. */
   continueBeyond?: boolean;
-  /** Limicon category: 'speaker' | 'practice' | 'audience' | 'other' | null. */
+  /** Limicon category: 'speaker' | 'practice' | 'audience' | 'project' | 'other' | null. */
   category?: string | null;
   /** Free text when category is 'other'. */
   categoryOther?: string | null;

@@ -32,37 +32,8 @@ export default async function ConferenceLayout({
     <div className="min-h-screen bg-grove-bg">
       <NavBar hideAbout hideBrandText hideIntro viewBase={`/c/${slug}`} />
       <div className="border-b border-grove-border bg-grove-surface/60">
-        <div className="max-w-5xl mx-auto px-4 pt-5 pb-3">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="font-serif text-2xl text-grove-text font-light italic">
-              {conference.name} Calendar
-            </span>
-            <span
-              className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${
-                ended
-                  ? 'border-grove-border text-grove-text-muted'
-                  : conference.status === 'active'
-                    ? 'border-grove-accent/60 text-grove-accent-deep'
-                    : 'border-grove-border text-grove-text-muted'
-              }`}
-            >
-              {conference.status}
-            </span>
-          </div>
-          {ended ? (
-            <p className="text-sm text-grove-text-muted mt-2 italic">
-              This conference has ended. Retained events live on in the{' '}
-              <Link href="/list" className="underline underline-offset-4">
-                permanent calendar
-              </Link>
-              .
-            </p>
-          ) : (
-            <p className="text-sm text-grove-text-muted mt-1 italic">
-              Every member can host here — create freely, all members see it.
-            </p>
-          )}
-          <nav className="flex gap-1 mt-3 flex-wrap">
+        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-1 flex-wrap">
+          <nav className="flex gap-1 flex-wrap">
             {TABS.map((t) => (
               <Link
                 key={t.href}
@@ -81,7 +52,21 @@ export default async function ConferenceLayout({
               </Link>
             )}
           </nav>
+          {ended && (
+            <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border border-grove-border text-grove-text-muted">
+              ended
+            </span>
+          )}
         </div>
+        {ended && (
+          <p className="max-w-5xl mx-auto px-4 pb-2 text-sm text-grove-text-muted italic">
+            This conference has ended. Retained events live on in the{' '}
+            <Link href="/list" className="underline underline-offset-4">
+              permanent calendar
+            </Link>
+            .
+          </p>
+        )}
       </div>
       {children}
     </div>

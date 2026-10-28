@@ -499,7 +499,7 @@ export function EventForm({ mode, eventId, conference, externalValues, onValuesC
         if (event.visibility === 'members' || event.visibility === 'public' || event.visibility === 'private') {
           setVisibility(event.visibility);
         }
-        if (event.category === 'speaker' || event.category === 'practice' || event.category === 'audience' || event.category === 'other') {
+        if (event.category === 'speaker' || event.category === 'practice' || event.category === 'audience' || event.category === 'project' || event.category === 'other') {
           setCategory(event.category);
         }
         if (typeof event.categoryOther === 'string') setCategoryOther(event.categoryOther);

@@ -6,9 +6,9 @@
 
 export type EventVisibility = 'public' | 'private' | 'members';
 
-export type EventCategory = 'speaker' | 'practice' | 'audience' | 'other';
+export type EventCategory = 'speaker' | 'practice' | 'audience' | 'project' | 'other';
 
-const CATEGORIES: ReadonlySet<string> = new Set(['speaker', 'practice', 'audience', 'other']);
+const CATEGORIES: ReadonlySet<string> = new Set(['speaker', 'practice', 'audience', 'project', 'other']);
 
 export interface ValidatedCreateEventInput {
   title: string;

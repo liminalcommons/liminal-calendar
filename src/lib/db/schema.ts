@@ -72,7 +72,7 @@ export const events = pgTable('events', {
   conferenceId: integer('conference_id').references(() => conferences.id, { onDelete: 'set null' }),
   // "Continues beyond Limicon" tick-box: flags transfer candidates for admin.
   continueBeyond: boolean('continue_beyond').notNull().default(false),
-  // Limicon event category: 'speaker' | 'practice' | 'audience' | 'other' | null.
+  // Limicon event category: 'speaker' | 'practice' | 'audience' | 'project' | 'other' | null.
   category: text('category'),
   // Free text when category = 'other' ("please specify").
   categoryOther: text('category_other'),

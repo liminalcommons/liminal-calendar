@@ -269,7 +269,7 @@ export async function PATCH(
   if (typeof updates.continueBeyond === 'boolean') setValues.continueBeyond = updates.continueBeyond;
   if (updates.category === null || updates.category === undefined) {
     if (updates.category === null) setValues.category = null;
-  } else if (typeof updates.category === 'string' && ['speaker', 'practice', 'audience', 'other'].includes(updates.category)) {
+  } else if (typeof updates.category === 'string' && ['speaker', 'practice', 'audience', 'project', 'other'].includes(updates.category)) {
     setValues.category = updates.category;
   } else {
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 });

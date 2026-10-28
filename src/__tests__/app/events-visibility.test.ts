@@ -385,6 +385,12 @@ describe('validateCreateEventInput — visibility field', () => {
     }
   });
 
+  it('accepts the project / collaboration category', () => {
+    const result = realValidate({ ...baseInput, category: 'project' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.category).toBe('project');
+  });
+
   it('keeps free text only for "other" categories', () => {
     const other = realValidate({ ...baseInput, category: 'other', categoryOther: '  drum circle  ' });
     expect(other.ok).toBe(true);

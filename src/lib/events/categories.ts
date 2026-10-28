@@ -38,6 +38,13 @@ export const EVENT_CATEGORIES: CategoryMeta[] = [
     dot: '#6a7f8b',
   },
   {
+    value: 'project',
+    label: 'Project / collaboration',
+    shortLabel: 'Project',
+    chip: 'bg-[#b26a4e]/25 border-[#b26a4e]/60 text-[#6e3f2c]',
+    dot: '#b26a4e',
+  },
+  {
     value: 'other',
     label: 'Other (please specify)',
     shortLabel: 'Other',
