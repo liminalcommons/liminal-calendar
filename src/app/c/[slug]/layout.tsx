@@ -3,17 +3,10 @@ import Link from 'next/link';
 import { getConferenceBySlug } from '@/lib/events/conferences';
 import { NavBar } from '@/components/NavBar';
 
-const TABS = [
-  { href: 'upcoming', label: 'Next 24h' },
-  { href: 'list', label: 'List' },
-  { href: 'week', label: 'Week' },
-  { href: 'month', label: 'Month' },
-] as const;
-
 /**
- * Limicon section shell: /c/[slug]. Conference name + status in the header,
- * four view tabs, create link, and an ended-state banner once the window
- * closes. The permanent calendar is untouched — same app, same database.
+ * Limicon section shell: /c/[slug]. The view switcher (+ New event) lives in
+ * the top bar; the ended-state banner appears once the window closes. The
+ * permanent calendar is untouched — same app, same database.
  */
 export default async function ConferenceLayout({
   children,
@@ -30,44 +23,24 @@ export default async function ConferenceLayout({
 
   return (
     <div className="min-h-screen bg-grove-bg">
-      <NavBar hideAbout hideBrandText hideIntro viewBase={`/c/${slug}`} />
-      <div className="border-b border-grove-border bg-grove-surface/60">
-        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-1 flex-wrap">
-          <nav className="flex gap-1 flex-wrap">
-            {TABS.map((t) => (
-              <Link
-                key={t.href}
-                href={`/c/${slug}/${t.href}`}
-                className="px-3 py-1.5 rounded-md text-sm text-grove-text-muted hover:text-grove-text hover:bg-grove-border/30 transition-colors"
-              >
-                {t.label}
-              </Link>
-            ))}
-            {!ended && (
-              <Link
-                href={`/c/${slug}/events/new`}
-                className="px-3 py-1.5 rounded-md text-sm font-medium bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
-              >
-                + New event
-              </Link>
-            )}
-          </nav>
-          {ended && (
-            <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border border-grove-border text-grove-text-muted">
-              ended
-            </span>
-          )}
-        </div>
-        {ended && (
-          <p className="max-w-5xl mx-auto px-4 pb-2 text-sm text-grove-text-muted italic">
+      <NavBar
+        hideAbout
+        hideBrandText
+        hideIntro
+        viewBase={`/c/${slug}`}
+        createHref={ended ? undefined : `/c/${slug}/events/new`}
+      />
+      {ended && (
+        <div className="border-b border-grove-border bg-grove-surface/60">
+          <p className="max-w-5xl mx-auto px-4 py-2 text-sm text-grove-text-muted italic">
             This conference has ended. Retained events live on in the{' '}
             <Link href="/list" className="underline underline-offset-4">
               permanent calendar
             </Link>
             .
           </p>
-        )}
-      </div>
+        </div>
+      )}
       {children}
     </div>
   );

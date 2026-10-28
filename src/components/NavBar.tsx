@@ -34,6 +34,8 @@ export function NavBar({
   hideIntro?: boolean;
   /** Conference view root (e.g. `/c/limicon1`) — keeps the view switcher inside it. */
   viewBase?: string;
+  /** Show a + New event button beside the view switcher (conference only). */
+  createHref?: string;
 } = {}) {
   const { data: session, status } = useSession();
   const { isSignedIn: clerkSignedIn, user: clerkUser, isLoaded: clerkLoaded } = useUser();
@@ -121,6 +123,14 @@ export function NavBar({
           </span>
         )}
         <ViewToggle base={viewBase} />
+        {createHref && (
+          <Link
+            href={createHref}
+            className="ml-1 px-3 py-1 rounded-full text-xs font-medium bg-grove-accent-deep text-grove-surface hover:opacity-90 transition-opacity"
+          >
+            + New event
+          </Link>
+        )}
 
         {/* Theme toggle */}
         <button
