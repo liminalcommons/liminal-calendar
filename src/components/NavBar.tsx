@@ -28,6 +28,7 @@ export function NavBar({
   hideBrandText = false,
   hideIntro = false,
   viewBase = '',
+  createHref,
 }: {
   hideAbout?: boolean;
   hideBrandText?: boolean;
